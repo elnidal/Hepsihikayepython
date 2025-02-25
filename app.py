@@ -1,0 +1,198 @@
+from flask import Flask, render_template, redirect, url_for, request, flash, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from flask_admin import Admin, AdminIndexView
+from flask_admin.contrib.sqla import ModelView
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+from flask_wtf import CSRFProtect
+from flask_ckeditor import CKEditor, CKEditorField
+import os
+from wtforms import SelectField
+from sqlalchemy import or_
+
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'your-secret-key'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
+app.config['UPLOAD_FOLDER'] = 'static/uploads'
+app.config['CKEDITOR_FILE_UPLOADER'] = 'upload'
+
+# Initialize extensions
+db = SQLAlchemy(app)
+csrf = CSRFProtect(app)
+ckeditor = CKEditor(app)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
+
+# Ensure upload directory exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password = db.Column(db.String(120), nullable=False)
+
+CATEGORIES = [
+    ('şiir', 'Şiir'),
+    ('öykü', 'Öykü'),
+    ('roman', 'Roman'),
+    ('deneme', 'Deneme'),
+    ('makale', 'Makale'),
+    ('haber', 'Haber')
+]
+
+class Post(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    category = db.Column(db.String(50), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class PostAdmin(ModelView):
+    def is_accessible(self):
+        return current_user.is_authenticated
+
+    form_overrides = {
+        'content': CKEditorField
+    }
+
+    form_extra_fields = {
+        'category': SelectField('Category', choices=CATEGORIES)
+    }
+
+    column_list = ('title', 'category', 'created_at')
+    form_columns = ('title', 'content', 'category')
+
+    create_template = 'admin/create_post.html'
+    edit_template = 'admin/edit_post.html'
+
+class Video(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    youtube_embed = db.Column(db.String(500), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class VideoAdmin(ModelView):
+    def is_accessible(self):
+        return current_user.is_authenticated
+
+    column_list = ('title', 'youtube_embed', 'created_at')
+    form_columns = ('title', 'youtube_embed')
+
+class MyAdminIndexView(AdminIndexView):
+    def is_accessible(self):
+        return current_user.is_authenticated
+
+    def inaccessible_callback(self, name, **kwargs):
+        return redirect(url_for('login'))
+
+admin = Admin(app, name='HepsiHikaye Admin', template_mode='bootstrap3', index_view=MyAdminIndexView())
+admin.add_view(PostAdmin(Post, db.session))
+admin.add_view(VideoAdmin(Video, db.session))
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+@app.route('/')
+def index():
+    # Get latest posts
+    latest_posts = Post.query.order_by(Post.created_at.desc()).limit(4).all()
+    
+    # Get featured posts (for now, just getting some recent posts)
+    featured_posts = Post.query.order_by(Post.created_at.desc()).limit(3).all()
+    
+    return render_template('index.html', 
+                         latest_posts=latest_posts,
+                         featured_posts=featured_posts,
+                         current_year=datetime.now().year,
+                         active_category=None)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('admin.index'))
+
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        user = User.query.filter_by(username=username).first()
+        
+        if user and check_password_hash(user.password, password):
+            login_user(user)
+            flash('Başarıyla giriş yaptınız!', 'success')
+            return redirect(url_for('admin.index'))
+        else:
+            flash('Geçersiz kullanıcı adı veya şifre!', 'error')
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
+
+@app.route('/admin')
+@login_required
+def admin_index():
+    return redirect('/admin/')
+
+@app.route('/category/<category>')
+def category(category):
+    if category == 'video':
+        videos = Video.query.order_by(Video.created_at.desc()).all()
+        return render_template('videos.html', 
+                             videos=videos,
+                             current_year=datetime.now().year,
+                             active_category=category)
+    
+    posts = Post.query.filter_by(category=category).order_by(Post.created_at.desc()).all()
+    return render_template('category.html', 
+                         posts=posts,
+                         category_name=category.capitalize(),
+                         current_year=datetime.now().year,
+                         active_category=category)
+
+@app.route('/post/<int:post_id>')
+def view_post(post_id):
+    post = Post.query.get_or_404(post_id)
+    return render_template('post.html', post=post)
+
+@app.route('/upload', methods=['POST'])
+@login_required
+def upload():
+    f = request.files.get('upload')
+    if not f:
+        return jsonify({'error': {'message': 'No file uploaded'}})
+
+    # Check if the file is an allowed image type
+    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif'}
+    if '.' not in f.filename or f.filename.rsplit('.', 1)[1].lower() not in allowed_extensions:
+        return jsonify({'error': {'message': 'Invalid file type'}})
+
+    # Save the file with a unique name
+    filename = secure_filename(f.filename)
+    unique_filename = datetime.now().strftime('%Y%m%d_%H%M%S_') + filename
+    f.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
+    
+    # Return the URL
+    url = url_for('static', filename=f'uploads/{unique_filename}')
+    return jsonify({'url': url})
+
+def create_admin_user(username, password):
+    with app.app_context():
+        if not User.query.filter_by(username=username).first():
+            user = User(username=username, password=generate_password_hash(password))
+            db.session.add(user)
+            db.session.commit()
+
+if __name__ == '__main__':
+    if not os.path.exists('static/uploads'):
+        os.makedirs('static/uploads')
+    with app.app_context():
+        db.create_all()
+        # Create admin user
+        create_admin_user('admin', 'admin123')  # Change these credentials!
+    app.run(debug=True, port=3000)

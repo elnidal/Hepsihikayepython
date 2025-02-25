@@ -1,0 +1,20 @@
+{% extends 'admin/model/create.html' %}
+
+{% block head %}
+    {{ super() }}
+    {{ ckeditor.load() }}
+    {{ ckeditor.config(name='content') }}
+{% endblock %}
+
+{% block tail %}
+    {{ super() }}
+    <script>
+        // Add CSRF token to upload requests
+        CKEDITOR.on('instanceReady', function(evt) {
+            evt.editor.on('fileUploadRequest', function(evt) {
+                var xhr = evt.data.fileLoader.xhr;
+                xhr.setRequestHeader('X-CSRFToken', "{{ csrf_token() }}");
+            });
+        });
+    </script>
+{% endblock %}

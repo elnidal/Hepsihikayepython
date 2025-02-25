@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="welcome-section text-center py-5">
+    <h1 class="display-4 mb-4">Hikayelerin Dünyasına Hoş Geldiniz</h1>
+    <p class="lead mb-5">Kafamızda Çok Kuruyoruz - Düşüncelerimizi, Hayallerimizi ve Hikayelerimizi Paylaşıyoruz</p>
+</div>
+
+<div class="featured-posts mb-5">
+    <h2 class="section-title mb-4">Öne Çıkan İçerikler</h2>
+    <div class="row">
+        {% for post in featured_posts %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <span class="badge bg-primary mb-2">{{ post.category }}</span>
+                    <h5 class="card-title">{{ post.title }}</h5>
+                    <p class="card-text">{{ post.content[:200] }}...</p>
+                    <a href="{{ url_for('view_post', post_id=post.id) }}" class="btn btn-outline-primary">Devamını Oku</a>
+                </div>
+                <div class="card-footer text-muted">
+                    {{ post.created_at.strftime('%d.%m.%Y') }}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="category-highlights py-5 bg-light">
+    <h2 class="section-title mb-4">Kategorilerden Seçmeler</h2>
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="category-card text-center p-4 bg-white shadow-sm rounded">
+                <h3 class="h5 mb-3">Şiir</h3>
+                <p class="text-muted">En son eklenen şiirlerimizi keşfedin</p>
+                <a href="{{ url_for('category', category='şiir') }}" class="btn btn-sm btn-outline-secondary">Şiirleri Gör</a>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="category-card text-center p-4 bg-white shadow-sm rounded">
+                <h3 class="h5 mb-3">Öykü</h3>
+                <p class="text-muted">Kısa öykülerimizi okumaya başlayın</p>
+                <a href="{{ url_for('category', category='öykü') }}" class="btn btn-sm btn-outline-secondary">Öyküleri Gör</a>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="category-card text-center p-4 bg-white shadow-sm rounded">
+                <h3 class="h5 mb-3">Deneme</h3>
+                <p class="text-muted">Düşündüren denemelerimizi inceleyin</p>
+                <a href="{{ url_for('category', category='deneme') }}" class="btn btn-sm btn-outline-secondary">Denemeleri Gör</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="latest-posts py-5">
+    <h2 class="section-title mb-4">Son Eklenenler</h2>
+    <div class="row">
+        {% for post in latest_posts %}
+        <div class="col-md-6 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body">
+                    <span class="badge bg-secondary mb-2">{{ post.category }}</span>
+                    <h5 class="card-title">{{ post.title }}</h5>
+                    <p class="card-text text-muted">{{ post.content[:150] }}...</p>
+                    <a href="{{ url_for('view_post', post_id=post.id) }}" class="text-decoration-none">Devamını Oku →</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+.section-title {
+    position: relative;
+    padding-bottom: 15px;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.section-title:after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 50px;
+    height: 2px;
+    background-color: #E9967A;
+}
+
+.card {
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.welcome-section {
+    background: linear-gradient(45deg, #E9967A, #FFA07A);
+    color: white;
+    padding: 60px 0;
+    margin-bottom: 40px;
+    border-radius: 10px;
+}
+
+.category-card {
+    transition: all 0.3s ease;
+}
+
+.category-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+}
+
+.badge {
+    font-weight: 500;
+    padding: 6px 12px;
+}
+</style>
+{% endblock %}

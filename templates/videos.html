@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Videolar</h2>
+    
+    {% if videos %}
+        <div class="row">
+            {% for video in videos %}
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="embed-responsive embed-responsive-16by9">
+                        {% if 'youtube.com' in video.youtube_embed or 'youtu.be' in video.youtube_embed %}
+                            {% set video_id = video.youtube_embed.split('v=')[-1] if 'v=' in video.youtube_embed else video.youtube_embed.split('/')[-1] %}
+                            <iframe class="embed-responsive-item" style="width: 100%; height: 315px;"
+                                src="https://www.youtube.com/embed/{{ video_id }}"
+                                frameborder="0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowfullscreen>
+                            </iframe>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ video.title }}</h5>
+                        <p class="card-text"><small class="text-muted">{{ video.created_at.strftime('%Y-%m-%d %H:%M') }}</small></p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center empty-message">
+            <p>Bu kategoride henüz video bulunmamaktadır.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

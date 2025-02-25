@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Ana Sayfa</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('category', category=post.category) }}">{{ post.category|title }}</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">{{ post.title }}</li>
+                </ol>
+            </nav>
+            
+            <article class="bg-white p-4 shadow-sm rounded">
+                <header class="mb-4">
+                    <span class="badge bg-primary mb-2">{{ post.category }}</span>
+                    <h1 class="display-5 mb-3">{{ post.title }}</h1>
+                    <div class="text-muted">
+                        <small>{{ post.created_at.strftime('%d.%m.%Y') }}</small>
+                    </div>
+                </header>
+
+                <div class="post-content">
+                    {{ post.content|safe }}
+                </div>
+            </article>
+        </div>
+    </div>
+</div>
+
+<style>
+.post-content {
+    font-size: 1.1rem;
+    line-height: 1.8;
+}
+
+.breadcrumb {
+    background: transparent;
+    padding: 0;
+    margin-bottom: 2rem;
+}
+
+.breadcrumb-item a {
+    color: #E9967A;
+    text-decoration: none;
+}
+
+.breadcrumb-item.active {
+    color: #666;
+}
+
+article {
+    border-radius: 10px;
+}
+</style>
+{% endblock %}
