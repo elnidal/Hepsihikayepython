@@ -458,44 +458,49 @@ def post_detail(post_id):
         flash('Bu yazıya şu anda ulaşılamıyor.', 'error')
         return redirect(url_for('index'))
 
-@app.route('/post/<int:post_id>/rate/<action>')
+@app.route('/post/<int:post_id>/rate/<action>', methods=['POST'])
 def rate_post(post_id, action):
-    if action not in ['like', 'dislike']:
-        return jsonify({'error': 'Invalid action'}), 400
-        
-    post = Post.query.get_or_404(post_id)
-    ip_address = request.remote_addr
-    
-    # Check if user already rated
-    existing_rating = Rating.query.filter_by(
-        post_id=post_id,
-        ip_address=ip_address
-    ).first()
-    
-    if existing_rating:
-        if (existing_rating.is_like and action == 'like') or \
-           (not existing_rating.is_like and action == 'dislike'):
-            # Remove rating if clicking the same button again
-            db.session.delete(existing_rating)
-        else:
-            # Change rating if clicking the opposite button
-            existing_rating.is_like = (action == 'like')
-    else:
-        # Create new rating
-        new_rating = Rating(
+    """Handle post rating (like/dislike)"""
+    try:
+        if action not in ['like', 'dislike']:
+            return jsonify({'success': False, 'message': 'Geçersiz işlem'}), 400
+
+        post = Post.query.get_or_404(post_id)
+        rating = Rating.query.filter_by(
             post_id=post_id,
-            ip_address=ip_address,
-            is_like=(action == 'like')
-        )
-        db.session.add(new_rating)
-    
-    db.session.commit()
-    post.update_rating_counts()
-    
-    return jsonify({
-        'likes': post.likes,
-        'dislikes': post.dislikes
-    })
+            ip_address=request.remote_addr
+        ).first()
+
+        if rating:
+            # Update existing rating
+            if (action == 'like' and not rating.is_like) or (action == 'dislike' and rating.is_like):
+                rating.is_like = (action == 'like')
+                db.session.commit()
+        else:
+            # Create new rating
+            new_rating = Rating(
+                post_id=post_id,
+                ip_address=request.remote_addr,
+                is_like=(action == 'like')
+            )
+            db.session.add(new_rating)
+            db.session.commit()
+
+        # Update post rating counts
+        post.update_rating_counts()
+        
+        return jsonify({
+            'success': True,
+            'likes': post.likes,
+            'dislikes': post.dislikes
+        })
+
+    except Exception as e:
+        app.logger.error(f"Error rating post {post_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Bir hata oluştu. Lütfen daha sonra tekrar deneyin.'
+        }), 500
 
 @app.route('/upload', methods=['POST'])
 @login_required
