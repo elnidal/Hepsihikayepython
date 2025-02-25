@@ -1,26 +1,26 @@
-# HepsiHikaye - Content Management Website
+# HepsiHikaye
 
-A modern content management website built with Flask for sharing stories, poems, articles, and news.
+A modern blog platform for sharing stories, poems, and literary content.
 
 ## Features
 
-- Modern, responsive design
-- Rich text editing with CKEditor
-- Multiple content categories (Şiir, Öykü, Roman, Deneme, Makale, Haber)
-- Image upload support
+- Story, poem, and novel categories
+- Image upload support with automatic optimization
+- Rating system
 - Admin panel for content management
-- Search functionality
-- Category-based content organization
+- Mobile-friendly responsive design
+- Modern UI with smooth transitions
+- SEO-friendly URLs
 
-## Tech Stack
+## Technical Stack
 
-- Python 3.x
-- Flask
-- SQLAlchemy
+- Python/Flask
+- SQLite
 - Flask-Admin
 - Flask-Login
-- CKEditor
-- Bootstrap 5
+- CKEditor for rich text editing
+- PIL for image processing
+- Bootstrap for styling
 
 ## Installation
 
