@@ -1,57 +1,116 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Ana Sayfa</a></li>
-                    <li class="breadcrumb-item"><a href="{{ url_for('category', category=post.category) }}">{{ post.category|title }}</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">{{ post.title }}</li>
-                </ol>
-            </nav>
-            
-            <article class="bg-white p-4 shadow-sm rounded">
-                <header class="mb-4">
-                    <span class="badge bg-primary mb-2">{{ post.category }}</span>
-                    <h1 class="display-5 mb-3">{{ post.title }}</h1>
-                    <div class="text-muted">
-                        <small>{{ post.created_at.strftime('%d.%m.%Y') }}</small>
-                    </div>
-                </header>
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Ana Sayfa</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('category', category=post.category) }}">{{ post.category|title }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ post.title }}</li>
+        </ol>
+    </nav>
 
-                <div class="post-content">
-                    {{ post.content|safe }}
-                </div>
-            </article>
+    <article class="blog-post">
+        <h1 class="blog-post-title">{{ post.title }}</h1>
+        <p class="blog-post-meta text-muted">{{ post.created_at.strftime('%d %B %Y') }}</p>
+        
+        <div class="blog-post-content">
+            {{ post.content|safe }}
         </div>
-    </div>
+
+        <div class="rating-section mt-4 mb-4">
+            <div class="d-flex align-items-center">
+                <div class="me-4">
+                    <button class="btn btn-outline-primary rating-btn" data-action="like" data-post-id="{{ post.id }}">
+                        <i class="fas fa-thumbs-up"></i>
+                        <span class="likes-count">{{ post.likes }}</span>
+                    </button>
+                </div>
+                <div>
+                    <button class="btn btn-outline-danger rating-btn" data-action="dislike" data-post-id="{{ post.id }}">
+                        <i class="fas fa-thumbs-down"></i>
+                        <span class="dislikes-count">{{ post.dislikes }}</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </article>
 </div>
 
+<!-- Add Font Awesome for thumbs up/down icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<!-- Add rating functionality -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ratingButtons = document.querySelectorAll('.rating-btn');
+    
+    ratingButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const postId = this.dataset.postId;
+            const action = this.dataset.action;
+            
+            fetch(`/post/${postId}/rate/${action}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Update counts
+                    document.querySelector('.likes-count').textContent = data.likes;
+                    document.querySelector('.dislikes-count').textContent = data.dislikes;
+                    
+                    // Toggle active state
+                    ratingButtons.forEach(btn => {
+                        if (btn === this) {
+                            btn.classList.toggle('active');
+                        } else {
+                            btn.classList.remove('active');
+                        }
+                    });
+                })
+                .catch(error => console.error('Error:', error));
+        });
+    });
+});
+</script>
+
 <style>
-.post-content {
-    font-size: 1.1rem;
-    line-height: 1.8;
+.rating-btn {
+    padding: 8px 16px;
+    font-size: 16px;
+    transition: all 0.3s ease;
 }
 
-.breadcrumb {
-    background: transparent;
-    padding: 0;
+.rating-btn i {
+    margin-right: 8px;
+}
+
+.rating-btn.active {
+    transform: scale(1.1);
+}
+
+.rating-btn[data-action="like"].active {
+    background-color: #007bff;
+    color: white;
+}
+
+.rating-btn[data-action="dislike"].active {
+    background-color: #dc3545;
+    color: white;
+}
+
+.blog-post-title {
+    color: #333;
+    margin-bottom: 1rem;
+}
+
+.blog-post-meta {
+    font-size: 0.9rem;
     margin-bottom: 2rem;
 }
 
-.breadcrumb-item a {
-    color: #E9967A;
-    text-decoration: none;
-}
-
-.breadcrumb-item.active {
-    color: #666;
-}
-
-article {
-    border-radius: 10px;
+.blog-post-content {
+    font-size: 1.1rem;
+    line-height: 1.8;
+    margin-bottom: 2rem;
 }
 </style>
 {% endblock %}

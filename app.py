@@ -65,12 +65,33 @@ CATEGORIES = [
     ('haber', 'Haber')
 ]
 
+class Rating(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
+    ip_address = db.Column(db.String(45), nullable=False)  # Store IP to prevent multiple votes
+    is_like = db.Column(db.Boolean, nullable=False)  # True for like, False for dislike
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=False)
     category = db.Column(db.String(50), nullable=False)
     image_url = db.Column(db.String(500))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    likes = db.Column(db.Integer, default=0)
+    dislikes = db.Column(db.Integer, default=0)
+    ratings = db.relationship('Rating', backref='post', lazy=True)
+
+    def update_rating_counts(self):
+        self.likes = Rating.query.filter_by(post_id=self.id, is_like=True).count()
+        self.dislikes = Rating.query.filter_by(post_id=self.id, is_like=False).count()
+        db.session.commit()
+
+class Video(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    youtube_embed = db.Column(db.String(500), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class PostAdmin(ModelView):
@@ -83,12 +104,6 @@ class PostAdmin(ModelView):
     column_list = ('title', 'category', 'created_at')
     form_columns = ('title', 'content', 'category', 'image_url')
     form_choices = {'category': CATEGORIES}
-
-class Video(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    youtube_embed = db.Column(db.String(500), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class VideoAdmin(ModelView):
     def is_accessible(self):
@@ -193,6 +208,45 @@ def category(category):
 def view_post(post_id):
     post = Post.query.get_or_404(post_id)
     return render_template('post.html', post=post)
+
+@app.route('/post/<int:post_id>/rate/<action>')
+def rate_post(post_id, action):
+    if action not in ['like', 'dislike']:
+        return jsonify({'error': 'Invalid action'}), 400
+        
+    post = Post.query.get_or_404(post_id)
+    ip_address = request.remote_addr
+    
+    # Check if user already rated
+    existing_rating = Rating.query.filter_by(
+        post_id=post_id,
+        ip_address=ip_address
+    ).first()
+    
+    if existing_rating:
+        if (existing_rating.is_like and action == 'like') or \
+           (not existing_rating.is_like and action == 'dislike'):
+            # Remove rating if clicking the same button again
+            db.session.delete(existing_rating)
+        else:
+            # Change rating if clicking the opposite button
+            existing_rating.is_like = (action == 'like')
+    else:
+        # Create new rating
+        new_rating = Rating(
+            post_id=post_id,
+            ip_address=ip_address,
+            is_like=(action == 'like')
+        )
+        db.session.add(new_rating)
+    
+    db.session.commit()
+    post.update_rating_counts()
+    
+    return jsonify({
+        'likes': post.likes,
+        'dislikes': post.dislikes
+    })
 
 @app.route('/upload', methods=['POST'])
 @login_required
