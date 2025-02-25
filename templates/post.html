@@ -14,6 +14,12 @@
         <h1 class="blog-post-title">{{ post.title }}</h1>
         <p class="blog-post-meta text-muted">{{ post.created_at.strftime('%d %B %Y') }}</p>
         
+        {% if post.image_url %}
+        <div class="blog-post-image mb-4">
+            <img src="{{ post.image_url }}" alt="{{ post.title }}" class="img-fluid rounded">
+        </div>
+        {% endif %}
+        
         <div class="blog-post-content">
             {{ post.content|safe }}
         </div>

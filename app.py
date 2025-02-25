@@ -10,7 +10,7 @@ from flask_wtf import CSRFProtect, FlaskForm
 from flask_ckeditor import CKEditor, CKEditorField
 import os
 import time
-from wtforms import StringField, PasswordField, SubmitField, SelectField
+from wtforms import StringField, PasswordField, SubmitField, SelectField, FileField
 from wtforms.validators import DataRequired
 from sqlalchemy import or_
 
@@ -88,21 +88,67 @@ class Post(db.Model):
         self.dislikes = Rating.query.filter_by(post_id=self.id, is_like=False).count()
         db.session.commit()
 
+    @property
+    def rating_score(self):
+        # Calculate score based on likes and recency
+        time_diff = datetime.utcnow() - self.created_at
+        hours_passed = time_diff.total_seconds() / 3600
+        # Score decreases with time, increases with likes
+        return (self.likes * 10) / (hours_passed + 1)
+
+    @staticmethod
+    def get_trending_posts(limit=5):
+        posts = Post.query.all()
+        # Sort posts by rating score
+        sorted_posts = sorted(posts, key=lambda p: p.rating_score, reverse=True)
+        return sorted_posts[:limit]
+
+    @staticmethod
+    def get_most_liked_posts(limit=5):
+        return Post.query.order_by(Post.likes.desc()).limit(limit).all()
+
 class Video(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     youtube_embed = db.Column(db.String(500), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+UPLOAD_FOLDER = 'static/uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 class PostAdmin(ModelView):
     def is_accessible(self):
         return current_user.is_authenticated
 
+    form_extra_fields = {
+        'image_file': FileField('Upload Image')
+    }
+    
+    form_widget_args = {
+        'image_url': {'readonly': True}
+    }
+    
+    column_list = ('title', 'category', 'created_at', 'likes', 'dislikes')
+    form_columns = ('title', 'content', 'category', 'image_file')
+    
+    def on_model_change(self, form, model, is_created):
+        file = form.image_file.data
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            # Ensure the upload directory exists
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            file.save(file_path)
+            model.image_url = f'/static/uploads/{filename}'
+    
     form_overrides = {
         'content': CKEditorField
     }
-    column_list = ('title', 'category', 'created_at')
-    form_columns = ('title', 'content', 'category', 'image_url')
     form_choices = {'category': CATEGORIES}
 
 class VideoAdmin(ModelView):
@@ -134,17 +180,24 @@ def load_user(user_id):
 
 @app.route('/')
 def index():
-    # Get latest posts
-    latest_posts = Post.query.order_by(Post.created_at.desc()).limit(4).all()
+    page = request.args.get('page', 1, type=int)
+    per_page = 6
     
-    # Get featured posts (for now, just getting some recent posts)
-    featured_posts = Post.query.order_by(Post.created_at.desc()).limit(3).all()
+    # Get regular posts with pagination
+    pagination = Post.query.order_by(Post.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    posts = pagination.items
     
-    return render_template('index.html', 
-                         latest_posts=latest_posts,
-                         featured_posts=featured_posts,
-                         current_year=datetime.now().year,
-                         active_category=None)
+    # Get trending and most liked posts
+    trending_posts = Post.get_trending_posts(limit=3)
+    most_liked_posts = Post.get_most_liked_posts(limit=3)
+    
+    return render_template('index.html',
+                         posts=posts,
+                         trending_posts=trending_posts,
+                         most_liked_posts=most_liked_posts,
+                         pagination=pagination)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -275,80 +328,6 @@ def upload():
         })
     
     return jsonify({'error': 'File type not allowed'})
-
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
-
-@app.route('/debug/check-admin')
-def check_admin():
-    try:
-        # Check if database exists
-        if not os.path.exists('blog.db'):
-            return jsonify({
-                'status': 'error',
-                'message': 'Database file does not exist',
-                'db_path': os.path.abspath('blog.db')
-            })
-
-        # Check admin user
-        admin = User.query.filter_by(username='elnidal').first()
-        if admin:
-            return jsonify({
-                'status': 'success',
-                'message': 'Admin user found',
-                'details': {
-                    'username': admin.username,
-                    'id': admin.id,
-                    'password_hash': admin.password[:10] + '...'  # Show only first 10 chars of hash
-                }
-            })
-        else:
-            # List all users in database
-            all_users = User.query.all()
-            return jsonify({
-                'status': 'error',
-                'message': 'Admin user not found',
-                'existing_users': [{'id': u.id, 'username': u.username} for u in all_users]
-            })
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'message': f'Error checking admin user: {str(e)}'
-        })
-
-@app.route('/debug/init-admin')
-def init_admin():
-    try:
-        with app.app_context():
-            # Create admin user
-            admin_username = 'elnidal'
-            admin_password = 'm37479673m'
-            
-            admin = User.query.filter_by(username=admin_username).first()
-            if admin:
-                admin.password = generate_password_hash(admin_password, method='sha256')
-                db.session.commit()
-                message = 'Admin password updated'
-            else:
-                admin = User(
-                    username=admin_username,
-                    password=generate_password_hash(admin_password, method='sha256')
-                )
-                db.session.add(admin)
-                db.session.commit()
-                message = 'Admin user created'
-                
-            return jsonify({
-                'status': 'success',
-                'message': message,
-                'username': admin_username
-            })
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'message': f'Error initializing admin: {str(e)}'
-        })
 
 def init_db():
     with app.app_context():

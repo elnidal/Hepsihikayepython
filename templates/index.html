@@ -9,6 +9,9 @@
             {% for post in trending_posts %}
             <div class="col-md-4 mb-4">
                 <div class="card h-100 shadow-sm hover-card">
+                    {% if post.image_url %}
+                    <img src="{{ post.image_url }}" class="card-img-top" alt="{{ post.title }}">
+                    {% endif %}
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="badge bg-danger">Trend</span>
@@ -34,6 +37,9 @@
             {% for post in most_liked_posts %}
             <div class="col-md-4 mb-4">
                 <div class="card h-100 shadow-sm hover-card">
+                    {% if post.image_url %}
+                    <img src="{{ post.image_url }}" class="card-img-top" alt="{{ post.title }}">
+                    {% endif %}
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="badge bg-success">En Çok Beğenilen</span>
@@ -59,6 +65,9 @@
             {% for post in posts %}
             <div class="col-md-4 mb-4">
                 <div class="card h-100 shadow-sm hover-card">
+                    {% if post.image_url %}
+                    <img src="{{ post.image_url }}" class="card-img-top" alt="{{ post.title }}">
+                    {% endif %}
                     <div class="card-body">
                         <span class="badge bg-primary mb-2">{{ post.category }}</span>
                         <h5 class="card-title">{{ post.title }}</h5>
