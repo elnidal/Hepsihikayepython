@@ -1,15 +1,17 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
-from flask_admin import Admin, AdminIndexView
-from flask_admin.contrib.sqla import ModelView
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from datetime import datetime
+from flask_admin import Admin
+from flask_admin.contrib.sqla import ModelView
+from flask_wtf import FlaskForm
+from flask_wtf.csrf import CSRFProtect
+from flask_ckeditor import CKEditor, CKEditorField
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from flask_wtf import CSRFProtect, FlaskForm
-from flask_ckeditor import CKEditor, CKEditorField
+from werkzeug.exceptions import ValidationError
 import os
 import time
+from datetime import datetime
 from wtforms import StringField, PasswordField, SubmitField, SelectField, FileField
 from wtforms.validators import DataRequired
 from sqlalchemy import or_
@@ -17,13 +19,25 @@ from sqlalchemy import or_
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key')
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.abspath("blog.db")}'
-app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static/uploads')
-app.config['CKEDITOR_FILE_UPLOADER'] = 'upload'
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
+try:
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    app.logger.info(f'Upload directory created/verified at: {UPLOAD_FOLDER}')
+except Exception as e:
+    app.logger.error(f'Failed to create upload directory: {str(e)}')
+    # Create uploads directory in a temporary location if main location fails
+    UPLOAD_FOLDER = os.path.join('/tmp', 'hepsihikaye_uploads')
+    app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    app.logger.warning(f'Using temporary upload directory: {UPLOAD_FOLDER}')
+
 # CKEditor configuration
-app.config['CKEDITOR_ENABLE_CSRF'] = True
 app.config['CKEDITOR_FILE_UPLOADER'] = 'upload'
+app.config['CKEDITOR_ENABLE_CSRF'] = True
 app.config['CKEDITOR_HEIGHT'] = 400
 app.config['CKEDITOR_CONFIG'] = {
     'toolbar': [
@@ -41,12 +55,6 @@ app.config['CKEDITOR_CONFIG'] = {
     'removeDialogTabs': 'image:advanced;link:advanced',
     'language': 'tr'
 }
-
-UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static/uploads')
-
-# Create upload directory if it doesn't exist
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-app.logger.info(f'Upload directory configured at: {UPLOAD_FOLDER}')
 
 # Initialize extensions
 db = SQLAlchemy(app)
@@ -137,24 +145,42 @@ class PostAdmin(ModelView):
     column_list = ('title', 'category', 'created_at', 'likes', 'dislikes')
     form_columns = ('title', 'content', 'category', 'image_file')
     
+    def handle_file_upload(self, file):
+        if not file:
+            return None
+            
+        if not allowed_file(file.filename):
+            app.logger.warning(f'Invalid file type: {file.filename}')
+            raise ValueError('Invalid file type. Allowed types are: png, jpg, jpeg, gif')
+            
+        try:
+            filename = secure_filename(file.filename)
+            name, ext = os.path.splitext(filename)
+            filename = f"{name}_{int(time.time())}{ext}"
+            
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(file_path)
+            
+            app.logger.info(f'Successfully saved image: {filename}')
+            return f'/static/uploads/{filename}'
+            
+        except Exception as e:
+            app.logger.error(f'Error saving image: {str(e)}')
+            raise ValueError(f'Failed to save image: {str(e)}')
+    
     def on_model_change(self, form, model, is_created):
         try:
             file = form.image_file.data
-            if file and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                # Add timestamp to filename to prevent duplicates
-                name, ext = os.path.splitext(filename)
-                filename = f"{name}_{int(time.time())}{ext}"
-                
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(file_path)
-                model.image_url = f'/static/uploads/{filename}'
-                
-                app.logger.info(f'Successfully saved image: {filename}')
-            else:
-                app.logger.warning(f'No file uploaded or invalid file type')
+            if file:
+                image_url = self.handle_file_upload(file)
+                if image_url:
+                    model.image_url = image_url
+        except ValueError as e:
+            flash(str(e), 'error')
+            raise ValidationError(str(e))
         except Exception as e:
-            app.logger.error(f'Error saving image: {str(e)}')
+            app.logger.error(f'Unexpected error in on_model_change: {str(e)}')
+            flash('An unexpected error occurred while saving the image', 'error')
             raise
 
     form_overrides = {
