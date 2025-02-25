@@ -19,25 +19,33 @@ from sqlalchemy import or_
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key')
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.abspath("blog.db")}'
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
+
+# File upload configuration
+if os.environ.get('PRODUCTION'):
+    # In production, use a directory that's definitely writable
+    UPLOAD_FOLDER = '/tmp/uploads'
+else:
+    # In development, use the static folder
+    UPLOAD_FOLDER = os.path.join(app.static_folder, 'uploads')
+
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
+# Ensure the upload directory exists
 try:
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    app.logger.info(f'Upload directory created/verified at: {UPLOAD_FOLDER}')
+    app.logger.info(f'Upload directory created at: {UPLOAD_FOLDER}')
 except Exception as e:
-    app.logger.error(f'Failed to create upload directory: {str(e)}')
-    # Create uploads directory in a temporary location if main location fails
-    UPLOAD_FOLDER = os.path.join('/tmp', 'hepsihikaye_uploads')
-    app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+    app.logger.error(f'Error creating upload directory: {str(e)}')
+    # If we can't create the directory, use the system temp directory
+    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    app.logger.warning(f'Using temporary upload directory: {UPLOAD_FOLDER}')
+    app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+    app.logger.warning(f'Using fallback upload directory: {UPLOAD_FOLDER}')
 
 # CKEditor configuration
-app.config['CKEDITOR_FILE_UPLOADER'] = 'upload'
 app.config['CKEDITOR_ENABLE_CSRF'] = True
+app.config['CKEDITOR_FILE_UPLOADER'] = 'upload'
 app.config['CKEDITOR_HEIGHT'] = 400
 app.config['CKEDITOR_CONFIG'] = {
     'toolbar': [
@@ -130,6 +138,15 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+@app.route('/uploads/<path:filename>')
+def uploaded_file(filename):
+    """Serve uploaded files"""
+    try:
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    except Exception as e:
+        app.logger.error(f'Error serving file {filename}: {str(e)}')
+        return 'File not found', 404
+
 class PostAdmin(ModelView):
     def is_accessible(self):
         return current_user.is_authenticated
@@ -146,6 +163,7 @@ class PostAdmin(ModelView):
     form_columns = ('title', 'content', 'category', 'image_file')
     
     def handle_file_upload(self, file):
+        """Handle file upload with proper error handling"""
         if not file:
             return None
             
@@ -154,21 +172,37 @@ class PostAdmin(ModelView):
             raise ValueError('Invalid file type. Allowed types are: png, jpg, jpeg, gif')
             
         try:
-            filename = secure_filename(file.filename)
-            name, ext = os.path.splitext(filename)
-            filename = f"{name}_{int(time.time())}{ext}"
+            # Generate a unique filename
+            original_filename = secure_filename(file.filename)
+            name, ext = os.path.splitext(original_filename)
+            timestamp = int(time.time())
+            unique_filename = f"{name}_{timestamp}{ext}"
             
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            # Ensure the upload directory exists
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            
+            # Save the file
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
             file.save(file_path)
             
-            app.logger.info(f'Successfully saved image: {filename}')
-            return f'/static/uploads/{filename}'
+            # Verify the file was saved
+            if not os.path.exists(file_path):
+                raise ValueError('Failed to save file')
+                
+            app.logger.info(f'Successfully saved image: {unique_filename}')
+            
+            # Return the URL path
+            if os.environ.get('PRODUCTION'):
+                return f'/uploads/{unique_filename}'  # Use the uploads route in production
+            else:
+                return f'/static/uploads/{unique_filename}'  # Use static route in development
             
         except Exception as e:
             app.logger.error(f'Error saving image: {str(e)}')
             raise ValueError(f'Failed to save image: {str(e)}')
     
     def on_model_change(self, form, model, is_created):
+        """Handle model changes with proper error handling"""
         try:
             file = form.image_file.data
             if file:
