@@ -56,7 +56,8 @@
                     {% endif %}
                 {% endwith %}
 
-                <form method="POST">
+                <form method="POST" action="{{ url_for('login', next=request.args.get('next', '')) }}">
+                    {{ csrf_token() }}
                     <div class="mb-3">
                         <label for="username" class="form-label">Kullanıcı Adı</label>
                         <input type="text" class="form-control" id="username" name="username" required>
@@ -65,9 +66,7 @@
                         <label for="password" class="form-label">Şifre</label>
                         <input type="password" class="form-control" id="password" name="password" required>
                     </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Giriş Yap</button>
-                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Giriş Yap</button>
                 </form>
             </div>
         </div>

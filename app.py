@@ -13,7 +13,7 @@ from wtforms import SelectField
 from sqlalchemy import or_
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['CKEDITOR_FILE_UPLOADER'] = 'upload'
@@ -122,6 +122,9 @@ def login():
         if user and check_password_hash(user.password, password):
             login_user(user)
             flash('Başarıyla giriş yaptınız!', 'success')
+            next_page = request.args.get('next')
+            if next_page and next_page.startswith('/'):
+                return redirect(next_page)
             return redirect(url_for('admin.index'))
         else:
             flash('Geçersiz kullanıcı adı veya şifre!', 'error')
