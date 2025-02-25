@@ -33,7 +33,7 @@ if os.environ.get('PRODUCTION'):
     app.config['UPLOAD_URL'] = '/uploads'  # URL path for uploads
 else:
     app.config['UPLOAD_FOLDER'] = os.path.join(app.static_folder, 'uploads')
-    app.config['UPLOAD_URL'] = 'static/uploads'  # URL path for uploads
+    app.config['UPLOAD_URL'] = 'uploads'  # URL path for uploads
 
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)

@@ -12,7 +12,7 @@
                 <div class="col-md-6 mb-4">
                     <article class="post-card h-100">
                         {% if post.image_url %}
-                        <img src="{{ url_for('static', filename=post.image_url) }}" class="card-img-top" alt="{{ post.title }}">
+                        <img src="/static/{{ post.image_url }}" class="card-img-top" alt="{{ post.title }}">
                         {% endif %}
                         <div class="card-body">
                             <a href="{{ url_for('category', category_name=post.category) }}" class="category-pill mb-2">
