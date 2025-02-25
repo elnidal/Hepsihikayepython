@@ -6,10 +6,11 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from flask_wtf import CSRFProtect
+from flask_wtf import CSRFProtect, FlaskForm
 from flask_ckeditor import CKEditor, CKEditorField
 import os
-from wtforms import SelectField
+from wtforms import StringField, PasswordField, SubmitField, SelectField
+from wtforms.validators import DataRequired
 from sqlalchemy import or_
 
 app = Flask(__name__)
@@ -87,6 +88,11 @@ class MyAdminIndexView(AdminIndexView):
     def inaccessible_callback(self, name, **kwargs):
         return redirect(url_for('login'))
 
+class LoginForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired()])
+    password = PasswordField('Password', validators=[DataRequired()])
+    submit = SubmitField('Login')
+
 admin = Admin(app, name='HepsiHikaye Admin', template_mode='bootstrap3', index_view=MyAdminIndexView())
 admin.add_view(PostAdmin(Post, db.session))
 admin.add_view(VideoAdmin(Video, db.session))
@@ -114,9 +120,10 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('admin.index'))
 
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+    form = LoginForm()
+    if form.validate_on_submit():
+        username = form.username.data
+        password = form.password.data
         user = User.query.filter_by(username=username).first()
         
         if user and check_password_hash(user.password, password):
@@ -129,7 +136,7 @@ def login():
         else:
             flash('Geçersiz kullanıcı adı veya şifre!', 'error')
     
-    return render_template('login.html')
+    return render_template('login.html', form=form)
 
 @app.route('/logout')
 @login_required
