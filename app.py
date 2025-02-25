@@ -24,29 +24,19 @@ class ValidationError(Exception):
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key')
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.abspath("blog.db")}'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Configure upload folder based on environment
+if os.environ.get('PRODUCTION'):
+    app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
+else:
+    app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+
+# Ensure upload directory exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # File upload configuration
-if os.environ.get('PRODUCTION'):
-    # In production, use a directory that's definitely writable
-    UPLOAD_FOLDER = '/tmp/uploads'
-else:
-    # In development, use the static folder
-    UPLOAD_FOLDER = os.path.join(app.static_folder, 'uploads')
-
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-
-# Ensure the upload directory exists
-try:
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    app.logger.info(f'Upload directory created at: {UPLOAD_FOLDER}')
-except Exception as e:
-    app.logger.error(f'Error creating upload directory: {str(e)}')
-    # If we can't create the directory, use the system temp directory
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-    app.logger.warning(f'Using fallback upload directory: {UPLOAD_FOLDER}')
 
 # CKEditor configuration
 app.config['CKEDITOR_ENABLE_CSRF'] = True
@@ -84,7 +74,7 @@ if os.environ.get('PRODUCTION'):
     app.logger.info('HepsiHikaye startup')
 
 # Log important configuration
-app.logger.info(f'Upload directory: {UPLOAD_FOLDER}')
+app.logger.info(f'Upload directory: {app.config["UPLOAD_FOLDER"]}')
 app.logger.info(f'Environment: {"Production" if os.environ.get("PRODUCTION") else "Development"}')
 app.logger.info(f'Static folder: {app.static_folder}')
 
@@ -225,11 +215,11 @@ class PostAdmin(ModelView):
                 
             app.logger.info(f'Successfully saved image: {unique_filename}')
             
-            # Return the URL path
+            # Return the URL for the file
             if os.environ.get('PRODUCTION'):
-                return f'/uploads/{unique_filename}'  # Use the uploads route in production
+                return f'/uploads/{unique_filename}'
             else:
-                return f'/static/uploads/{unique_filename}'  # Use static route in development
+                return url_for('static', filename=f'uploads/{unique_filename}')
             
         except Exception as e:
             app.logger.error(f'Error saving image: {str(e)}')
