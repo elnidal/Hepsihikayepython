@@ -8,104 +8,47 @@
 {% endblock %}
 
 {% block content %}
-<div class="admin-container">
-    <!-- Sidebar -->
-    <div class="admin-sidebar">
-        <h2 class="mb-4">Admin Panel</h2>
-        <nav class="admin-nav">
-            <div class="admin-nav-item">
-                <a href="{{ url_for('admin_index') }}" class="admin-nav-link">
-                    <i class="fas fa-home"></i> Dashboard
-                </a>
-            </div>
-            <div class="admin-nav-item">
-                <a href="{{ url_for('create_post') }}" class="admin-nav-link">
-                    <i class="fas fa-plus"></i> Yeni Hikaye
-                </a>
-            </div>
-        </nav>
-    </div>
-
-    <!-- Main Content -->
-    <div class="admin-content">
-        <div class="admin-header">
-            <h1>Hikaye Düzenle</h1>
+<div class="container mt-4">
+    <h1>Hikaye Düzenle</h1>
+    
+    <form method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        
+        <div class="mb-3">
+            <label for="title" class="form-label">Başlık</label>
+            <input type="text" class="form-control" id="title" name="title" value="{{ post.title }}" required>
         </div>
-
-        <div class="admin-card">
-            <form method="POST" enctype="multipart/form-data">
-                {{ form.csrf_token }}
-                
-                <div class="admin-form-group">
-                    {{ form.title.label(class="admin-label") }}
-                    {{ form.title(class="admin-input") }}
-                    {% if form.title.errors %}
-                    <div class="alert alert-danger">
-                        {% for error in form.title.errors %}
-                        <span>{{ error }}</span>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                </div>
-
-                <div class="admin-form-group">
-                    {{ form.category.label(class="admin-label") }}
-                    {{ form.category(class="admin-input") }}
-                    {% if form.category.errors %}
-                    <div class="alert alert-danger">
-                        {% for error in form.category.errors %}
-                        <span>{{ error }}</span>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                </div>
-
-                <div class="admin-form-group">
-                    {{ form.content.label(class="admin-label") }}
-                    {{ form.content() }}
-                    {% if form.content.errors %}
-                    <div class="alert alert-danger">
-                        {% for error in form.content.errors %}
-                        <span>{{ error }}</span>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                </div>
-
-                {% if post.image_url %}
-                <div class="admin-form-group">
-                    <label class="admin-label">Mevcut Resim</label>
-                    <img src="{{ url_for('static', filename=post.image_url) }}" alt="{{ post.title }}" class="img-fluid mb-3" style="max-width: 300px;">
-                </div>
-                {% endif %}
-
-                <div class="admin-form-group">
-                    {{ form.image.label(class="admin-label") }}
-                    <div class="admin-file-upload">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                        <p>Yeni resim yüklemek için tıklayın veya sürükleyin</p>
-                        {{ form.image(class="admin-input", style="opacity: 0; position: absolute;") }}
-                    </div>
-                    {% if form.image.errors %}
-                    <div class="alert alert-danger">
-                        {% for error in form.image.errors %}
-                        <span>{{ error }}</span>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                </div>
-
-                <div class="admin-form-group">
-                    <button type="submit" class="admin-btn admin-btn-primary">
-                        <i class="fas fa-save"></i> Kaydet
-                    </button>
-                    <a href="{{ url_for('admin_index') }}" class="admin-btn admin-btn-secondary">
-                        <i class="fas fa-times"></i> İptal
-                    </a>
-                </div>
-            </form>
+        
+        <div class="mb-3">
+            <label for="category" class="form-label">Kategori</label>
+            <select class="form-control" id="category" name="category" required>
+                {% for value, label in categories %}
+                <option value="{{ value }}" {% if value == post.category %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
         </div>
-    </div>
+        
+        <div class="mb-3">
+            <label for="content" class="form-label">İçerik</label>
+            {{ ckeditor.create(value=post.content) }}
+        </div>
+        
+        <div class="mb-3">
+            <label for="image" class="form-label">Resim</label>
+            {% if post.image_url %}
+            <div class="mb-2">
+                <img src="{{ url_for('static', filename=post.image_url) }}" alt="Current image" style="max-width: 200px;">
+            </div>
+            {% endif %}
+            <input type="file" class="form-control" id="image" name="image" accept="image/*">
+            <small class="form-text text-muted">Yeni bir resim yüklemek için seçin veya mevcut resmi korumak için boş bırakın.</small>
+        </div>
+        
+        <div class="mb-3">
+            <button type="submit" class="btn btn-primary">Kaydet</button>
+            <a href="{{ url_for('admin_index') }}" class="btn btn-secondary">İptal</a>
+        </div>
+    </form>
 </div>
 {% endblock %}
 

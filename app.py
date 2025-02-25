@@ -1,22 +1,21 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from flask_admin import Admin, AdminIndexView
+from flask_admin import Admin, AdminIndexView, expose
 from flask_admin.contrib.sqla import ModelView
-from flask_wtf import FlaskForm
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf import FlaskForm, CSRFProtect
 from flask_ckeditor import CKEditor, CKEditorField
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-import os
-import time
 from datetime import datetime
 from wtforms import StringField, PasswordField, SubmitField, SelectField, FileField
 from wtforms.validators import DataRequired
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 import logging
 from logging.handlers import RotatingFileHandler
 from PIL import Image
+import os
+import time
 
 # Custom exception for validation errors
 class ValidationError(Exception):
@@ -97,11 +96,26 @@ csrf = CSRFProtect(app)
 ckeditor = CKEditor(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+login_manager.login_message = 'Lütfen giriş yapın!'
+login_manager.login_message_category = 'warning'
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)
+
+    def check_password(self, password):
+        return check_password_hash(self.password, password)
+
+    @staticmethod
+    def get_by_username(username):
+        return User.query.filter_by(username=username).first()
+
+    def __repr__(self):
+        return f'<User {self.username}>'
+
+    def get_id(self):
+        return str(self.id)
 
 CATEGORIES = [
     ('şiir', 'Şiir'),
@@ -226,115 +240,193 @@ def serve_upload(filename):
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
     return redirect(url_for('static', filename=f'uploads/{filename}'))
 
-class PostAdmin(ModelView):
+class SecureModelView(ModelView):
     def is_accessible(self):
         return current_user.is_authenticated
 
-    form_extra_fields = {
-        'image_file': FileField('Upload Image')
-    }
-    
-    form_widget_args = {
-        'image_url': {'readonly': True}
-    }
-    
-    column_list = ('title', 'category', 'created_at', 'likes', 'dislikes', 'image_url')
-    form_columns = ('title', 'content', 'category', 'image_file')
-    
-    def handle_file_upload(self, file):
-        """Handle file upload with proper error handling"""
-        try:
-            if not file:
-                return None
-                
-            filename = secure_filename(file.filename)
-            if not filename:
-                raise ValidationError("Invalid filename")
-                
-            if not allowed_file(filename):
-                raise ValidationError("File type not allowed")
-                
-            # Create a unique filename to avoid conflicts
-            timestamp = int(time.time())
-            name, ext = os.path.splitext(filename)
-            unique_filename = f"{name}_{timestamp}{ext}"
-            
-            # Ensure upload directory exists
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-            
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-            
-            # Save the file
-            file.save(filepath)
-            
-            # Validate that it's actually an image
-            try:
-                with open(filepath, 'rb') as img_file:
-                    validate_image(img_file)
-            except Exception as e:
-                if os.path.exists(filepath):
-                    os.remove(filepath)
-                raise ValidationError(f"Invalid image: {str(e)}")
-            
-            # Resize if needed
-            try:
-                resize_image(filepath)
-            except Exception as e:
-                app.logger.error(f"Error resizing image: {str(e)}")
-                # Continue even if resize fails
-                
-            # Return the URL path (not filesystem path)
-            return os.path.join('uploads', unique_filename)
-        except Exception as e:
-            app.logger.error(f"File upload error: {str(e)}")
-            if 'filepath' in locals() and os.path.exists(filepath):
-                os.remove(filepath)
-            raise ValidationError(str(e))
+    def inaccessible_callback(self, name, **kwargs):
+        flash('Lütfen giriş yapın!', 'warning')
+        return redirect(url_for('login', next=request.url))
 
-    def on_model_change(self, form, model, is_created):
-        """Handle model changes with proper error handling"""
-        try:
-            file = form.image_file.data
-            if file:
-                image_url = self.handle_file_upload(file)
-                if image_url:
-                    model.image_url = image_url
-                    app.logger.info(f"Updated model with image URL: {image_url}")
-        except Exception as e:
-            app.logger.error(f"Error in on_model_change: {str(e)}")
-            flash(str(e), 'error')
-            raise
+class PostAdmin(SecureModelView):
+    column_list = ('title', 'category', 'created_at')
+    form_columns = ('title', 'content', 'category', 'image')
+    form_extra_fields = {
+        'image': FileField('Resim')
+    }
     form_overrides = {
         'content': CKEditorField
     }
     form_choices = {'category': CATEGORIES}
 
-class VideoAdmin(ModelView):
-    def is_accessible(self):
-        return current_user.is_authenticated
+    def on_model_change(self, form, model, is_created):
+        """Handle image upload"""
+        try:
+            file = form.image.data
+            if file:
+                filename = secure_filename(file.filename)
+                timestamp = int(time.time())
+                name, ext = os.path.splitext(filename)
+                unique_filename = f"{name}_{timestamp}{ext}"
+                
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                file.save(filepath)
+                
+                # Validate and resize image
+                with open(filepath, 'rb') as img_file:
+                    validate_image(img_file)
+                resize_image(filepath)
+                
+                model.image_url = os.path.join('uploads', unique_filename)
+        except Exception as e:
+            if 'filepath' in locals() and os.path.exists(filepath):
+                os.remove(filepath)
+            raise ValidationError(str(e))
 
+    def delete_model(self, model):
+        """Delete image when post is deleted"""
+        try:
+            if model.image_url:
+                image_path = os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(model.image_url))
+                if os.path.exists(image_path):
+                    os.remove(image_path)
+            return super().delete_model(model)
+        except Exception as e:
+            app.logger.error(f"Error deleting post: {str(e)}")
+            raise
+
+class VideoAdmin(SecureModelView):
     column_list = ('title', 'youtube_embed', 'created_at')
     form_columns = ('title', 'youtube_embed')
 
-class MyAdminIndexView(AdminIndexView):
-    def is_accessible(self):
-        return current_user.is_authenticated
+# Initialize admin interface
+admin = Admin(app, name='HepsiHikaye Admin', template_mode='bootstrap3')
+admin.add_view(PostAdmin(Post, db.session, name='Hikayeler'))
+admin.add_view(VideoAdmin(Video, db.session, name='Videolar'))
 
-    def inaccessible_callback(self, name, **kwargs):
-        return redirect(url_for('login'))
+@app.route('/admin')
+@login_required
+def admin_index():
+    """Admin dashboard page"""
+    posts = Post.query.order_by(Post.created_at.desc()).all()
+    return render_template('admin/index.html', posts=posts)
+
+@app.route('/post/create', methods=['GET', 'POST'])
+@login_required
+def create_post():
+    """Create a new post"""
+    if request.method == 'POST':
+        try:
+            title = request.form['title']
+            content = request.form['content']
+            category = request.form['category']
+            image = request.files.get('image')
+            
+            post = Post(title=title, content=content, category=category)
+            
+            if image and allowed_file(image.filename):
+                filename = secure_filename(image.filename)
+                timestamp = int(time.time())
+                name, ext = os.path.splitext(filename)
+                unique_filename = f"{name}_{timestamp}{ext}"
+                
+                # Ensure upload directory exists
+                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                image.save(filepath)
+                
+                # Validate and resize image
+                with open(filepath, 'rb') as img_file:
+                    validate_image(img_file)
+                resize_image(filepath)
+                
+                post.image_url = os.path.join('uploads', unique_filename)
+            
+            db.session.add(post)
+            db.session.commit()
+            flash('Hikaye başarıyla oluşturuldu!', 'success')
+            return redirect(url_for('admin_index'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(str(e), 'error')
+            
+    return render_template('admin/create_post.html', categories=CATEGORIES)
+
+@app.route('/post/<int:post_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_post(post_id):
+    """Edit an existing post"""
+    post = Post.query.get_or_404(post_id)
+    
+    if request.method == 'POST':
+        try:
+            post.title = request.form['title']
+            post.content = request.form['content']
+            post.category = request.form['category']
+            
+            image = request.files.get('image')
+            if image and allowed_file(image.filename):
+                # Delete old image if it exists
+                if post.image_url:
+                    old_image_path = os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(post.image_url))
+                    if os.path.exists(old_image_path):
+                        os.remove(old_image_path)
+                
+                filename = secure_filename(image.filename)
+                timestamp = int(time.time())
+                name, ext = os.path.splitext(filename)
+                unique_filename = f"{name}_{timestamp}{ext}"
+                
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                image.save(filepath)
+                
+                # Validate and resize image
+                with open(filepath, 'rb') as img_file:
+                    validate_image(img_file)
+                resize_image(filepath)
+                
+                post.image_url = os.path.join('uploads', unique_filename)
+            
+            db.session.commit()
+            flash('Hikaye başarıyla güncellendi!', 'success')
+            return redirect(url_for('admin_index'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(str(e), 'error')
+    
+    return render_template('admin/edit_post.html', post=post, categories=CATEGORIES)
+
+@app.route('/post/<int:post_id>/delete', methods=['POST'])
+@login_required
+def delete_post(post_id):
+    """Delete a post"""
+    post = Post.query.get_or_404(post_id)
+    try:
+        # Delete the post's image if it exists
+        if post.image_url:
+            image_path = os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(post.image_url))
+            if os.path.exists(image_path):
+                os.remove(image_path)
+        
+        db.session.delete(post)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error deleting post: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
 
 class LoginForm(FlaskForm):
     username = StringField('Kullanıcı Adı', validators=[DataRequired()])
     password = PasswordField('Şifre', validators=[DataRequired()])
     submit = SubmitField('Giriş Yap')
-
-admin = Admin(app, name='HepsiHikaye Admin', template_mode='bootstrap3', index_view=MyAdminIndexView())
-admin.add_view(PostAdmin(Post, db.session))
-admin.add_view(VideoAdmin(Video, db.session))
-
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
 
 @app.route('/')
 def index():
@@ -382,7 +474,7 @@ def index():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('admin.index'))
+        return redirect(url_for('admin_index'))
 
     form = LoginForm()
     if form.validate_on_submit():
@@ -393,14 +485,14 @@ def login():
         user = User.query.filter_by(username=username).first()
         if user:
             print(f"User found in database")
-            if check_password_hash(user.password, password):
+            if user.check_password(password):
                 print("Password verification successful")
                 login_user(user)
                 flash('Başarıyla giriş yaptınız!', 'success')
                 next_page = request.args.get('next')
                 if next_page and next_page.startswith('/'):
                     return redirect(next_page)
-                return redirect(url_for('admin.index'))
+                return redirect(url_for('admin_index'))
             else:
                 print("Password verification failed")
                 flash('Geçersiz şifre!', 'error')
@@ -415,20 +507,6 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for('index'))
-
-@app.route('/admin')
-@login_required
-def admin_index():
-    posts = Post.query.order_by(Post.created_at.desc()).all()
-    post_count = Post.query.count()
-    category_count = db.session.query(db.func.count(db.distinct(Post.category))).scalar()
-    total_likes = db.session.query(db.func.sum(Post.likes)).scalar() or 0
-    
-    return render_template('admin/index.html', 
-                         posts=posts,
-                         post_count=post_count,
-                         category_count=category_count,
-                         total_likes=total_likes)
 
 @app.route('/category/<category_name>')
 def category(category_name):
@@ -552,31 +630,32 @@ def upload():
     return jsonify({'error': 'File type not allowed'})
 
 def init_db():
-    with app.app_context():
-        print("Dropping all tables...")  # Debug log
-        db.drop_all()
-        print("Creating all tables...")  # Debug log
-        db.create_all()
-        print("Tables created successfully")  # Debug log
-        
-        # Create admin user
-        admin_username = 'elnidal'
-        admin_password = 'm37479673m'
-        
-        print(f"Creating admin user: {admin_username}")
-        admin = User(
-            username=admin_username,
-            password=generate_password_hash(admin_password, method='sha256')
+    """Initialize the database with required data"""
+    db.create_all()
+    
+    # Create admin user if it doesn't exist
+    admin_user = User.query.filter_by(username='admin').first()
+    if not admin_user:
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')  # Default password for development
+        admin_user = User(
+            username='admin',
+            password=generate_password_hash(admin_password)
         )
-        db.session.add(admin)
+        db.session.add(admin_user)
         db.session.commit()
-        print("Admin user created successfully")
+        app.logger.info("Admin user created successfully")
 
 @app.before_first_request
 def initialize_app():
-    print("Initializing application...")
-    init_db()
+    """Initialize the app before first request"""
+    try:
+        init_db()
+        app.logger.info("Database initialized successfully")
+    except Exception as e:
+        app.logger.error(f"Error initializing database: {str(e)}")
+        raise
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
+    app.debug = True
     app.run(host='0.0.0.0', port=port)

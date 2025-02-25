@@ -1,101 +1,60 @@
 {% extends "base.html" %}
 
-{% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-{% endblock %}
-
 {% block content %}
-<div class="admin-container">
-    <!-- Sidebar -->
-    <div class="admin-sidebar">
-        <h2 class="mb-4">Admin Panel</h2>
-        <nav class="admin-nav">
-            <div class="admin-nav-item">
-                <a href="{{ url_for('admin_index') }}" class="admin-nav-link active">
-                    <i class="fas fa-home"></i> Dashboard
-                </a>
-            </div>
-            <div class="admin-nav-item">
-                <a href="{{ url_for('create_post') }}" class="admin-nav-link">
+<div class="container mt-4">
+    <h1>Admin Panel</h1>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2>Hikayeler</h2>
+                <a href="{{ url_for('create_post') }}" class="btn btn-primary">
                     <i class="fas fa-plus"></i> Yeni Hikaye
                 </a>
             </div>
-        </nav>
+            
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Başlık</th>
+                        <th>Kategori</th>
+                        <th>Tarih</th>
+                        <th>İşlemler</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for post in posts %}
+                    <tr>
+                        <td>{{ post.title }}</td>
+                        <td>{{ post.category }}</td>
+                        <td>{{ post.created_at.strftime('%d/%m/%Y') }}</td>
+                        <td>
+                            <a href="{{ url_for('edit_post', post_id=post.id) }}" class="btn btn-sm btn-warning">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <button onclick="deletePost({{ post.id }})" class="btn btn-sm btn-danger">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-
-    <!-- Main Content -->
-    <div class="admin-content">
-        <div class="admin-header">
-            <h1>Dashboard</h1>
-        </div>
-
-        <!-- Stats -->
-        <div class="admin-stats">
-            <div class="admin-stat-card">
-                <div class="admin-stat-number">{{ post_count }}</div>
-                <div class="admin-stat-label">Toplam Hikaye</div>
-            </div>
-            <div class="admin-stat-card">
-                <div class="admin-stat-number">{{ category_count }}</div>
-                <div class="admin-stat-label">Kategoriler</div>
-            </div>
-            <div class="admin-stat-card">
-                <div class="admin-stat-number">{{ total_likes }}</div>
-                <div class="admin-stat-label">Toplam Beğeni</div>
-            </div>
-        </div>
-
-        <!-- Recent Posts -->
-        <div class="admin-card">
-            <div class="admin-card-header">
-                <h2 class="admin-card-title">Son Hikayeler</h2>
-                <a href="{{ url_for('create_post') }}" class="admin-btn admin-btn-primary">
-                    <i class="fas fa-plus"></i> Yeni Hikaye
-                </a>
-            </div>
-            <div class="table-responsive">
-                <table class="admin-table">
-                    <thead>
-                        <tr>
-                            <th>Başlık</th>
-                            <th>Kategori</th>
-                            <th>Tarih</th>
-                            <th>Beğeni</th>
-                            <th>İşlemler</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for post in posts %}
-                        <tr>
-                            <td>{{ post.title }}</td>
-                            <td>{{ post.category }}</td>
-                            <td>{{ post.created_at.strftime('%d %B %Y') }}</td>
-                            <td>{{ post.likes }}</td>
-                            <td>
-                                <a href="{{ url_for('edit_post', post_id=post.id) }}" class="admin-btn admin-btn-secondary btn-sm">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                <button onclick="deletePost({{ post.id }})" class="admin-btn admin-btn-primary btn-sm">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    
+    <div class="mt-4">
+        <a href="{{ url_for('logout') }}" class="btn btn-secondary">Çıkış Yap</a>
     </div>
 </div>
 
-<!-- Delete Confirmation Modal -->
-<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Hikayeyi Sil</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 Bu hikayeyi silmek istediğinizden emin misiniz?
@@ -107,9 +66,7 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
 <script>
 let postIdToDelete = null;
 
@@ -122,10 +79,11 @@ function deletePost(postId) {
 document.getElementById('confirmDelete').addEventListener('click', async () => {
     if (postIdToDelete) {
         try {
-            const response = await fetch(`/admin/delete_post/${postIdToDelete}`, {
+            const response = await fetch(`/post/${postIdToDelete}/delete`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
                 }
             });
             
