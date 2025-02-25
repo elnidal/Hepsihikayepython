@@ -352,7 +352,10 @@ def index():
             
         if posts is None:
             app.logger.error("No posts found or database error")
-            return render_template('index.html', posts=[], trending_posts=[], most_liked_posts=[])
+            return render_template('index.html', 
+                                posts=[], 
+                                trending_posts=[], 
+                                most_liked_posts=[])
             
         # Get trending and most liked posts for sidebars
         try:
@@ -374,7 +377,10 @@ def index():
                              
     except Exception as e:
         app.logger.error(f"Error in index route: {str(e)}")
-        return render_template('index.html', posts=[], trending_posts=[], most_liked_posts=[])
+        return render_template('index.html', 
+                             posts=[], 
+                             trending_posts=[], 
+                             most_liked_posts=[])
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -418,28 +424,33 @@ def logout():
 def admin_index():
     return redirect('/admin/')
 
-@app.route('/category/<category>')
-def category(category):
-    if category == 'video':
-        videos = Video.query.order_by(Video.created_at.desc()).all()
-        return render_template('videos.html', 
-                             videos=videos,
-                             current_year=datetime.now().year,
-                             active_category=category)
-    
-    posts = Post.query.filter_by(category=category).order_by(Post.created_at.desc()).all()
-    return render_template('category.html', 
-                         posts=posts,
-                         category_name=category.capitalize(),
-                         current_year=datetime.now().year,
-                         active_category=category)
+@app.route('/category/<category_name>')
+def category(category_name):
+    """Display posts for a specific category"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = 10
+        
+        posts = Post.query.filter_by(category=category_name)\
+            .order_by(Post.created_at.desc())\
+            .paginate(page=page, per_page=per_page, error_out=False)
+            
+        if posts is None:
+            app.logger.error(f"No posts found for category: {category_name}")
+            return render_template('category.html', 
+                                posts=[], 
+                                category_name=category_name)
+        
+        return render_template('category.html',
+                             posts=posts,
+                             category_name=category_name)
+                             
+    except Exception as e:
+        app.logger.error(f"Error in category route: {str(e)}")
+        flash('Bir hata oluştu. Lütfen daha sonra tekrar deneyin.', 'error')
+        return redirect(url_for('index'))
 
 @app.route('/post/<int:post_id>')
-def view_post(post_id):
-    post = Post.query.get_or_404(post_id)
-    return render_template('post.html', post=post)
-
-@app.route('/post/<int:post_id>/detail')
 def post_detail(post_id):
     """Display a single post with its full content"""
     try:
@@ -457,6 +468,10 @@ def post_detail(post_id):
         app.logger.error(f"Error displaying post {post_id}: {str(e)}")
         flash('Bu yazıya şu anda ulaşılamıyor.', 'error')
         return redirect(url_for('index'))
+
+@app.route('/post/<int:post_id>/detail')
+def post_detail_route(post_id):
+    return redirect(url_for('post_detail', post_id=post_id))
 
 @app.route('/post/<int:post_id>/rate/<action>', methods=['POST'])
 def rate_post(post_id, action):
