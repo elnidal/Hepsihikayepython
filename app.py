@@ -15,6 +15,8 @@ from datetime import datetime
 from wtforms import StringField, PasswordField, SubmitField, SelectField, FileField
 from wtforms.validators import DataRequired
 from sqlalchemy import or_
+import logging
+from logging.handlers import RotatingFileHandler
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key')
@@ -63,6 +65,35 @@ app.config['CKEDITOR_CONFIG'] = {
     'removeDialogTabs': 'image:advanced;link:advanced',
     'language': 'tr'
 }
+
+# Configure logging
+if os.environ.get('PRODUCTION'):
+    # In production, log to a file
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+    file_handler = RotatingFileHandler('logs/hepsihikaye.log', maxBytes=10240, backupCount=10)
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    ))
+    file_handler.setLevel(logging.INFO)
+    app.logger.addHandler(file_handler)
+    app.logger.setLevel(logging.INFO)
+    app.logger.info('HepsiHikaye startup')
+
+# Log important configuration
+app.logger.info(f'Upload directory: {UPLOAD_FOLDER}')
+app.logger.info(f'Environment: {"Production" if os.environ.get("PRODUCTION") else "Development"}')
+app.logger.info(f'Static folder: {app.static_folder}')
+
+@app.after_request
+def after_request(response):
+    if not os.environ.get('PRODUCTION'):
+        return response
+        
+    # Log non-successful responses in production
+    if response.status_code != 200:
+        app.logger.warning(f'Request to {request.path} returned status code {response.status_code}')
+    return response
 
 # Initialize extensions
 db = SQLAlchemy(app)
