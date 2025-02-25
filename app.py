@@ -439,6 +439,25 @@ def view_post(post_id):
     post = Post.query.get_or_404(post_id)
     return render_template('post.html', post=post)
 
+@app.route('/post/<int:post_id>/detail')
+def post_detail(post_id):
+    """Display a single post with its full content"""
+    try:
+        post = Post.query.get_or_404(post_id)
+        # Get related posts from the same category
+        related_posts = Post.query.filter(
+            Post.category == post.category,
+            Post.id != post.id
+        ).order_by(Post.created_at.desc()).limit(3).all()
+        
+        return render_template('post_detail.html', 
+                             post=post,
+                             related_posts=related_posts)
+    except Exception as e:
+        app.logger.error(f"Error displaying post {post_id}: {str(e)}")
+        flash('Bu yazıya şu anda ulaşılamıyor.', 'error')
+        return redirect(url_for('index'))
+
 @app.route('/post/<int:post_id>/rate/<action>')
 def rate_post(post_id, action):
     if action not in ['like', 'dislike']:
