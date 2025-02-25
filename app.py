@@ -422,7 +422,16 @@ def logout():
 @app.route('/admin')
 @login_required
 def admin_index():
-    return redirect('/admin/')
+    posts = Post.query.order_by(Post.created_at.desc()).all()
+    post_count = Post.query.count()
+    category_count = db.session.query(db.func.count(db.distinct(Post.category))).scalar()
+    total_likes = db.session.query(db.func.sum(Post.likes)).scalar() or 0
+    
+    return render_template('admin/index.html', 
+                         posts=posts,
+                         post_count=post_count,
+                         category_count=category_count,
+                         total_likes=total_likes)
 
 @app.route('/category/<category_name>')
 def category(category_name):

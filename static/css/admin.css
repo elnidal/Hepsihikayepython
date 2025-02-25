@@ -1,0 +1,252 @@
+:root {
+    --admin-primary: #2D3250;
+    --admin-secondary: #424769;
+    --admin-accent: #7077A1;
+    --admin-light: #F6B17A;
+    --admin-bg: #f8f9fa;
+    --admin-text: #2c3e50;
+    --admin-border: #e9ecef;
+}
+
+/* Admin Layout */
+.admin-container {
+    display: flex;
+    min-height: 100vh;
+}
+
+.admin-sidebar {
+    width: 250px;
+    background: var(--admin-primary);
+    color: white;
+    padding: 1.5rem;
+    position: fixed;
+    height: 100vh;
+    overflow-y: auto;
+}
+
+.admin-content {
+    flex: 1;
+    margin-left: 250px;
+    padding: 2rem;
+    background: var(--admin-bg);
+}
+
+/* Admin Header */
+.admin-header {
+    padding: 1rem 0;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-header h1 {
+    color: var(--admin-primary);
+    font-size: 1.8rem;
+    margin: 0;
+}
+
+/* Admin Navigation */
+.admin-nav {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.admin-nav-item {
+    margin-bottom: 0.5rem;
+}
+
+.admin-nav-link {
+    display: block;
+    padding: 0.75rem 1rem;
+    color: rgba(255, 255, 255, 0.8);
+    text-decoration: none;
+    border-radius: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.admin-nav-link:hover,
+.admin-nav-link.active {
+    background: var(--admin-accent);
+    color: white;
+}
+
+.admin-nav-link i {
+    margin-right: 0.5rem;
+    width: 20px;
+    text-align: center;
+}
+
+/* Admin Cards */
+.admin-card {
+    background: white;
+    border-radius: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.admin-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.admin-card-title {
+    color: var(--admin-primary);
+    font-size: 1.2rem;
+    margin: 0;
+}
+
+/* Admin Forms */
+.admin-form-group {
+    margin-bottom: 1.5rem;
+}
+
+.admin-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--admin-text);
+    font-weight: 500;
+}
+
+.admin-input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--admin-border);
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+}
+
+.admin-input:focus {
+    border-color: var(--admin-accent);
+    outline: none;
+}
+
+/* Admin Tables */
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-table th {
+    background: var(--admin-bg);
+    color: var(--admin-text);
+    font-weight: 600;
+    text-align: left;
+}
+
+.admin-table tr:hover {
+    background: rgba(0,0,0,0.02);
+}
+
+/* Admin Buttons */
+.admin-btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.admin-btn-primary {
+    background: var(--admin-primary);
+    color: white;
+}
+
+.admin-btn-primary:hover {
+    background: var(--admin-secondary);
+}
+
+.admin-btn-secondary {
+    background: var(--admin-accent);
+    color: white;
+}
+
+.admin-btn-secondary:hover {
+    background: var(--admin-primary);
+}
+
+/* Admin Stats */
+.admin-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.admin-stat-card {
+    background: white;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.admin-stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--admin-primary);
+    margin-bottom: 0.5rem;
+}
+
+.admin-stat-label {
+    color: var(--admin-text);
+    font-size: 0.9rem;
+}
+
+/* CKEditor Customization */
+.cke_chrome {
+    border-color: var(--admin-border) !important;
+    border-radius: 0.5rem !important;
+}
+
+.cke_top {
+    background: var(--admin-bg) !important;
+    border-bottom-color: var(--admin-border) !important;
+}
+
+/* File Upload */
+.admin-file-upload {
+    border: 2px dashed var(--admin-border);
+    border-radius: 0.5rem;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.admin-file-upload:hover {
+    border-color: var(--admin-accent);
+}
+
+.admin-file-upload i {
+    font-size: 2rem;
+    color: var(--admin-accent);
+    margin-bottom: 1rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .admin-sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+    }
+    
+    .admin-content {
+        margin-left: 0;
+    }
+    
+    .admin-stats {
+        grid-template-columns: 1fr;
+    }
+}

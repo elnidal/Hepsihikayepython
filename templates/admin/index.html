@@ -1,12 +1,144 @@
-{% extends 'admin/master.html' %}
+{% extends "base.html" %}
 
-{% block body %}
-<div class="container">
-    <div class="row">
-        <div class="col-md-8 offset-md-2">
-            <h1>HepsiHikaye Yönetim Paneli</h1>
-            <p>Sol menüden içerik ekleyebilir veya düzenleyebilirsiniz.</p>
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <!-- Sidebar -->
+    <div class="admin-sidebar">
+        <h2 class="mb-4">Admin Panel</h2>
+        <nav class="admin-nav">
+            <div class="admin-nav-item">
+                <a href="{{ url_for('admin_index') }}" class="admin-nav-link active">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+            </div>
+            <div class="admin-nav-item">
+                <a href="{{ url_for('create_post') }}" class="admin-nav-link">
+                    <i class="fas fa-plus"></i> Yeni Hikaye
+                </a>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="admin-content">
+        <div class="admin-header">
+            <h1>Dashboard</h1>
+        </div>
+
+        <!-- Stats -->
+        <div class="admin-stats">
+            <div class="admin-stat-card">
+                <div class="admin-stat-number">{{ post_count }}</div>
+                <div class="admin-stat-label">Toplam Hikaye</div>
+            </div>
+            <div class="admin-stat-card">
+                <div class="admin-stat-number">{{ category_count }}</div>
+                <div class="admin-stat-label">Kategoriler</div>
+            </div>
+            <div class="admin-stat-card">
+                <div class="admin-stat-number">{{ total_likes }}</div>
+                <div class="admin-stat-label">Toplam Beğeni</div>
+            </div>
+        </div>
+
+        <!-- Recent Posts -->
+        <div class="admin-card">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title">Son Hikayeler</h2>
+                <a href="{{ url_for('create_post') }}" class="admin-btn admin-btn-primary">
+                    <i class="fas fa-plus"></i> Yeni Hikaye
+                </a>
+            </div>
+            <div class="table-responsive">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Başlık</th>
+                            <th>Kategori</th>
+                            <th>Tarih</th>
+                            <th>Beğeni</th>
+                            <th>İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for post in posts %}
+                        <tr>
+                            <td>{{ post.title }}</td>
+                            <td>{{ post.category }}</td>
+                            <td>{{ post.created_at.strftime('%d %B %Y') }}</td>
+                            <td>{{ post.likes }}</td>
+                            <td>
+                                <a href="{{ url_for('edit_post', post_id=post.id) }}" class="admin-btn admin-btn-secondary btn-sm">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button onclick="deletePost({{ post.id }})" class="admin-btn admin-btn-primary btn-sm">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Hikayeyi Sil</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Bu hikayeyi silmek istediğinizden emin misiniz?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">Sil</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let postIdToDelete = null;
+
+function deletePost(postId) {
+    postIdToDelete = postId;
+    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    modal.show();
+}
+
+document.getElementById('confirmDelete').addEventListener('click', async () => {
+    if (postIdToDelete) {
+        try {
+            const response = await fetch(`/admin/delete_post/${postIdToDelete}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Hikaye silinirken bir hata oluştu.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Bir hata oluştu.');
+        }
+    }
+});
+</script>
 {% endblock %}
