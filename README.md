@@ -1,69 +1,82 @@
-# Content Management Website
+# HepsiHikaye - Content Management Website
 
-This is a simple content management website built with Flask that allows you to:
-- Create categories for your content
-- Add posts with text and images
-- Embed YouTube videos
-- Manage everything through an easy-to-use admin interface
+A modern content management website built with Flask for sharing stories, poems, articles, and news.
 
-## Setup
+## Features
 
-1. Make sure you have Python installed on your computer
+- Modern, responsive design
+- Rich text editing with CKEditor
+- Multiple content categories (Şiir, Öykü, Roman, Deneme, Makale, Haber)
+- Image upload support
+- Admin panel for content management
+- Search functionality
+- Category-based content organization
 
-2. Create a virtual environment and activate it:
+## Tech Stack
+
+- Python 3.x
+- Flask
+- SQLAlchemy
+- Flask-Admin
+- Flask-Login
+- CKEditor
+- Bootstrap 5
+
+## Installation
+
+1. Clone the repository:
 ```bash
-python3 -m venv venv
+git clone <repository-url>
+cd story-website
+```
+
+2. Create and activate virtual environment:
+```bash
+python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Install the requirements:
+3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Run the application:
+4. Initialize the database:
+```bash
+flask db upgrade
+```
+
+5. Create an admin user:
+```python
+flask shell
+>>> from app import create_admin_user
+>>> create_admin_user('admin', 'your-password')
+>>> exit()
+```
+
+6. Run the application:
 ```bash
 python app.py
 ```
 
-5. Access the website:
-- Main website: http://localhost:5000
-- Admin panel: http://localhost:5000/admin
+The application will be available at `http://localhost:3000`
 
-## Using the Admin Panel
+## Project Structure
 
-1. Categories:
-   - Go to "Category" in the admin panel
-   - Click "Create" to add a new category
-   - Fill in the name (the slug will be generated automatically)
+- `app.py` - Main application file
+- `templates/` - HTML templates
+- `static/` - Static files (CSS, uploads)
+- `instance/` - Instance-specific files
+- `requirements.txt` - Python dependencies
 
-2. Posts:
-   - Go to "Post" in the admin panel
-   - Click "Create" to add a new post
-   - Fill in the title and content
-   - Upload an image if desired
-   - Select the category for the post
+## Contributing
 
-3. Videos:
-   - Go to "Video" in the admin panel
-   - Click "Create" to add a new video
-   - Add the title
-   - For YouTube videos, get the embed code from YouTube (Share > Embed) and paste it in the "YouTube Embed" field
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a new Pull Request
 
-## File Structure
+## License
 
-- `app.py`: Main application file
-- `templates/`: HTML templates
-  - `base.html`: Base template with common elements
-  - `index.html`: Home page template
-  - `category.html`: Category page template
-  - `videos.html`: Videos page template
-- `static/`: Static files (CSS, uploaded images)
-- `site.db`: SQLite database (created automatically)
-
-## Customization
-
-You can customize the look and feel of your website by:
-1. Modifying the templates in the `templates` folder
-2. Editing the CSS in `static/style.css`
-3. Adding new routes in `app.py`
+This project is licensed under the MIT License - see the LICENSE file for details.
