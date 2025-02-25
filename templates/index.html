@@ -1,125 +1,85 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <!-- Main content -->
-        <div class="col-md-8">
-            <div class="row row-cols-1 row-cols-md-2 g-4">
-                {% if posts.items %}
-                    {% for post in posts.items %}
-                    <div class="col">
-                        <div class="card h-100 shadow-sm hover-card">
-                            {% if post.image_url %}
-                            <div class="card-img-container">
-                                <img src="{{ post.image_url }}" class="card-img-top image-loading" alt="{{ post.title }}"
-                                     onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'200\' viewBox=\'0 0 300 200\'><rect fill=\'%23f8f9fa\' width=\'300\' height=\'200\'/><text fill=\'%23dee2e6\' font-family=\'sans-serif\' font-size=\'24\' text-anchor=\'middle\' x=\'150\' y=\'100\'>Resim Yüklenemedi</text></svg>'; this.classList.add('image-error'); this.classList.add('image-loaded');"
-                                     loading="lazy"
-                                     onload="this.classList.remove('image-loading'); this.classList.add('image-loaded');">
-                                <div class="card-img-overlay-gradient"></div>
-                            </div>
-                            {% endif %}
-                            <div class="card-body">
-                                <h5 class="card-title">
-                                    <a href="{{ url_for('view_post', post_id=post.id) }}" class="text-decoration-none text-dark">
-                                        {{ post.title }}
-                                    </a>
-                                </h5>
-                                <p class="card-text text-muted small">{{ post.created_at.strftime('%d %B %Y') }}</p>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <a href="{{ url_for('category', category=post.category) }}" class="btn btn-sm btn-outline-secondary">
-                                        {{ post.category|title }}
-                                    </a>
-                                    <div class="rating-info">
-                                        <span class="text-primary">
-                                            <i class="fas fa-thumbs-up"></i> {{ post.likes }}
-                                        </span>
-                                        <span class="text-danger ms-2">
-                                            <i class="fas fa-thumbs-down"></i> {{ post.dislikes }}
-                                        </span>
-                                    </div>
+<div class="row">
+    <!-- Main Content -->
+    <div class="col-lg-8">
+        <!-- Featured Posts -->
+        <section class="mb-5">
+            <h2 class="mb-4">Son Yazılar</h2>
+            <div class="row">
+                {% for post in posts.items %}
+                <div class="col-md-6 mb-4">
+                    <article class="post-card h-100">
+                        {% if post.image_url %}
+                        <img src="{{ url_for('static', filename=post.image_url) }}" class="card-img-top" alt="{{ post.title }}">
+                        {% endif %}
+                        <div class="card-body">
+                            <a href="{{ url_for('category', category_name=post.category) }}" class="category-pill mb-2">
+                                {{ post.category }}
+                            </a>
+                            <h3 class="card-title">{{ post.title }}</h3>
+                            <p class="card-text">{{ post.content|striptags|truncate(150) }}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="rating-buttons">
+                                    <button class="rating-btn" onclick="ratePost({{ post.id }}, true)">
+                                        <i class="fas fa-thumbs-up"></i> {{ post.likes }}
+                                    </button>
+                                    <button class="rating-btn" onclick="ratePost({{ post.id }}, false)">
+                                        <i class="fas fa-thumbs-down"></i> {{ post.dislikes }}
+                                    </button>
                                 </div>
+                                <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-primary">Devamını Oku</a>
                             </div>
                         </div>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="col-12">
-                        <div class="alert alert-info">
-                            Henüz hiç gönderi yok.
+                        <div class="card-footer text-muted">
+                            {{ post.created_at.strftime('%d %B %Y') }}
                         </div>
-                    </div>
-                {% endif %}
+                    </article>
+                </div>
+                {% endfor %}
             </div>
-
+            
             <!-- Pagination -->
             {% if posts.pages > 1 %}
             <nav aria-label="Page navigation" class="mt-4">
                 <ul class="pagination justify-content-center">
-                    {% if posts.has_prev %}
-                    <li class="page-item">
-                        <a class="page-link" href="{{ url_for('index', page=posts.prev_num) }}">Önceki</a>
-                    </li>
-                    {% endif %}
-
-                    {% for page_num in range(1, posts.pages + 1) %}
-                    <li class="page-item {% if page_num == posts.page %}active{% endif %}">
-                        <a class="page-link" href="{{ url_for('index', page=page_num) }}">{{ page_num }}</a>
+                    {% for page in range(1, posts.pages + 1) %}
+                    <li class="page-item {% if page == posts.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('index', page=page) }}">{{ page }}</a>
                     </li>
                     {% endfor %}
-
-                    {% if posts.has_next %}
-                    <li class="page-item">
-                        <a class="page-link" href="{{ url_for('index', page=posts.next_num) }}">Sonraki</a>
-                    </li>
-                    {% endif %}
                 </ul>
             </nav>
             {% endif %}
+        </section>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- Trending Posts -->
+        <div class="sidebar mb-4">
+            <h3>Trend Yazılar</h3>
+            {% for post in trending_posts %}
+            <div class="mb-3">
+                <h5><a href="{{ url_for('post_detail', post_id=post.id) }}" class="text-decoration-none">{{ post.title }}</a></h5>
+                <p class="small text-muted mb-0">{{ post.created_at.strftime('%d %B %Y') }}</p>
+            </div>
+            {% endfor %}
         </div>
 
-        <!-- Sidebar -->
-        <div class="col-md-4">
-            <!-- Trending Posts -->
-            {% if trending_posts %}
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Trend Yazılar</h5>
-                </div>
-                <div class="list-group list-group-flush">
-                    {% for post in trending_posts %}
-                    <a href="{{ url_for('view_post', post_id=post.id) }}" class="list-group-item list-group-item-action">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">{{ post.title }}</h6>
-                        </div>
-                        <small class="text-muted">{{ post.created_at.strftime('%d %B %Y') }}</small>
-                    </a>
-                    {% endfor %}
+        <!-- Most Liked Posts -->
+        <div class="sidebar">
+            <h3>En Çok Beğenilenler</h3>
+            {% for post in most_liked_posts %}
+            <div class="mb-3">
+                <h5><a href="{{ url_for('post_detail', post_id=post.id) }}" class="text-decoration-none">{{ post.title }}</a></h5>
+                <div class="d-flex align-items-center">
+                    <span class="me-3"><i class="fas fa-thumbs-up"></i> {{ post.likes }}</span>
+                    <span class="small text-muted">{{ post.created_at.strftime('%d %B %Y') }}</span>
                 </div>
             </div>
-            {% endif %}
-
-            <!-- Most Liked Posts -->
-            {% if most_liked_posts %}
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">En Çok Beğenilenler</h5>
-                </div>
-                <div class="list-group list-group-flush">
-                    {% for post in most_liked_posts %}
-                    <a href="{{ url_for('view_post', post_id=post.id) }}" class="list-group-item list-group-item-action">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">{{ post.title }}</h6>
-                            <small class="text-primary">
-                                <i class="fas fa-thumbs-up"></i> {{ post.likes }}
-                            </small>
-                        </div>
-                        <small class="text-muted">{{ post.created_at.strftime('%d %B %Y') }}</small>
-                    </a>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
+            {% endfor %}
         </div>
     </div>
 </div>
