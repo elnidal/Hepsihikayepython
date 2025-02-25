@@ -31,8 +31,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Configure upload folder based on environment
 if os.environ.get('PRODUCTION'):
     app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
+    app.config['UPLOAD_URL'] = '/uploads'  # URL path for uploads
 else:
-    app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+    app.config['UPLOAD_FOLDER'] = os.path.join(app.static_folder, 'uploads')
+    app.config['UPLOAD_URL'] = '/static/uploads'  # URL path for uploads
 
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -201,13 +203,11 @@ def resize_image(image_path, max_size=(800, 800)):
         app.logger.error(f'Error resizing image {image_path}: {str(e)}')
 
 @app.route('/uploads/<path:filename>')
-def uploaded_file(filename):
-    """Serve uploaded files"""
-    try:
+def serve_upload(filename):
+    """Serve uploaded files in production"""
+    if os.environ.get('PRODUCTION'):
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-    except Exception as e:
-        app.logger.error(f'Error serving file {filename}: {str(e)}')
-        return 'File not found', 404
+    return redirect(url_for('static', filename=f'uploads/{filename}'))
 
 class PostAdmin(ModelView):
     def is_accessible(self):
@@ -229,49 +229,39 @@ class PostAdmin(ModelView):
         if not file:
             return None
             
-        if not allowed_file(file.filename):
-            app.logger.warning(f'Invalid file type: {file.filename}')
-            raise ValidationError('Invalid file type. Allowed types are: png, jpg, jpeg, gif')
-            
         try:
-            # Validate image
-            if not validate_image(file.stream):
-                raise ValidationError('Invalid image file or dimensions too large')
-            
-            # Generate a unique filename
-            original_filename = secure_filename(file.filename)
-            name, ext = os.path.splitext(original_filename)
+            filename = secure_filename(file.filename)
+            if not filename:
+                raise ValidationError("Invalid filename")
+                
+            if not allowed_file(filename):
+                raise ValidationError("File type not allowed")
+                
+            # Create a unique filename to avoid conflicts
             timestamp = int(time.time())
+            name, ext = os.path.splitext(filename)
             unique_filename = f"{name}_{timestamp}{ext}"
             
-            # Ensure the upload directory exists
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
             
-            # Save the file
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-            file.save(file_path)
+            # Validate and save the image
+            file.save(filepath)
             
-            # Verify the file was saved
-            if not os.path.exists(file_path):
-                raise ValidationError('Failed to save file')
+            # Validate that it's actually an image
+            with open(filepath, 'rb') as img_file:
+                validate_image(img_file)
             
-            # Resize image if necessary
-            resize_image(file_path)
+            # Resize if needed
+            resize_image(filepath)
                 
-            app.logger.info(f'Successfully saved and processed image: {unique_filename}')
+            # Return the URL path (not filesystem path)
+            return os.path.join(app.config['UPLOAD_URL'], unique_filename)
             
-            # Return the URL for the file
-            if os.environ.get('PRODUCTION'):
-                return f'/uploads/{unique_filename}'
-            else:
-                return url_for('static', filename=f'uploads/{unique_filename}')
-            
-        except ValidationError as e:
-            app.logger.error(f'Validation error while saving image: {str(e)}')
-            raise
-        except Exception as e:
-            app.logger.error(f'Error saving image: {str(e)}')
-            raise ValidationError(f'Failed to save image: {str(e)}')
+        except (ValidationError, OSError) as e:
+            app.logger.error(f"File upload error: {str(e)}")
+            if os.path.exists(filepath):
+                os.remove(filepath)
+            raise ValidationError(str(e))
     
     def on_model_change(self, form, model, is_created):
         """Handle model changes with proper error handling"""
@@ -461,7 +451,7 @@ def upload():
         filename = f"{name}_{int(time.time())}{ext}"
         
         f.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        url = url_for('static', filename=f'uploads/{filename}')
+        url = os.path.join(app.config['UPLOAD_URL'], filename)
         
         # Return in the format CKEditor expects
         return jsonify({
