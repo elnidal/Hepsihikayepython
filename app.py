@@ -16,6 +16,8 @@ from wtforms.validators import DataRequired
 from sqlalchemy import or_
 import logging
 from logging.handlers import RotatingFileHandler
+from PIL import Image
+import imghdr
 
 # Custom exception for validation errors
 class ValidationError(Exception):
@@ -162,6 +164,42 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def validate_image(stream):
+    """Validate that the file is actually an image"""
+    try:
+        # Try to open the image using PIL
+        img = Image.open(stream)
+        img.verify()  # Verify it's actually an image
+        stream.seek(0)  # Reset stream position
+        
+        # Additional checks
+        if img.format.lower() not in ['jpeg', 'jpg', 'png', 'gif']:
+            return False
+            
+        # Check dimensions
+        if img.size[0] > 4096 or img.size[1] > 4096:  # Max 4096x4096
+            return False
+            
+        return True
+    except Exception:
+        return False
+
+def resize_image(image_path, max_size=(800, 800)):
+    """Resize image if it's larger than max_size while maintaining aspect ratio"""
+    try:
+        with Image.open(image_path) as img:
+            # Convert to RGB if necessary
+            if img.mode in ('RGBA', 'P'):
+                img = img.convert('RGB')
+                
+            # Only resize if image is larger than max_size
+            if img.size[0] > max_size[0] or img.size[1] > max_size[1]:
+                img.thumbnail(max_size, Image.Resampling.LANCZOS)
+                img.save(image_path, 'JPEG', quality=85)
+                app.logger.info(f'Resized image: {image_path}')
+    except Exception as e:
+        app.logger.error(f'Error resizing image {image_path}: {str(e)}')
+
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
     """Serve uploaded files"""
@@ -196,6 +234,10 @@ class PostAdmin(ModelView):
             raise ValidationError('Invalid file type. Allowed types are: png, jpg, jpeg, gif')
             
         try:
+            # Validate image
+            if not validate_image(file.stream):
+                raise ValidationError('Invalid image file or dimensions too large')
+            
             # Generate a unique filename
             original_filename = secure_filename(file.filename)
             name, ext = os.path.splitext(original_filename)
@@ -212,8 +254,11 @@ class PostAdmin(ModelView):
             # Verify the file was saved
             if not os.path.exists(file_path):
                 raise ValidationError('Failed to save file')
+            
+            # Resize image if necessary
+            resize_image(file_path)
                 
-            app.logger.info(f'Successfully saved image: {unique_filename}')
+            app.logger.info(f'Successfully saved and processed image: {unique_filename}')
             
             # Return the URL for the file
             if os.environ.get('PRODUCTION'):
@@ -221,6 +266,9 @@ class PostAdmin(ModelView):
             else:
                 return url_for('static', filename=f'uploads/{unique_filename}')
             
+        except ValidationError as e:
+            app.logger.error(f'Validation error while saving image: {str(e)}')
+            raise
         except Exception as e:
             app.logger.error(f'Error saving image: {str(e)}')
             raise ValidationError(f'Failed to save image: {str(e)}')

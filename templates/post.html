@@ -16,8 +16,9 @@
         
         {% if post.image_url %}
         <div class="blog-post-image mb-4">
-            <img src="{{ post.image_url }}" alt="{{ post.title }}" class="img-fluid rounded" 
-                 onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'200\' viewBox=\'0 0 300 200\'><rect fill=\'%23f8f9fa\' width=\'300\' height=\'200\'/><text fill=\'%23dee2e6\' font-family=\'sans-serif\' font-size=\'24\' text-anchor=\'middle\' x=\'150\' y=\'100\'>Resim Yüklenemedi</text></svg>'; this.classList.add('image-error');">
+            <img src="{{ post.image_url }}" alt="{{ post.title }}" class="img-fluid rounded image-loading" 
+                 onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'200\' viewBox=\'0 0 300 200\'><rect fill=\'%23f8f9fa\' width=\'300\' height=\'200\'/><text fill=\'%23dee2e6\' font-family=\'sans-serif\' font-size=\'24\' text-anchor=\'middle\' x=\'150\' y=\'100\'>Resim Yüklenemedi</text></svg>'; this.classList.add('image-error'); this.classList.add('image-loaded');"
+                 loading="lazy">
         </div>
         {% endif %}
         
@@ -118,6 +119,36 @@ document.addEventListener('DOMContentLoaded', function() {
     font-size: 1.1rem;
     line-height: 1.8;
     margin-bottom: 2rem;
+}
+
+.blog-post-image {
+    position: relative;
+    max-height: 500px;
+    overflow: hidden;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.blog-post-image img {
+    width: 100%;
+    height: auto;
+    object-fit: cover;
+    transition: opacity 0.3s ease;
+}
+
+.blog-post-image img.image-error {
+    opacity: 0.7;
+    border: 1px dashed #dc3545;
+    padding: 1rem;
+    background-color: #f8f9fa;
+}
+
+.image-loading {
+    opacity: 0;
+}
+
+.image-loaded {
+    opacity: 1;
 }
 
 .image-error {
