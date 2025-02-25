@@ -9,6 +9,7 @@ from werkzeug.utils import secure_filename
 from flask_wtf import CSRFProtect, FlaskForm
 from flask_ckeditor import CKEditor, CKEditorField
 import os
+import time
 from wtforms import StringField, PasswordField, SubmitField, SelectField
 from wtforms.validators import DataRequired
 from sqlalchemy import or_
@@ -18,6 +19,27 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key')
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.abspath("blog.db")}'
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['CKEDITOR_FILE_UPLOADER'] = 'upload'
+
+# CKEditor configuration
+app.config['CKEDITOR_ENABLE_CSRF'] = True
+app.config['CKEDITOR_FILE_UPLOADER'] = 'upload'
+app.config['CKEDITOR_HEIGHT'] = 400
+app.config['CKEDITOR_CONFIG'] = {
+    'toolbar': [
+        ['Style', 'Format', 'Font', 'FontSize'],
+        ['Bold', 'Italic', 'Underline', 'Strike'],
+        ['TextColor', 'BGColor'],
+        ['NumberedList', 'BulletedList', '-', 'Outdent', 'Indent', '-', 'Blockquote'],
+        ['JustifyLeft', 'JustifyCenter', 'JustifyRight', 'JustifyBlock'],
+        ['Link', 'Unlink'],
+        ['Image', 'Table'],
+        ['Undo', 'Redo'],
+        ['RemoveFormat', 'Source']
+    ],
+    'filebrowserUploadUrl': '/upload',
+    'removeDialogTabs': 'image:advanced;link:advanced',
+    'language': 'tr'
+}
 
 # Initialize extensions
 db = SQLAlchemy(app)
@@ -48,6 +70,7 @@ class Post(db.Model):
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=False)
     category = db.Column(db.String(50), nullable=False)
+    image_url = db.Column(db.String(500))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class PostAdmin(ModelView):
@@ -57,16 +80,9 @@ class PostAdmin(ModelView):
     form_overrides = {
         'content': CKEditorField
     }
-
-    form_extra_fields = {
-        'category': SelectField('Category', choices=CATEGORIES)
-    }
-
     column_list = ('title', 'category', 'created_at')
-    form_columns = ('title', 'content', 'category')
-
-    create_template = 'admin/create_post.html'
-    edit_template = 'admin/edit_post.html'
+    form_columns = ('title', 'content', 'category', 'image_url')
+    form_choices = {'category': CATEGORIES}
 
 class Video(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -181,23 +197,34 @@ def view_post(post_id):
 @app.route('/upload', methods=['POST'])
 @login_required
 def upload():
-    f = request.files.get('upload')
-    if not f:
-        return jsonify({'error': {'message': 'No file uploaded'}})
-
-    # Check if the file is an allowed image type
-    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif'}
-    if '.' not in f.filename or f.filename.rsplit('.', 1)[1].lower() not in allowed_extensions:
-        return jsonify({'error': {'message': 'Invalid file type'}})
-
-    # Save the file with a unique name
-    filename = secure_filename(f.filename)
-    unique_filename = datetime.now().strftime('%Y%m%d_%H%M%S_') + filename
-    f.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
+    if 'upload' not in request.files:
+        return jsonify({'error': 'No file part'})
     
-    # Return the URL
-    url = url_for('static', filename=f'uploads/{unique_filename}')
-    return jsonify({'url': url})
+    f = request.files['upload']
+    if f.filename == '':
+        return jsonify({'error': 'No selected file'})
+    
+    if f and allowed_file(f.filename):
+        filename = secure_filename(f.filename)
+        # Add timestamp to filename to make it unique
+        name, ext = os.path.splitext(filename)
+        filename = f"{name}_{int(time.time())}{ext}"
+        
+        f.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        url = url_for('static', filename=f'uploads/{filename}')
+        
+        # Return in the format CKEditor expects
+        return jsonify({
+            'url': url,
+            "uploaded": 1,
+            "fileName": filename
+        })
+    
+    return jsonify({'error': 'File type not allowed'})
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
 
 @app.route('/debug/check-admin')
 def check_admin():
