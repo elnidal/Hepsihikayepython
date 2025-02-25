@@ -183,10 +183,21 @@ def upload():
 
 def create_admin_user(username, password):
     with app.app_context():
-        if not User.query.filter_by(username=username).first():
-            user = User(username=username, password=generate_password_hash(password))
-            db.session.add(user)
+        # Check if admin user already exists
+        admin = User.query.filter_by(username=username).first()
+        if not admin:
+            admin = User(username=username,
+                        password=generate_password_hash(password, method='sha256'))
+            db.session.add(admin)
             db.session.commit()
+
+# Initialize database and create admin user
+@app.before_first_request
+def initialize_app():
+    db.create_all()
+    admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
+    admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
+    create_admin_user(admin_username, admin_password)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
