@@ -15,7 +15,7 @@ from sqlalchemy import or_
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.abspath("blog.db")}'
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['CKEDITOR_FILE_UPLOADER'] = 'upload'
 
@@ -198,6 +198,76 @@ def upload():
     # Return the URL
     url = url_for('static', filename=f'uploads/{unique_filename}')
     return jsonify({'url': url})
+
+@app.route('/debug/check-admin')
+def check_admin():
+    try:
+        # Check if database exists
+        if not os.path.exists('blog.db'):
+            return jsonify({
+                'status': 'error',
+                'message': 'Database file does not exist',
+                'db_path': os.path.abspath('blog.db')
+            })
+
+        # Check admin user
+        admin = User.query.filter_by(username='elnidal').first()
+        if admin:
+            return jsonify({
+                'status': 'success',
+                'message': 'Admin user found',
+                'details': {
+                    'username': admin.username,
+                    'id': admin.id,
+                    'password_hash': admin.password[:10] + '...'  # Show only first 10 chars of hash
+                }
+            })
+        else:
+            # List all users in database
+            all_users = User.query.all()
+            return jsonify({
+                'status': 'error',
+                'message': 'Admin user not found',
+                'existing_users': [{'id': u.id, 'username': u.username} for u in all_users]
+            })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error checking admin user: {str(e)}'
+        })
+
+@app.route('/debug/init-admin')
+def init_admin():
+    try:
+        with app.app_context():
+            # Create admin user
+            admin_username = 'elnidal'
+            admin_password = 'm37479673m'
+            
+            admin = User.query.filter_by(username=admin_username).first()
+            if admin:
+                admin.password = generate_password_hash(admin_password, method='sha256')
+                db.session.commit()
+                message = 'Admin password updated'
+            else:
+                admin = User(
+                    username=admin_username,
+                    password=generate_password_hash(admin_password, method='sha256')
+                )
+                db.session.add(admin)
+                db.session.commit()
+                message = 'Admin user created'
+                
+            return jsonify({
+                'status': 'success',
+                'message': message,
+                'username': admin_username
+            })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error initializing admin: {str(e)}'
+        })
 
 def init_db():
     with app.app_context():
