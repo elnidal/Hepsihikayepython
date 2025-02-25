@@ -124,22 +124,25 @@ def login():
     if form.validate_on_submit():
         username = form.username.data
         password = form.password.data
-        print(f"Login attempt for user: {username}")  # Debug log
+        print(f"Login attempt for user: {username}")
         
         user = User.query.filter_by(username=username).first()
-        print(f"User found: {user is not None}")  # Debug log
-        
-        if user and check_password_hash(user.password, password):
-            print("Password check successful")  # Debug log
-            login_user(user)
-            flash('Başarıyla giriş yaptınız!', 'success')
-            next_page = request.args.get('next')
-            if next_page and next_page.startswith('/'):
-                return redirect(next_page)
-            return redirect(url_for('admin.index'))
+        if user:
+            print(f"User found in database")
+            if check_password_hash(user.password, password):
+                print("Password verification successful")
+                login_user(user)
+                flash('Başarıyla giriş yaptınız!', 'success')
+                next_page = request.args.get('next')
+                if next_page and next_page.startswith('/'):
+                    return redirect(next_page)
+                return redirect(url_for('admin.index'))
+            else:
+                print("Password verification failed")
+                flash('Geçersiz şifre!', 'error')
         else:
-            print("Password check failed")  # Debug log
-            flash('Geçersiz kullanıcı adı veya şifre!', 'error')
+            print(f"User {username} not found in database")
+            flash('Kullanıcı bulunamadı!', 'error')
     
     return render_template('login.html', form=form)
 
@@ -196,34 +199,31 @@ def upload():
     url = url_for('static', filename=f'uploads/{unique_filename}')
     return jsonify({'url': url})
 
-def create_admin_user(username, password):
-    print(f"Creating admin user: {username}")  # Debug log
+def init_db():
     with app.app_context():
-        # Check if admin user already exists
-        admin = User.query.filter_by(username=username).first()
-        if not admin:
-            print(f"Admin user does not exist, creating new one")  # Debug log
-            admin = User(
-                username=username,
-                password=generate_password_hash(password, method='sha256')
-            )
-            db.session.add(admin)
-            db.session.commit()
-            print(f"Admin user created successfully")  # Debug log
-        else:
-            print(f"Admin user already exists")  # Debug log
-            # Update password if needed
-            admin.password = generate_password_hash(password, method='sha256')
-            db.session.commit()
-            print(f"Admin password updated")  # Debug log
+        print("Dropping all tables...")  # Debug log
+        db.drop_all()
+        print("Creating all tables...")  # Debug log
+        db.create_all()
+        print("Tables created successfully")  # Debug log
+        
+        # Create admin user
+        admin_username = 'elnidal'
+        admin_password = 'm37479673m'
+        
+        print(f"Creating admin user: {admin_username}")
+        admin = User(
+            username=admin_username,
+            password=generate_password_hash(admin_password, method='sha256')
+        )
+        db.session.add(admin)
+        db.session.commit()
+        print("Admin user created successfully")
 
 @app.before_first_request
 def initialize_app():
-    print("Initializing application...")  # Debug log
-    db.create_all()
-    admin_username = os.environ.get('ADMIN_USERNAME', 'elnidal')
-    admin_password = os.environ.get('ADMIN_PASSWORD', 'm37479673m')
-    create_admin_user(admin_username, admin_password)
+    print("Initializing application...")
+    init_db()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
