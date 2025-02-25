@@ -17,8 +17,9 @@ from sqlalchemy import or_
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key')
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.abspath("blog.db")}'
-app.config['UPLOAD_FOLDER'] = 'static/uploads'
+app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static/uploads')
 app.config['CKEDITOR_FILE_UPLOADER'] = 'upload'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # CKEditor configuration
 app.config['CKEDITOR_ENABLE_CSRF'] = True
@@ -41,15 +42,18 @@ app.config['CKEDITOR_CONFIG'] = {
     'language': 'tr'
 }
 
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static/uploads')
+
+# Create upload directory if it doesn't exist
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.logger.info(f'Upload directory configured at: {UPLOAD_FOLDER}')
+
 # Initialize extensions
 db = SQLAlchemy(app)
 csrf = CSRFProtect(app)
 ckeditor = CKEditor(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
-
-# Ensure upload directory exists
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -113,10 +117,7 @@ class Video(db.Model):
     youtube_embed = db.Column(db.String(500), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -137,15 +138,25 @@ class PostAdmin(ModelView):
     form_columns = ('title', 'content', 'category', 'image_file')
     
     def on_model_change(self, form, model, is_created):
-        file = form.image_file.data
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            # Ensure the upload directory exists
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            file.save(file_path)
-            model.image_url = f'/static/uploads/{filename}'
-    
+        try:
+            file = form.image_file.data
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                # Add timestamp to filename to prevent duplicates
+                name, ext = os.path.splitext(filename)
+                filename = f"{name}_{int(time.time())}{ext}"
+                
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                model.image_url = f'/static/uploads/{filename}'
+                
+                app.logger.info(f'Successfully saved image: {filename}')
+            else:
+                app.logger.warning(f'No file uploaded or invalid file type')
+        except Exception as e:
+            app.logger.error(f'Error saving image: {str(e)}')
+            raise
+
     form_overrides = {
         'content': CKEditorField
     }
