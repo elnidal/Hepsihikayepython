@@ -89,9 +89,9 @@ class MyAdminIndexView(AdminIndexView):
         return redirect(url_for('login'))
 
 class LoginForm(FlaskForm):
-    username = StringField('Username', validators=[DataRequired()])
-    password = PasswordField('Password', validators=[DataRequired()])
-    submit = SubmitField('Login')
+    username = StringField('Kullanıcı Adı', validators=[DataRequired()])
+    password = PasswordField('Şifre', validators=[DataRequired()])
+    submit = SubmitField('Giriş Yap')
 
 admin = Admin(app, name='HepsiHikaye Admin', template_mode='bootstrap3', index_view=MyAdminIndexView())
 admin.add_view(PostAdmin(Post, db.session))
