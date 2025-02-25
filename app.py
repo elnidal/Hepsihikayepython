@@ -17,7 +17,6 @@ from sqlalchemy import or_
 import logging
 from logging.handlers import RotatingFileHandler
 from PIL import Image
-import imghdr
 
 # Custom exception for validation errors
 class ValidationError(Exception):
@@ -132,9 +131,18 @@ class Post(db.Model):
     ratings = db.relationship('Rating', backref='post', lazy=True)
 
     def update_rating_counts(self):
-        self.likes = Rating.query.filter_by(post_id=self.id, is_like=True).count()
-        self.dislikes = Rating.query.filter_by(post_id=self.id, is_like=False).count()
-        db.session.commit()
+        """Update the likes and dislikes count for this post"""
+        try:
+            self.likes = Rating.query.filter_by(post_id=self.id, is_like=True).count()
+            self.dislikes = Rating.query.filter_by(post_id=self.id, is_like=False).count()
+            db.session.commit()
+        except Exception as e:
+            app.logger.error(f"Error updating rating counts: {str(e)}")
+            db.session.rollback()
+
+    def rating_score(self):
+        """Calculate the rating score for sorting"""
+        return self.likes - self.dislikes
 
     @property
     def rating_score(self):
@@ -167,24 +175,33 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def validate_image(stream):
-    """Validate that the file is actually an image"""
+    """Validate that the file is actually an image and check its dimensions"""
     try:
-        # Try to open the image using PIL
+        # Open the image using PIL
         img = Image.open(stream)
-        img.verify()  # Verify it's actually an image
-        stream.seek(0)  # Reset stream position
         
-        # Additional checks
-        if img.format.lower() not in ['jpeg', 'jpg', 'png', 'gif']:
-            return False
+        # Check if it's actually an image
+        img.verify()
+        
+        # Reopen the image after verify (verify closes the file)
+        img = Image.open(stream)
+        
+        # Get image dimensions
+        width, height = img.size
+        
+        # Check if dimensions are too large
+        if width > 4096 or height > 4096:
+            raise ValidationError("Image dimensions too large (max 4096x4096)")
             
-        # Check dimensions
-        if img.size[0] > 4096 or img.size[1] > 4096:  # Max 4096x4096
-            return False
+        # Check format
+        if img.format.lower() not in {'png', 'jpeg', 'jpg', 'gif'}:
+            raise ValidationError("Invalid image format")
             
         return True
-    except Exception:
-        return False
+        
+    except Exception as e:
+        app.logger.error(f"Image validation error: {str(e)}")
+        raise ValidationError("Invalid image file")
 
 def resize_image(image_path, max_size=(800, 800)):
     """Resize image if it's larger than max_size while maintaining aspect ratio"""
@@ -221,7 +238,7 @@ class PostAdmin(ModelView):
         'image_url': {'readonly': True}
     }
     
-    column_list = ('title', 'category', 'created_at', 'likes', 'dislikes')
+    column_list = ('title', 'category', 'created_at', 'likes', 'dislikes', 'image_url')
     form_columns = ('title', 'content', 'category', 'image_file')
     
     def handle_file_upload(self, file):
@@ -242,24 +259,38 @@ class PostAdmin(ModelView):
             name, ext = os.path.splitext(filename)
             unique_filename = f"{name}_{timestamp}{ext}"
             
+            # Ensure upload directory exists
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
             
-            # Validate and save the image
+            # Save the file
             file.save(filepath)
             
             # Validate that it's actually an image
-            with open(filepath, 'rb') as img_file:
-                validate_image(img_file)
+            try:
+                with open(filepath, 'rb') as img_file:
+                    validate_image(img_file)
+            except Exception as e:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                raise ValidationError(f"Invalid image: {str(e)}")
             
             # Resize if needed
-            resize_image(filepath)
+            try:
+                resize_image(filepath)
+            except Exception as e:
+                app.logger.error(f"Error resizing image: {str(e)}")
+                # Continue even if resize fails
                 
             # Return the URL path (not filesystem path)
-            return os.path.join(app.config['UPLOAD_URL'], unique_filename)
+            url = url_for('static', filename=f'uploads/{unique_filename}')
+            app.logger.info(f"Saved image at: {url}")
+            return url
             
-        except (ValidationError, OSError) as e:
+        except Exception as e:
             app.logger.error(f"File upload error: {str(e)}")
-            if os.path.exists(filepath):
+            if 'filepath' in locals() and os.path.exists(filepath):
                 os.remove(filepath)
             raise ValidationError(str(e))
     
@@ -271,14 +302,11 @@ class PostAdmin(ModelView):
                 image_url = self.handle_file_upload(file)
                 if image_url:
                     model.image_url = image_url
-        except ValidationError as e:
+                    app.logger.info(f"Updated model with image URL: {image_url}")
+        except Exception as e:
+            app.logger.error(f"Error in on_model_change: {str(e)}")
             flash(str(e), 'error')
             raise
-        except Exception as e:
-            app.logger.error(f'Unexpected error in on_model_change: {str(e)}')
-            flash('An unexpected error occurred while saving the image', 'error')
-            raise
-
     form_overrides = {
         'content': CKEditorField
     }
@@ -313,24 +341,40 @@ def load_user(user_id):
 
 @app.route('/')
 def index():
-    page = request.args.get('page', 1, type=int)
-    per_page = 6
-    
-    # Get regular posts with pagination
-    pagination = Post.query.order_by(Post.created_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
-    posts = pagination.items
-    
-    # Get trending and most liked posts
-    trending_posts = Post.get_trending_posts(limit=3)
-    most_liked_posts = Post.get_most_liked_posts(limit=3)
-    
-    return render_template('index.html',
-                         posts=posts,
-                         trending_posts=trending_posts,
-                         most_liked_posts=most_liked_posts,
-                         pagination=pagination)
+    """Home page"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = 10
+        
+        # Get posts with pagination
+        posts = Post.query.order_by(Post.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False)
+            
+        if posts is None:
+            app.logger.error("No posts found or database error")
+            return render_template('index.html', posts=[], trending_posts=[], most_liked_posts=[])
+            
+        # Get trending and most liked posts for sidebars
+        try:
+            trending_posts = Post.query.order_by(Post.created_at.desc()).limit(5).all()
+        except Exception as e:
+            app.logger.error(f"Error getting trending posts: {str(e)}")
+            trending_posts = []
+            
+        try:
+            most_liked_posts = Post.query.order_by(Post.likes.desc()).limit(5).all()
+        except Exception as e:
+            app.logger.error(f"Error getting most liked posts: {str(e)}")
+            most_liked_posts = []
+        
+        return render_template('index.html',
+                             posts=posts,
+                             trending_posts=trending_posts,
+                             most_liked_posts=most_liked_posts)
+                             
+    except Exception as e:
+        app.logger.error(f"Error in index route: {str(e)}")
+        return render_template('index.html', posts=[], trending_posts=[], most_liked_posts=[])
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():

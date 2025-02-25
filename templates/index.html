@@ -2,227 +2,125 @@
 
 {% block content %}
 <div class="container mt-4">
-    <!-- Trending Posts Section -->
-    <section class="mb-5">
-        <h2 class="section-title mb-4">Trend Hikayeler</h2>
-        <div class="row">
-            {% for post in trending_posts %}
-            <div class="col-md-4 mb-4">
-                <div class="card h-100 shadow-sm hover-card">
-                    {% if post.image_url %}
-                    <div class="card-img-container">
-                        <img src="{{ post.image_url }}" class="card-img-top image-loading" alt="{{ post.title }}"
-                             onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'200\' viewBox=\'0 0 300 200\'><rect fill=\'%23f8f9fa\' width=\'300\' height=\'200\'/><text fill=\'%23dee2e6\' font-family=\'sans-serif\' font-size=\'24\' text-anchor=\'middle\' x=\'150\' y=\'100\'>Resim Yüklenemedi</text></svg>'; this.classList.add('image-error'); this.classList.add('image-loaded');"
-                             loading="lazy"
-                             onload="this.classList.remove('image-loading'); this.classList.add('image-loaded');">
-                        <div class="card-img-overlay-gradient"></div>
-                    </div>
-                    {% endif %}
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="badge bg-danger">Trend</span>
-                            <div class="rating-info">
-                                <i class="fas fa-thumbs-up text-primary"></i>
-                                <span>{{ post.likes }}</span>
+    <div class="row">
+        <!-- Main content -->
+        <div class="col-md-8">
+            <div class="row row-cols-1 row-cols-md-2 g-4">
+                {% if posts.items %}
+                    {% for post in posts.items %}
+                    <div class="col">
+                        <div class="card h-100 shadow-sm hover-card">
+                            {% if post.image_url %}
+                            <div class="card-img-container">
+                                <img src="{{ post.image_url }}" class="card-img-top image-loading" alt="{{ post.title }}"
+                                     onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'200\' viewBox=\'0 0 300 200\'><rect fill=\'%23f8f9fa\' width=\'300\' height=\'200\'/><text fill=\'%23dee2e6\' font-family=\'sans-serif\' font-size=\'24\' text-anchor=\'middle\' x=\'150\' y=\'100\'>Resim Yüklenemedi</text></svg>'; this.classList.add('image-error'); this.classList.add('image-loaded');"
+                                     loading="lazy"
+                                     onload="this.classList.remove('image-loading'); this.classList.add('image-loaded');">
+                                <div class="card-img-overlay-gradient"></div>
                             </div>
-                        </div>
-                        <h5 class="card-title">{{ post.title }}</h5>
-                        <p class="card-text text-muted">{{ post.created_at.strftime('%d %B %Y') }}</p>
-                        <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-outline-primary stretched-link">Devamını Oku</a>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </section>
-
-    <!-- Most Liked Posts Section -->
-    <section class="mb-5">
-        <h2 class="section-title mb-4">En Çok Beğenilenler</h2>
-        <div class="row">
-            {% for post in most_liked_posts %}
-            <div class="col-md-4 mb-4">
-                <div class="card h-100 shadow-sm hover-card">
-                    {% if post.image_url %}
-                    <div class="card-img-container">
-                        <img src="{{ post.image_url }}" class="card-img-top image-loading" alt="{{ post.title }}"
-                             onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'200\' viewBox=\'0 0 300 200\'><rect fill=\'%23f8f9fa\' width=\'300\' height=\'200\'/><text fill=\'%23dee2e6\' font-family=\'sans-serif\' font-size=\'24\' text-anchor=\'middle\' x=\'150\' y=\'100\'>Resim Yüklenemedi</text></svg>'; this.classList.add('image-error'); this.classList.add('image-loaded');"
-                             loading="lazy"
-                             onload="this.classList.remove('image-loading'); this.classList.add('image-loaded');">
-                        <div class="card-img-overlay-gradient"></div>
-                    </div>
-                    {% endif %}
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="badge bg-success">En Çok Beğenilen</span>
-                            <div class="rating-info">
-                                <i class="fas fa-thumbs-up text-primary"></i>
-                                <span>{{ post.likes }}</span>
-                            </div>
-                        </div>
-                        <h5 class="card-title">{{ post.title }}</h5>
-                        <p class="card-text text-muted">{{ post.created_at.strftime('%d %B %Y') }}</p>
-                        <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-outline-primary stretched-link">Devamını Oku</a>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </section>
-
-    <!-- Latest Posts Section -->
-    <section>
-        <h2 class="section-title mb-4">Son Hikayeler</h2>
-        <div class="row">
-            {% for post in posts %}
-            <div class="col-md-4 mb-4">
-                <div class="card h-100 shadow-sm hover-card">
-                    {% if post.image_url %}
-                    <div class="card-img-container">
-                        <img src="{{ post.image_url }}" class="card-img-top image-loading" alt="{{ post.title }}"
-                             onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'200\' viewBox=\'0 0 300 200\'><rect fill=\'%23f8f9fa\' width=\'300\' height=\'200\'/><text fill=\'%23dee2e6\' font-family=\'sans-serif\' font-size=\'24\' text-anchor=\'middle\' x=\'150\' y=\'100\'>Resim Yüklenemedi</text></svg>'; this.classList.add('image-error'); this.classList.add('image-loaded');"
-                             loading="lazy"
-                             onload="this.classList.remove('image-loading'); this.classList.add('image-loaded');">
-                        <div class="card-img-overlay-gradient"></div>
-                    </div>
-                    {% endif %}
-                    <div class="card-body">
-                        <span class="badge bg-primary mb-2">{{ post.category }}</span>
-                        <h5 class="card-title">{{ post.title }}</h5>
-                        <p class="card-text text-muted">{{ post.created_at.strftime('%d %B %Y') }}</p>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-outline-primary stretched-link">Devamını Oku</a>
-                            <div class="rating-info">
-                                <i class="fas fa-thumbs-up text-primary"></i>
-                                <span>{{ post.likes }}</span>
+                            {% endif %}
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <a href="{{ url_for('view_post', post_id=post.id) }}" class="text-decoration-none text-dark">
+                                        {{ post.title }}
+                                    </a>
+                                </h5>
+                                <p class="card-text text-muted small">{{ post.created_at.strftime('%d %B %Y') }}</p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <a href="{{ url_for('category', category=post.category) }}" class="btn btn-sm btn-outline-secondary">
+                                        {{ post.category|title }}
+                                    </a>
+                                    <div class="rating-info">
+                                        <span class="text-primary">
+                                            <i class="fas fa-thumbs-up"></i> {{ post.likes }}
+                                        </span>
+                                        <span class="text-danger ms-2">
+                                            <i class="fas fa-thumbs-down"></i> {{ post.dislikes }}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            Henüz hiç gönderi yok.
+                        </div>
+                    </div>
+                {% endif %}
             </div>
-            {% endfor %}
-        </div>
-    </section>
 
-    <!-- Pagination -->
-    <nav aria-label="Page navigation" class="mt-4">
-        <ul class="pagination justify-content-center">
-            {% if pagination.has_prev %}
-            <li class="page-item">
-                <a class="page-link" href="{{ url_for('index', page=pagination.prev_num) }}">Önceki</a>
-            </li>
-            {% endif %}
-            
-            {% for page_num in pagination.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2) %}
-                {% if page_num %}
-                    {% if page_num == pagination.page %}
-                    <li class="page-item active">
-                        <span class="page-link">{{ page_num }}</span>
-                    </li>
-                    {% else %}
+            <!-- Pagination -->
+            {% if posts.pages > 1 %}
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if posts.has_prev %}
                     <li class="page-item">
+                        <a class="page-link" href="{{ url_for('index', page=posts.prev_num) }}">Önceki</a>
+                    </li>
+                    {% endif %}
+
+                    {% for page_num in range(1, posts.pages + 1) %}
+                    <li class="page-item {% if page_num == posts.page %}active{% endif %}">
                         <a class="page-link" href="{{ url_for('index', page=page_num) }}">{{ page_num }}</a>
                     </li>
+                    {% endfor %}
+
+                    {% if posts.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('index', page=posts.next_num) }}">Sonraki</a>
+                    </li>
                     {% endif %}
-                {% else %}
-                    <li class="page-item disabled"><span class="page-link">...</span></li>
-                {% endif %}
-            {% endfor %}
-            
-            {% if pagination.has_next %}
-            <li class="page-item">
-                <a class="page-link" href="{{ url_for('index', page=pagination.next_num) }}">Sonraki</a>
-            </li>
+                </ul>
+            </nav>
             {% endif %}
-        </ul>
-    </nav>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-md-4">
+            <!-- Trending Posts -->
+            {% if trending_posts %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Trend Yazılar</h5>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% for post in trending_posts %}
+                    <a href="{{ url_for('view_post', post_id=post.id) }}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ post.title }}</h6>
+                        </div>
+                        <small class="text-muted">{{ post.created_at.strftime('%d %B %Y') }}</small>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Most Liked Posts -->
+            {% if most_liked_posts %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">En Çok Beğenilenler</h5>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% for post in most_liked_posts %}
+                    <a href="{{ url_for('view_post', post_id=post.id) }}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ post.title }}</h6>
+                            <small class="text-primary">
+                                <i class="fas fa-thumbs-up"></i> {{ post.likes }}
+                            </small>
+                        </div>
+                        <small class="text-muted">{{ post.created_at.strftime('%d %B %Y') }}</small>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 </div>
-
-<style>
-.section-title {
-    color: #333;
-    font-weight: 600;
-    position: relative;
-    padding-bottom: 10px;
-}
-
-.section-title:after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 50px;
-    height: 3px;
-    background: #007bff;
-}
-
-.card-img-container {
-    position: relative;
-    padding-top: 56.25%; /* 16:9 aspect ratio */
-    overflow: hidden;
-    background-color: #f8f9fa;
-}
-
-.card-img-container img {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: all 0.3s ease;
-}
-
-.card-img-container img:hover {
-    transform: scale(1.05);
-}
-
-.card-img-overlay-gradient {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 50%;
-    background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.3));
-    pointer-events: none;
-}
-
-.image-loading {
-    opacity: 0;
-}
-
-.image-loaded {
-    opacity: 1;
-}
-
-.image-error {
-    opacity: 0.7;
-    border: 1px dashed #dc3545;
-    padding: 1rem;
-    background-color: #f8f9fa;
-}
-
-.hover-card {
-    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-}
-
-.hover-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-}
-
-.rating-info {
-    font-size: 0.9rem;
-}
-
-.card {
-    border: none;
-    background: #fff;
-}
-
-.badge {
-    font-weight: 500;
-    padding: 6px 12px;
-}
-</style>
 {% endblock %}
