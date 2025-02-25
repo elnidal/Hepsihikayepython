@@ -33,7 +33,7 @@ if os.environ.get('PRODUCTION'):
     app.config['UPLOAD_URL'] = '/uploads'  # URL path for uploads
 else:
     app.config['UPLOAD_FOLDER'] = os.path.join(app.static_folder, 'uploads')
-    app.config['UPLOAD_URL'] = 'uploads'  # URL path for uploads
+    app.config['UPLOAD_URL'] = 'static/uploads'  # URL path for uploads
 
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -243,54 +243,54 @@ class PostAdmin(ModelView):
     
     def handle_file_upload(self, file):
         """Handle file upload with proper error handling"""
-        if not file:
-            return None
-            
-        filename = secure_filename(file.filename)
-        if not filename:
-            raise ValidationError("Invalid filename")
-            
-        if not allowed_file(filename):
-            raise ValidationError("File type not allowed")
-            
-        # Create a unique filename to avoid conflicts
-        timestamp = int(time.time())
-        name, ext = os.path.splitext(filename)
-        unique_filename = f"{name}_{timestamp}{ext}"
-        
-        # Ensure upload directory exists
-        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-        
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-        
-        # Save the file
-        file.save(filepath)
-        
-        # Validate that it's actually an image
         try:
-            with open(filepath, 'rb') as img_file:
-                validate_image(img_file)
+            if not file:
+                return None
+                
+            filename = secure_filename(file.filename)
+            if not filename:
+                raise ValidationError("Invalid filename")
+                
+            if not allowed_file(filename):
+                raise ValidationError("File type not allowed")
+                
+            # Create a unique filename to avoid conflicts
+            timestamp = int(time.time())
+            name, ext = os.path.splitext(filename)
+            unique_filename = f"{name}_{timestamp}{ext}"
+            
+            # Ensure upload directory exists
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+            
+            # Save the file
+            file.save(filepath)
+            
+            # Validate that it's actually an image
+            try:
+                with open(filepath, 'rb') as img_file:
+                    validate_image(img_file)
+            except Exception as e:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                raise ValidationError(f"Invalid image: {str(e)}")
+            
+            # Resize if needed
+            try:
+                resize_image(filepath)
+            except Exception as e:
+                app.logger.error(f"Error resizing image: {str(e)}")
+                # Continue even if resize fails
+                
+            # Return the URL path (not filesystem path)
+            return os.path.join('uploads', unique_filename)
         except Exception as e:
-            if os.path.exists(filepath):
+            app.logger.error(f"File upload error: {str(e)}")
+            if 'filepath' in locals() and os.path.exists(filepath):
                 os.remove(filepath)
-            raise ValidationError(f"Invalid image: {str(e)}")
-        
-        # Resize if needed
-        try:
-            resize_image(filepath)
-        except Exception as e:
-            app.logger.error(f"Error resizing image: {str(e)}")
-            # Continue even if resize fails
-            
-        # Return the URL path (not filesystem path)
-        return os.path.join(app.config['UPLOAD_URL'], unique_filename)
-        
-    except Exception as e:
-        app.logger.error(f"File upload error: {str(e)}")
-        if 'filepath' in locals() and os.path.exists(filepath):
-            os.remove(filepath)
-        raise ValidationError(str(e))
-    
+            raise ValidationError(str(e))
+
     def on_model_change(self, form, model, is_created):
         """Handle model changes with proper error handling"""
         try:
