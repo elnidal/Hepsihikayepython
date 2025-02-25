@@ -8,7 +8,6 @@ from flask_wtf.csrf import CSRFProtect
 from flask_ckeditor import CKEditor, CKEditorField
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from werkzeug.exceptions import ValidationError
 import os
 import time
 from datetime import datetime
@@ -17,6 +16,10 @@ from wtforms.validators import DataRequired
 from sqlalchemy import or_
 import logging
 from logging.handlers import RotatingFileHandler
+
+# Custom exception for validation errors
+class ValidationError(Exception):
+    pass
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key')
@@ -200,7 +203,7 @@ class PostAdmin(ModelView):
             
         if not allowed_file(file.filename):
             app.logger.warning(f'Invalid file type: {file.filename}')
-            raise ValueError('Invalid file type. Allowed types are: png, jpg, jpeg, gif')
+            raise ValidationError('Invalid file type. Allowed types are: png, jpg, jpeg, gif')
             
         try:
             # Generate a unique filename
@@ -218,7 +221,7 @@ class PostAdmin(ModelView):
             
             # Verify the file was saved
             if not os.path.exists(file_path):
-                raise ValueError('Failed to save file')
+                raise ValidationError('Failed to save file')
                 
             app.logger.info(f'Successfully saved image: {unique_filename}')
             
@@ -230,7 +233,7 @@ class PostAdmin(ModelView):
             
         except Exception as e:
             app.logger.error(f'Error saving image: {str(e)}')
-            raise ValueError(f'Failed to save image: {str(e)}')
+            raise ValidationError(f'Failed to save image: {str(e)}')
     
     def on_model_change(self, form, model, is_created):
         """Handle model changes with proper error handling"""
@@ -240,9 +243,9 @@ class PostAdmin(ModelView):
                 image_url = self.handle_file_upload(file)
                 if image_url:
                     model.image_url = image_url
-        except ValueError as e:
+        except ValidationError as e:
             flash(str(e), 'error')
-            raise ValidationError(str(e))
+            raise
         except Exception as e:
             app.logger.error(f'Unexpected error in on_model_change: {str(e)}')
             flash('An unexpected error occurred while saving the image', 'error')
