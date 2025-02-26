@@ -33,7 +33,7 @@ if os.environ.get('FLASK_ENV') == 'production':
     app.config['UPLOAD_URL'] = 'uploads'
 else:
     app.config['UPLOAD_FOLDER'] = os.path.join(app.static_folder, 'uploads')
-    app.config['UPLOAD_URL'] = 'uploads'  # URL path for uploads
+    app.config['UPLOAD_URL'] = 'static/uploads'  # URL path for uploads in development
 
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -261,7 +261,7 @@ def serve_upload(filename):
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
     else:
         # In development, serve from the static/uploads directory
-        return redirect(url_for('static', filename=f'uploads/{filename}'))
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 @app.route('/admin')
 @login_required
@@ -386,7 +386,10 @@ def edit_post(post_id):
                 try:
                     # Delete old image if exists
                     if post.image_url:
-                        old_image_path = os.path.join(app.static_folder, post.image_url)
+                        if os.environ.get('FLASK_ENV') == 'production':
+                            old_image_path = os.path.join(app.config['UPLOAD_FOLDER'], post.image_url)
+                        else:
+                            old_image_path = os.path.join(app.static_folder, post.image_url)
                         if os.path.exists(old_image_path):
                             os.remove(old_image_path)
                     
@@ -427,7 +430,10 @@ def delete_post(post_id):
     
     # Delete image if exists
     if post.image_url:
-        image_path = os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(post.image_url))
+        if os.environ.get('FLASK_ENV') == 'production':
+            image_path = os.path.join(app.config['UPLOAD_FOLDER'], post.image_url)
+        else:
+            image_path = os.path.join(app.static_folder, post.image_url)
         if os.path.exists(image_path):
             os.remove(image_path)
     
