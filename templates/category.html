@@ -1,67 +1,41 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <!-- Main Content -->
-    <div class="col-lg-12">
-        <h2 class="mb-4">{{ category_name }}</h2>
-        
-        {% if posts.items %}
-            <div class="row">
-                {% for post in posts.items %}
-                <div class="col-md-6 mb-4">
-                    <article class="post-card h-100">
-                        {% if post.image_url %}
-                        <img src="{{ url_for('static', filename=post.image_url) }}" class="card-img-top" alt="{{ post.title }}">
-                        {% endif %}
-                        <div class="card-body">
-                            <a href="{{ url_for('category', category_name=post.category) }}" class="category-pill mb-2">
-                                {{ post.category }}
-                            </a>
-                            <h3 class="card-title">{{ post.title }}</h3>
-                            <p class="card-text">{{ post.content|striptags|truncate(150) }}</p>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div class="rating-buttons">
-                                    <button class="rating-btn" onclick="ratePost({{ post.id }}, true)">
-                                        <i class="fas fa-thumbs-up"></i> <span id="likes-{{ post.id }}">{{ post.likes }}</span>
-                                    </button>
-                                    <button class="rating-btn" onclick="ratePost({{ post.id }}, false)">
-                                        <i class="fas fa-thumbs-down"></i> <span id="dislikes-{{ post.id }}">{{ post.dislikes }}</span>
-                                    </button>
-                                </div>
-                                <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-primary">Devamını Oku</a>
-                            </div>
-                        </div>
-                        <div class="card-footer text-muted">
-                            {{ post.created_at.strftime('%d %B %Y') }}
-                        </div>
-                    </article>
+<div class="container">
+    <h1 class="section-title">{{ category_display }}</h1>
+    
+    <div class="row">
+        {% for post in posts %}
+        <div class="col-md-4 mb-4">
+            <div class="story-card">
+                {% if post.image_url %}
+                <img src="{{ url_for('static', filename=post.image_url) }}" alt="{{ post.title }}" class="story-image">
+                {% else %}
+                <img src="{{ url_for('static', filename='img/default-story.jpg') }}" alt="{{ post.title }}" class="story-image">
+                {% endif %}
+                
+                <div class="story-content">
+                    <span class="story-category">{{ post.get_category_display() }}</span>
+                    <h3 class="story-title">{{ post.title }}</h3>
+                    <div class="story-excerpt">
+                        {{ post.content|striptags|truncate(150) }}
+                    </div>
+                    <div class="story-meta">
+                        <span>{{ post.created_at.strftime('%d.%m.%Y') }}</span>
+                        <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-sm btn-outline-primary">Devamını Oku</a>
+                    </div>
                 </div>
-                {% endfor %}
             </div>
-            
-            <!-- Pagination -->
-            {% if posts.pages > 1 %}
-            <nav aria-label="Page navigation" class="mt-4">
-                <ul class="pagination justify-content-center">
-                    {% for page in range(1, posts.pages + 1) %}
-                    <li class="page-item {% if page == posts.page %}active{% endif %}">
-                        <a class="page-link" href="{{ url_for('category', category_name=category_name, page=page) }}">{{ page }}</a>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </nav>
-            {% endif %}
-        {% else %}
-            <div class="alert alert-info text-center">
-                <p class="mb-0">Bu kategoride henüz içerik bulunmamaktadır.</p>
-            </div>
+        </div>
+        {% endfor %}
+        
+        {% if not posts %}
+        <div class="col-12 text-center py-5">
+            <p>Bu kategoride henüz hikaye bulunmamaktadır.</p>
+        </div>
         {% endif %}
     </div>
 </div>
-
-<!-- Message div for showing feedback -->
-<div id="message" class="alert" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 1000;"></div>
 {% endblock %}
 
 {% block scripts %}

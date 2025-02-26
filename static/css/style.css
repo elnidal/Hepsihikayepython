@@ -1,18 +1,324 @@
-.section-title {
-    color: #333;
-    font-weight: 600;
-    position: relative;
-    padding-bottom: 10px;
+:root {
+    --primary-color: #e8553e;
+    --secondary-color: #f8d568;
+    --text-color: #333;
+    --light-gray: #f5f5f5;
 }
 
-.section-title:after {
-    content: '';
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+.site-header {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 2rem 0;
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.site-title {
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    margin-bottom: 0.5rem;
+}
+
+.site-tagline {
+    font-size: 1.2rem;
+    position: relative;
+    display: inline-block;
+    padding: 0 1rem;
+}
+
+.site-tagline:before,
+.site-tagline:after {
+    content: "";
+    display: block;
+    height: 1px;
+    width: 100px;
+    background: white;
     position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 50px;
-    height: 3px;
-    background: #007bff;
+    top: 50%;
+}
+
+.site-tagline:before {
+    left: -100px;
+}
+
+.site-tagline:after {
+    right: -100px;
+}
+
+.nav-categories {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.nav-category {
+    padding: 0.5rem 1rem;
+    margin: 0 0.25rem 0.5rem 0.25rem;
+    border-radius: 50px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    background-color: white;
+    color: var(--text-color);
+    border: 1px solid #ddd;
+    font-size: 0.9rem;
+}
+
+.nav-category.active,
+.nav-category:hover {
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.section-title {
+    color: var(--primary-color);
+    font-size: 2.5rem;
+    margin-bottom: 2rem;
+    position: relative;
+    display: inline-block;
+}
+
+.story-card {
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    height: 100%;
+    background: white;
+}
+
+.story-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+.story-image {
+    height: 200px;
+    object-fit: cover;
+    width: 100%;
+}
+
+.story-content {
+    padding: 1.5rem;
+}
+
+.story-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.story-category {
+    display: inline-block;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    padding: 0.25rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.8rem;
+    margin-bottom: 0.75rem;
+}
+
+.story-excerpt {
+    color: #666;
+    margin-bottom: 1rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.story-meta {
+    font-size: 0.85rem;
+    color: #888;
+    display: flex;
+    justify-content: space-between;
+}
+
+.about-section {
+    background-color: var(--light-gray);
+    padding: 4rem 0;
+    margin-top: 3rem;
+}
+
+.about-image {
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+footer {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 2rem 0;
+    margin-top: 3rem;
+}
+
+.post-detail {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+}
+
+.post-image img {
+    width: 100%;
+    border-radius: 8px;
+}
+
+.post-content {
+    line-height: 1.8;
+    font-size: 1.1rem;
+}
+
+.post-meta {
+    color: #888;
+    font-size: 0.9rem;
+}
+
+.post-footer {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eee;
+}
+
+/* Admin styles */
+.admin-table {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.admin-form {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+/* Featured card styles */
+.featured-card {
+    border: none;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.featured-card .story-image {
+    height: 220px;
+}
+
+.featured-card .story-title {
+    font-size: 1.4rem;
+}
+
+/* Category highlights styles */
+.category-title {
+    color: var(--primary-color);
+    font-size: 1.8rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--secondary-color);
+}
+
+.category-post-item {
+    margin-bottom: 1rem;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    transition: all 0.3s ease;
+}
+
+.category-post-item:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.category-post-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    min-height: 100px;
+}
+
+.category-post-content {
+    padding: 0.75rem;
+}
+
+.category-post-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.category-post-date {
+    font-size: 0.8rem;
+    color: #888;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.category-post-link {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+.category-post-link:hover {
+    text-decoration: underline;
+}
+
+/* Search styles */
+.search-container {
+    margin: 1.5rem 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .site-title {
+        font-size: 2rem;
+    }
+    
+    .site-tagline:before,
+    .site-tagline:after {
+        width: 50px;
+    }
+    
+    .site-tagline:before {
+        left: -50px;
+    }
+    
+    .site-tagline:after {
+        right: -50px;
+    }
+    
+    .section-title {
+        font-size: 2rem;
+    }
+    
+    .story-card {
+        margin-bottom: 1.5rem;
+    }
 }
 
 .card-img-container {

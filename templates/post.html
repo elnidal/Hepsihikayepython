@@ -1,159 +1,32 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4">
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Ana Sayfa</a></li>
-            <li class="breadcrumb-item"><a href="{{ url_for('category', category=post.category) }}">{{ post.category|title }}</a></li>
-            <li class="breadcrumb-item active" aria-current="page">{{ post.title }}</li>
-        </ol>
-    </nav>
-
-    <article class="blog-post">
-        <h1 class="blog-post-title">{{ post.title }}</h1>
-        <p class="blog-post-meta text-muted">{{ post.created_at.strftime('%d %B %Y') }}</p>
-        
-        {% if post.image_url %}
-        <div class="blog-post-image mb-4">
-            <img src="{{ post.image_url }}" alt="{{ post.title }}" class="img-fluid rounded image-loading" 
-                 onerror="this.onerror=null; this.src='data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'200\' viewBox=\'0 0 300 200\'><rect fill=\'%23f8f9fa\' width=\'300\' height=\'200\'/><text fill=\'%23dee2e6\' font-family=\'sans-serif\' font-size=\'24\' text-anchor=\'middle\' x=\'150\' y=\'100\'>Resim Yüklenemedi</text></svg>'; this.classList.add('image-error'); this.classList.add('image-loaded');"
-                 loading="lazy">
-        </div>
-        {% endif %}
-        
-        <div class="blog-post-content">
-            {{ post.content|safe }}
-        </div>
-
-        <div class="rating-section mt-4 mb-4">
-            <div class="d-flex align-items-center">
-                <div class="me-4">
-                    <button class="btn btn-outline-primary rating-btn" data-action="like" data-post-id="{{ post.id }}">
-                        <i class="fas fa-thumbs-up"></i>
-                        <span class="likes-count">{{ post.likes }}</span>
-                    </button>
+<div class="container">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <article class="post-detail">
+                <span class="story-category">{{ post.get_category_display() }}</span>
+                <h1 class="mb-3">{{ post.title }}</h1>
+                
+                <div class="post-meta mb-4">
+                    <span><i class="far fa-calendar"></i> {{ post.created_at.strftime('%d.%m.%Y') }}</span>
                 </div>
-                <div>
-                    <button class="btn btn-outline-danger rating-btn" data-action="dislike" data-post-id="{{ post.id }}">
-                        <i class="fas fa-thumbs-down"></i>
-                        <span class="dislikes-count">{{ post.dislikes }}</span>
-                    </button>
+                
+                {% if post.image_url %}
+                <div class="post-image mb-4">
+                    <img src="{{ url_for('static', filename=post.image_url) }}" alt="{{ post.title }}" class="img-fluid rounded">
                 </div>
-            </div>
+                {% endif %}
+                
+                <div class="post-content">
+                    {{ post.content|safe }}
+                </div>
+                
+                <div class="post-footer mt-5 pt-4 border-top">
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-primary"><i class="fas fa-arrow-left"></i> Tüm Hikayelere Dön</a>
+                </div>
+            </article>
         </div>
-    </article>
+    </div>
 </div>
-
-<!-- Add Font Awesome for thumbs up/down icons -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-
-<!-- Add rating functionality -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const ratingButtons = document.querySelectorAll('.rating-btn');
-    
-    ratingButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const postId = this.dataset.postId;
-            const action = this.dataset.action;
-            
-            fetch(`/post/${postId}/rate/${action}`)
-                .then(response => response.json())
-                .then(data => {
-                    // Update counts
-                    document.querySelector('.likes-count').textContent = data.likes;
-                    document.querySelector('.dislikes-count').textContent = data.dislikes;
-                    
-                    // Toggle active state
-                    ratingButtons.forEach(btn => {
-                        if (btn === this) {
-                            btn.classList.toggle('active');
-                        } else {
-                            btn.classList.remove('active');
-                        }
-                    });
-                })
-                .catch(error => console.error('Error:', error));
-        });
-    });
-});
-</script>
-
-<style>
-.rating-btn {
-    padding: 8px 16px;
-    font-size: 16px;
-    transition: all 0.3s ease;
-}
-
-.rating-btn i {
-    margin-right: 8px;
-}
-
-.rating-btn.active {
-    transform: scale(1.1);
-}
-
-.rating-btn[data-action="like"].active {
-    background-color: #007bff;
-    color: white;
-}
-
-.rating-btn[data-action="dislike"].active {
-    background-color: #dc3545;
-    color: white;
-}
-
-.blog-post-title {
-    color: #333;
-    margin-bottom: 1rem;
-}
-
-.blog-post-meta {
-    font-size: 0.9rem;
-    margin-bottom: 2rem;
-}
-
-.blog-post-content {
-    font-size: 1.1rem;
-    line-height: 1.8;
-    margin-bottom: 2rem;
-}
-
-.blog-post-image {
-    position: relative;
-    max-height: 500px;
-    overflow: hidden;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.blog-post-image img {
-    width: 100%;
-    height: auto;
-    object-fit: cover;
-    transition: opacity 0.3s ease;
-}
-
-.blog-post-image img.image-error {
-    opacity: 0.7;
-    border: 1px dashed #dc3545;
-    padding: 1rem;
-    background-color: #f8f9fa;
-}
-
-.image-loading {
-    opacity: 0;
-}
-
-.image-loaded {
-    opacity: 1;
-}
-
-.image-error {
-    opacity: 0.7;
-    border: 1px dashed #dc3545;
-}
-</style>
 {% endblock %}

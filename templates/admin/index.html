@@ -2,101 +2,84 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h1>Admin Panel</h1>
-    
-    <div class="row mt-4">
-        <div class="col-md-12">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h2>Hikayeler</h2>
-                <a href="{{ url_for('create_post') }}" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Yeni Hikaye
-                </a>
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">HepsiHikaye Admin</h1>
+            
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3>Hikayeler</h3>
+                <a href="{{ url_for('create_post') }}" class="btn btn-primary">Yeni Hikaye Ekle</a>
             </div>
             
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Başlık</th>
-                        <th>Kategori</th>
-                        <th>Tarih</th>
-                        <th>İşlemler</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for post in posts %}
-                    <tr>
-                        <td>{{ post.title }}</td>
-                        <td>{{ post.category }}</td>
-                        <td>{{ post.created_at.strftime('%d/%m/%Y') }}</td>
-                        <td>
-                            <a href="{{ url_for('edit_post', post_id=post.id) }}" class="btn btn-sm btn-warning">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <button onclick="deletePost({{ post.id }})" class="btn btn-sm btn-danger">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Başlık</th>
+                                    <th>Kategori</th>
+                                    <th>Tarih</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for post in posts %}
+                                <tr>
+                                    <td>{{ post.title }}</td>
+                                    <td>{{ post.get_category_display() }}</td>
+                                    <td>{{ post.created_at.strftime('%d.%m.%Y') }}</td>
+                                    <td>
+                                        <a href="{{ url_for('edit_post', post_id=post.id) }}" class="btn btn-sm btn-primary">Düzenle</a>
+                                        <button class="btn btn-sm btn-danger delete-post" data-post-id="{{ post.id }}">Sil</button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
-    
-    <div class="mt-4">
-        <a href="{{ url_for('logout') }}" class="btn btn-secondary">Çıkış Yap</a>
     </div>
 </div>
 
-<!-- Delete Modal -->
-<div class="modal fade" id="deleteModal" tabindex="-1">
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Hikayeyi Sil</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="deleteModalLabel">Hikayeyi Sil</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 Bu hikayeyi silmek istediğinizden emin misiniz?
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
-                <button type="button" class="btn btn-danger" id="confirmDelete">Sil</button>
+                <form id="deleteForm" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger">Sil</button>
+                </form>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-let postIdToDelete = null;
-
-function deletePost(postId) {
-    postIdToDelete = postId;
-    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
-    modal.show();
-}
-
-document.getElementById('confirmDelete').addEventListener('click', async () => {
-    if (postIdToDelete) {
-        try {
-            const response = await fetch(`/post/${postIdToDelete}/delete`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token() }}'
-                }
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set up delete post functionality
+        const deleteButtons = document.querySelectorAll('.delete-post');
+        const deleteForm = document.getElementById('deleteForm');
+        
+        deleteButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const postId = this.getAttribute('data-post-id');
+                deleteForm.action = `/admin/delete/${postId}`;
+                var deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+                deleteModal.show();
             });
-            
-            if (response.ok) {
-                window.location.reload();
-            } else {
-                alert('Hikaye silinirken bir hata oluştu.');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Bir hata oluştu.');
-        }
-    }
-});
+        });
+    });
 </script>
 {% endblock %}

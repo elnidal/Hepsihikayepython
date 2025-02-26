@@ -1,59 +1,66 @@
 {% extends "base.html" %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 {{ ckeditor.load() }}
 {{ ckeditor.config(name='content') }}
 {% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-    <h1>Hikaye Düzenle</h1>
-    
-    <form method="POST" enctype="multipart/form-data">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        
-        <div class="mb-3">
-            <label for="title" class="form-label">Başlık</label>
-            <input type="text" class="form-control" id="title" name="title" value="{{ post.title }}" required>
-        </div>
-        
-        <div class="mb-3">
-            <label for="category" class="form-label">Kategori</label>
-            <select class="form-control" id="category" name="category" required>
-                {% for value, label in categories %}
-                <option value="{{ value }}" {% if value == post.category %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        
-        <div class="mb-3">
-            <label for="content" class="form-label">İçerik</label>
-            {{ ckeditor.create(value=post.content) }}
-        </div>
-        
-        <div class="mb-3">
-            <label for="image" class="form-label">Resim</label>
-            {% if post.image_url %}
-            <div class="mb-2">
-                <img src="{{ url_for('static', filename=post.image_url) }}" alt="Current image" style="max-width: 200px;">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Hikayeyi Düzenle</h1>
+                <a href="{{ url_for('admin_index') }}" class="btn btn-secondary">Geri Dön</a>
             </div>
-            {% endif %}
-            <input type="file" class="form-control" id="image" name="image" accept="image/*">
-            <small class="form-text text-muted">Yeni bir resim yüklemek için seçin veya mevcut resmi korumak için boş bırakın.</small>
+            
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Başlık <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="title" name="title" value="{{ post.title }}" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="category" class="form-label">Kategori</label>
+                            <select class="form-select" id="category" name="category">
+                                {% for value, label in categories %}
+                                <option value="{{ value }}" {% if value == post.category %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="image" class="form-label">Resim</label>
+                            {% if post.image_url %}
+                            <div class="mb-2">
+                                <img src="{{ url_for('static', filename=post.image_url) }}" alt="Current image" style="max-width: 200px; max-height: 200px;" class="img-thumbnail">
+                            </div>
+                            {% endif %}
+                            <input type="file" class="form-control" id="image" name="image" accept="image/*">
+                            <div class="form-text">Yeni bir resim yüklemezseniz mevcut resim korunacaktır.</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="content" class="form-label">İçerik <span class="text-danger">*</span></label>
+                            {{ ckeditor.create(value=post.content) }}
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="submit" class="btn btn-primary">Kaydet</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
-        
-        <div class="mb-3">
-            <button type="submit" class="btn btn-primary">Kaydet</button>
-            <a href="{{ url_for('admin_index') }}" class="btn btn-secondary">İptal</a>
-        </div>
-    </form>
+    </div>
 </div>
 {% endblock %}
 
 {% block tail %}
-    {{ super() }}
     <script>
         // Add CSRF token to upload requests
         CKEDITOR.instances.content.on('fileUploadRequest', function(evt) {

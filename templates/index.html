@@ -1,86 +1,105 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <!-- Main Content -->
-    <div class="col-lg-8">
-        <!-- Featured Posts -->
-        <section class="mb-5">
-            <h2 class="mb-4">Son Yazılar</h2>
-            <div class="row">
-                {% for post in posts.items %}
-                <div class="col-md-6 mb-4">
-                    <article class="post-card h-100">
-                        {% if post.image_url %}
-                        <img src="/static/{{ post.image_url }}" class="card-img-top" alt="{{ post.title }}">
-                        {% endif %}
-                        <div class="card-body">
-                            <a href="{{ url_for('category', category_name=post.category) }}" class="category-pill mb-2">
-                                {{ post.category }}
-                            </a>
-                            <h3 class="card-title">{{ post.title }}</h3>
-                            <p class="card-text">{{ post.content|striptags|truncate(150) }}</p>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div class="rating-buttons">
-                                    <button class="rating-btn" onclick="ratePost({{ post.id }}, true)">
-                                        <i class="fas fa-thumbs-up"></i> {{ post.likes }}
-                                    </button>
-                                    <button class="rating-btn" onclick="ratePost({{ post.id }}, false)">
-                                        <i class="fas fa-thumbs-down"></i> {{ post.dislikes }}
-                                    </button>
+<div class="container">
+    <!-- Featured Stories Section -->
+    <section class="featured-section mb-5">
+        <h2 class="section-title">Öne Çıkan Hikayeler</h2>
+        
+        <div class="row">
+            {% for post in featured_posts %}
+            <div class="col-md-4 mb-4">
+                <div class="story-card featured-card">
+                    {% if post.image_url %}
+                    <img src="{{ url_for('static', filename=post.image_url) }}" alt="{{ post.title }}" class="story-image">
+                    {% else %}
+                    <img src="{{ url_for('static', filename='img/default-story.jpg') }}" alt="{{ post.title }}" class="story-image">
+                    {% endif %}
+                    
+                    <div class="story-content">
+                        <span class="story-category">{{ post.get_category_display() }}</span>
+                        <h3 class="story-title">{{ post.title }}</h3>
+                        <div class="story-excerpt">
+                            {{ post.content|striptags|truncate(100) }}
+                        </div>
+                        <div class="story-meta">
+                            <span><i class="far fa-calendar"></i> {{ post.created_at.strftime('%d.%m.%Y') }}</span>
+                            <span><i class="far fa-thumbs-up"></i> {{ post.likes }}</span>
+                        </div>
+                        <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-sm btn-primary mt-2">Devamını Oku</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    
+    <!-- Recent Stories Section -->
+    <section class="recent-section mb-5">
+        <h2 class="section-title">Son Eklenenler</h2>
+        
+        <div class="row">
+            {% for post in recent_posts %}
+            <div class="col-md-3 mb-4">
+                <div class="story-card">
+                    {% if post.image_url %}
+                    <img src="{{ url_for('static', filename=post.image_url) }}" alt="{{ post.title }}" class="story-image">
+                    {% else %}
+                    <img src="{{ url_for('static', filename='img/default-story.jpg') }}" alt="{{ post.title }}" class="story-image">
+                    {% endif %}
+                    
+                    <div class="story-content">
+                        <span class="story-category">{{ post.get_category_display() }}</span>
+                        <h3 class="story-title">{{ post.title }}</h3>
+                        <div class="story-meta">
+                            <span><i class="far fa-calendar"></i> {{ post.created_at.strftime('%d.%m.%Y') }}</span>
+                            <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-sm btn-outline-primary">Oku</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    
+    <!-- Category Highlights Section -->
+    <section class="category-highlights">
+        <div class="row">
+            {% for category, posts in category_highlights.items() %}
+            {% if posts %}
+            <div class="col-md-6 mb-5">
+                <div class="category-section">
+                    <h3 class="category-title">{{ dict(CATEGORIES).get(category, category.capitalize()) }}</h3>
+                    
+                    <div class="category-posts">
+                        {% for post in posts %}
+                        <div class="category-post-item">
+                            <div class="row g-0">
+                                <div class="col-4">
+                                    {% if post.image_url %}
+                                    <img src="{{ url_for('static', filename=post.image_url) }}" alt="{{ post.title }}" class="category-post-image">
+                                    {% else %}
+                                    <img src="{{ url_for('static', filename='img/default-story.jpg') }}" alt="{{ post.title }}" class="category-post-image">
+                                    {% endif %}
                                 </div>
-                                <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-primary">Devamını Oku</a>
+                                <div class="col-8">
+                                    <div class="category-post-content">
+                                        <h4 class="category-post-title">{{ post.title }}</h4>
+                                        <span class="category-post-date">{{ post.created_at.strftime('%d.%m.%Y') }}</span>
+                                        <a href="{{ url_for('post', post_id=post.id) }}" class="category-post-link">Oku</a>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="card-footer text-muted">
-                            {{ post.created_at.strftime('%d %B %Y') }}
-                        </div>
-                    </article>
+                        {% endfor %}
+                        
+                        <a href="{{ url_for('category', category=category) }}" class="btn btn-outline-primary btn-sm mt-3">Tümünü Gör</a>
+                    </div>
                 </div>
-                {% endfor %}
             </div>
-            
-            <!-- Pagination -->
-            {% if posts.pages > 1 %}
-            <nav aria-label="Page navigation" class="mt-4">
-                <ul class="pagination justify-content-center">
-                    {% for page in range(1, posts.pages + 1) %}
-                    <li class="page-item {% if page == posts.page %}active{% endif %}">
-                        <a class="page-link" href="{{ url_for('index', page=page) }}">{{ page }}</a>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </nav>
             {% endif %}
-        </section>
-    </div>
-
-    <!-- Sidebar -->
-    <div class="col-lg-4">
-        <!-- Trending Posts -->
-        <div class="sidebar mb-4">
-            <h3>Trend Yazılar</h3>
-            {% for post in trending_posts %}
-            <div class="mb-3">
-                <h5><a href="{{ url_for('post_detail', post_id=post.id) }}" class="text-decoration-none">{{ post.title }}</a></h5>
-                <p class="small text-muted mb-0">{{ post.created_at.strftime('%d %B %Y') }}</p>
-            </div>
             {% endfor %}
         </div>
-
-        <!-- Most Liked Posts -->
-        <div class="sidebar">
-            <h3>En Çok Beğenilenler</h3>
-            {% for post in most_liked_posts %}
-            <div class="mb-3">
-                <h5><a href="{{ url_for('post_detail', post_id=post.id) }}" class="text-decoration-none">{{ post.title }}</a></h5>
-                <div class="d-flex align-items-center">
-                    <span class="me-3"><i class="fas fa-thumbs-up"></i> {{ post.likes }}</span>
-                    <span class="small text-muted">{{ post.created_at.strftime('%d %B %Y') }}</span>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
+    </section>
 </div>
 {% endblock %}

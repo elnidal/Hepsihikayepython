@@ -1,8 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from flask_admin import Admin, AdminIndexView, expose
-from flask_admin.contrib.sqla import ModelView
 from flask_wtf import FlaskForm, CSRFProtect
 from flask_ckeditor import CKEditor, CKEditorField
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -16,6 +14,7 @@ from logging.handlers import RotatingFileHandler
 from PIL import Image
 import os
 import time
+import re
 
 # Custom exception for validation errors
 class ValidationError(Exception):
@@ -58,22 +57,27 @@ app.config['CKEDITOR_CONFIG'] = {
     ],
     'filebrowserUploadUrl': '/upload',
     'removeDialogTabs': 'image:advanced;link:advanced',
-    'language': 'tr'
+    'language': 'tr',
+    'extraPlugins': 'image2,uploadimage',
+    'removePlugins': 'image',
+    'disableNativeSpellChecker': False,
+    'disableReadonlyStyling': True,
+    'ignoreEmptyParagraph': True,
+    'allowedContent': True,
+    'extraAllowedContent': '*(*);*{*}',
+    'startupShowBorders': False
 }
 
 # Configure logging
-if os.environ.get('PRODUCTION'):
-    # In production, log to a file
-    if not os.path.exists('logs'):
-        os.makedirs('logs')
-    file_handler = RotatingFileHandler('logs/hepsihikaye.log', maxBytes=10240, backupCount=10)
-    file_handler.setFormatter(logging.Formatter(
-        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-    ))
-    file_handler.setLevel(logging.INFO)
-    app.logger.addHandler(file_handler)
-    app.logger.setLevel(logging.INFO)
-    app.logger.info('HepsiHikaye startup')
+logging.basicConfig(level=logging.INFO)
+handler = RotatingFileHandler('logs/hepsihikaye.log', maxBytes=10240, backupCount=10)
+handler.setFormatter(logging.Formatter(
+    '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+))
+handler.setLevel(logging.INFO)
+app.logger.addHandler(handler)
+app.logger.setLevel(logging.INFO)
+app.logger.info('HepsiHikaye startup')
 
 # Log important configuration
 app.logger.info(f'Upload directory: {app.config["UPLOAD_FOLDER"]}')
@@ -118,12 +122,13 @@ class User(UserMixin, db.Model):
         return str(self.id)
 
 CATEGORIES = [
-    ('şiir', 'Şiir'),
     ('öykü', 'Öykü'),
     ('roman', 'Roman'),
+    ('şiir', 'Şiir'),
     ('deneme', 'Deneme'),
     ('makale', 'Makale'),
-    ('haber', 'Haber')
+    ('haber', 'Haber'),
+    ('video', 'Video'),
 ]
 
 class Rating(db.Model):
@@ -143,6 +148,11 @@ class Post(db.Model):
     likes = db.Column(db.Integer, default=0)
     dislikes = db.Column(db.Integer, default=0)
     ratings = db.relationship('Rating', backref='post', lazy=True)
+
+    def get_category_display(self):
+        """Get the display name for the category"""
+        category_dict = dict(CATEGORIES)
+        return category_dict.get(self.category, self.category.capitalize())
 
     def update_rating_counts(self):
         """Update the likes and dislikes count for this post"""
@@ -240,184 +250,178 @@ def serve_upload(filename):
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
     return redirect(url_for('static', filename=f'uploads/{filename}'))
 
-class SecureModelView(ModelView):
-    def is_accessible(self):
-        return current_user.is_authenticated
-
-    def inaccessible_callback(self, name, **kwargs):
-        flash('Lütfen giriş yapın!', 'warning')
-        return redirect(url_for('login', next=request.url))
-
-class PostAdmin(SecureModelView):
-    column_list = ('title', 'category', 'created_at')
-    form_columns = ('title', 'content', 'category', 'image')
-    form_extra_fields = {
-        'image': FileField('Resim')
-    }
-    form_overrides = {
-        'content': CKEditorField
-    }
-    form_choices = {'category': CATEGORIES}
-
-    def on_model_change(self, form, model, is_created):
-        """Handle image upload"""
-        try:
-            file = form.image.data
-            if file:
-                filename = secure_filename(file.filename)
-                timestamp = int(time.time())
-                name, ext = os.path.splitext(filename)
-                unique_filename = f"{name}_{timestamp}{ext}"
-                
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-                file.save(filepath)
-                
-                # Validate and resize image
-                with open(filepath, 'rb') as img_file:
-                    validate_image(img_file)
-                resize_image(filepath)
-                
-                model.image_url = os.path.join('uploads', unique_filename)
-        except Exception as e:
-            if 'filepath' in locals() and os.path.exists(filepath):
-                os.remove(filepath)
-            raise ValidationError(str(e))
-
-    def delete_model(self, model):
-        """Delete image when post is deleted"""
-        try:
-            if model.image_url:
-                image_path = os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(model.image_url))
-                if os.path.exists(image_path):
-                    os.remove(image_path)
-            return super().delete_model(model)
-        except Exception as e:
-            app.logger.error(f"Error deleting post: {str(e)}")
-            raise
-
-class VideoAdmin(SecureModelView):
-    column_list = ('title', 'youtube_embed', 'created_at')
-    form_columns = ('title', 'youtube_embed')
-
-# Initialize admin interface
-admin = Admin(app, name='HepsiHikaye Admin', template_mode='bootstrap3')
-admin.add_view(PostAdmin(Post, db.session, name='Hikayeler'))
-admin.add_view(VideoAdmin(Video, db.session, name='Videolar'))
-
 @app.route('/admin')
 @login_required
 def admin_index():
-    """Admin dashboard page"""
     posts = Post.query.order_by(Post.created_at.desc()).all()
-    return render_template('admin/index.html', posts=posts)
+    return render_template('admin/index.html', posts=posts, now=datetime.now())
 
-@app.route('/post/create', methods=['GET', 'POST'])
+@app.route('/admin/create', methods=['GET', 'POST'])
 @login_required
 def create_post():
-    """Create a new post"""
     if request.method == 'POST':
-        try:
-            title = request.form['title']
-            content = request.form['content']
-            category = request.form['category']
-            image = request.files.get('image')
+        title = request.form.get('title')
+        content = request.form.get('content')
+        category = request.form.get('category')
+        
+        # Debug logging
+        app.logger.info(f"Form data - Title: {title}, Category: {category}")
+        app.logger.info(f"Content: {content}")
+        
+        # Check if content is empty or just contains HTML tags with no actual content
+        content_without_tags = re.sub(r'<[^>]*>', '', content or '')
+        content_without_tags = content_without_tags.strip()
+        app.logger.info(f"Content without tags: '{content_without_tags}'")
+        
+        if not title:
+            flash('Lütfen başlık alanını doldurun!', 'danger')
+            return render_template('admin/create_post.html', categories=CATEGORIES, 
+                                 now=datetime.now(), form_data={'title': title, 'content': content, 'category': category})
+        
+        # Special check for CKEditor empty content patterns
+        is_empty_content = (not content or 
+                           content == '<p>&nbsp;</p>' or 
+                           content == '<p>None</p>' or
+                           content == 'None' or
+                           not content_without_tags)
+        
+        if is_empty_content:
+            app.logger.info(f"Content validation failed: '{content}'")
+            flash('Lütfen içerik alanını doldurun!', 'danger')
+            return render_template('admin/create_post.html', categories=CATEGORIES, 
+                                 now=datetime.now(), form_data={'title': title, 'content': '', 'category': category})
+        
+        app.logger.info(f"Content validation passed, creating post")
+        new_post = Post(
+            title=title,
+            content=content,
+            category=category
+        )
+        
+        # Handle image upload
+        if 'image' in request.files and request.files['image'].filename:
+            file = request.files['image']
             
-            post = Post(title=title, content=content, category=category)
-            
-            if image and allowed_file(image.filename):
-                filename = secure_filename(image.filename)
-                timestamp = int(time.time())
-                name, ext = os.path.splitext(filename)
-                unique_filename = f"{name}_{timestamp}{ext}"
-                
-                # Ensure upload directory exists
-                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-                
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-                image.save(filepath)
-                
-                # Validate and resize image
-                with open(filepath, 'rb') as img_file:
-                    validate_image(img_file)
-                resize_image(filepath)
-                
-                post.image_url = os.path.join('uploads', unique_filename)
-            
-            db.session.add(post)
-            db.session.commit()
-            flash('Hikaye başarıyla oluşturuldu!', 'success')
-            return redirect(url_for('admin_index'))
-            
-        except Exception as e:
-            db.session.rollback()
-            flash(str(e), 'error')
-            
-    return render_template('admin/create_post.html', categories=CATEGORIES)
+            if file and allowed_file(file.filename):
+                try:
+                    # Save file
+                    filename = secure_filename(file.filename)
+                    timestamp = int(time.time())
+                    name, ext = os.path.splitext(filename)
+                    unique_filename = f"{name}_{timestamp}{ext}"
+                    
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                    file.save(filepath)
+                    
+                    # Resize image
+                    resize_image(filepath)
+                    
+                    # Set image URL
+                    new_post.image_url = os.path.join('uploads', unique_filename)
+                except Exception as e:
+                    if 'filepath' in locals() and os.path.exists(filepath):
+                        os.remove(filepath)
+                    flash(f'Resim yüklenirken hata oluştu: {str(e)}', 'danger')
+                    return redirect(url_for('create_post'))
+            else:
+                flash('Geçersiz dosya türü. Lütfen bir resim dosyası seçin.', 'danger')
+                return redirect(url_for('create_post'))
+        
+        db.session.add(new_post)
+        db.session.commit()
+        flash('Hikaye başarıyla oluşturuldu!', 'success')
+        return redirect(url_for('admin_index'))
+    
+    categories = CATEGORIES
+    return render_template('admin/create_post.html', categories=categories, now=datetime.now())
 
-@app.route('/post/<int:post_id>/edit', methods=['GET', 'POST'])
+@app.route('/admin/edit/<int:post_id>', methods=['GET', 'POST'])
 @login_required
 def edit_post(post_id):
-    """Edit an existing post"""
     post = Post.query.get_or_404(post_id)
     
     if request.method == 'POST':
-        try:
-            post.title = request.form['title']
-            post.content = request.form['content']
-            post.category = request.form['category']
+        title = request.form.get('title')
+        content = request.form.get('content')
+        category = request.form.get('category')
+        
+        # Debug logging
+        app.logger.info(f"Edit form data - Title: {title}, Category: {category}, Content length: {len(content) if content else 0}")
+        
+        # Check if content is empty or just contains HTML tags with no actual content
+        content_without_tags = re.sub(r'<[^>]*>', '', content or '')
+        content_without_tags = content_without_tags.strip()
+        app.logger.info(f"Content without tags: '{content_without_tags}'")
+        
+        if not title:
+            flash('Lütfen başlık alanını doldurun!', 'danger')
+            return render_template('admin/edit_post.html', post=post, categories=CATEGORIES, now=datetime.now())
+        
+        if not content or content == '<p>&nbsp;</p>' or not content_without_tags:
+            flash('Lütfen içerik alanını doldurun!', 'danger')
+            return render_template('admin/edit_post.html', post=post, categories=CATEGORIES, now=datetime.now())
+        
+        post.title = title
+        post.content = content
+        post.category = category
+        
+        # Handle image upload
+        if 'image' in request.files and request.files['image'].filename:
+            file = request.files['image']
             
-            image = request.files.get('image')
-            if image and allowed_file(image.filename):
-                # Delete old image if it exists
-                if post.image_url:
-                    old_image_path = os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(post.image_url))
-                    if os.path.exists(old_image_path):
-                        os.remove(old_image_path)
-                
-                filename = secure_filename(image.filename)
-                timestamp = int(time.time())
-                name, ext = os.path.splitext(filename)
-                unique_filename = f"{name}_{timestamp}{ext}"
-                
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-                image.save(filepath)
-                
-                # Validate and resize image
-                with open(filepath, 'rb') as img_file:
-                    validate_image(img_file)
-                resize_image(filepath)
-                
-                post.image_url = os.path.join('uploads', unique_filename)
-            
-            db.session.commit()
-            flash('Hikaye başarıyla güncellendi!', 'success')
-            return redirect(url_for('admin_index'))
-            
-        except Exception as e:
-            db.session.rollback()
-            flash(str(e), 'error')
+            if file and allowed_file(file.filename):
+                try:
+                    # Delete old image if exists
+                    if post.image_url:
+                        old_image_path = os.path.join(app.static_folder, post.image_url)
+                        if os.path.exists(old_image_path):
+                            os.remove(old_image_path)
+                    
+                    # Save new file
+                    filename = secure_filename(file.filename)
+                    timestamp = int(time.time())
+                    name, ext = os.path.splitext(filename)
+                    unique_filename = f"{name}_{timestamp}{ext}"
+                    
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                    file.save(filepath)
+                    
+                    # Resize image
+                    resize_image(filepath)
+                    
+                    # Set image URL
+                    post.image_url = os.path.join('uploads', unique_filename)
+                except Exception as e:
+                    if 'filepath' in locals() and os.path.exists(filepath):
+                        os.remove(filepath)
+                    flash(f'Resim yüklenirken hata oluştu: {str(e)}', 'danger')
+                    return redirect(url_for('edit_post', post_id=post_id))
+            else:
+                flash('Geçersiz dosya türü. Lütfen bir resim dosyası seçin.', 'danger')
+                return redirect(url_for('edit_post', post_id=post_id))
+        
+        db.session.commit()
+        flash('Hikaye başarıyla güncellendi!', 'success')
+        return redirect(url_for('admin_index'))
     
-    return render_template('admin/edit_post.html', post=post, categories=CATEGORIES)
+    categories = CATEGORIES
+    return render_template('admin/edit_post.html', post=post, categories=categories, now=datetime.now())
 
-@app.route('/post/<int:post_id>/delete', methods=['POST'])
+@app.route('/admin/delete/<int:post_id>', methods=['POST'])
 @login_required
 def delete_post(post_id):
-    """Delete a post"""
     post = Post.query.get_or_404(post_id)
-    try:
-        # Delete the post's image if it exists
-        if post.image_url:
-            image_path = os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(post.image_url))
-            if os.path.exists(image_path):
-                os.remove(image_path)
-        
-        db.session.delete(post)
-        db.session.commit()
-        return jsonify({'success': True})
-    except Exception as e:
-        db.session.rollback()
-        app.logger.error(f"Error deleting post: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+    
+    # Delete image if exists
+    if post.image_url:
+        image_path = os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(post.image_url))
+        if os.path.exists(image_path):
+            os.remove(image_path)
+    
+    db.session.delete(post)
+    db.session.commit()
+    flash('Hikaye başarıyla silindi!', 'success')
+    return redirect(url_for('admin_index'))
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -431,45 +435,57 @@ class LoginForm(FlaskForm):
 @app.route('/')
 def index():
     """Home page"""
-    try:
-        page = request.args.get('page', 1, type=int)
-        per_page = 10
+    search_query = request.args.get('search', '')
+    
+    if search_query:
+        # Search in title and content
+        posts = Post.query.filter(
+            or_(
+                Post.title.ilike(f'%{search_query}%'),
+                Post.content.ilike(f'%{search_query}%')
+            )
+        ).order_by(Post.created_at.desc()).all()
+        return render_template('category.html', posts=posts, 
+                              category='search', 
+                              category_display=f'"{search_query}" için arama sonuçları', 
+                              now=datetime.now())
+    else:
+        # Get featured posts (most liked)
+        featured_posts = Post.query.order_by(Post.likes.desc()).limit(3).all()
         
-        # Get posts with pagination
-        posts = Post.query.order_by(Post.created_at.desc()).paginate(
-            page=page, per_page=per_page, error_out=False)
-            
-        if posts is None:
-            app.logger.error("No posts found or database error")
-            return render_template('index.html', 
-                                posts=[], 
-                                trending_posts=[], 
-                                most_liked_posts=[])
-            
-        # Get trending and most liked posts for sidebars
-        try:
-            trending_posts = Post.query.order_by(Post.created_at.desc()).limit(5).all()
-        except Exception as e:
-            app.logger.error(f"Error getting trending posts: {str(e)}")
-            trending_posts = []
-            
-        try:
-            most_liked_posts = Post.query.order_by(Post.likes.desc()).limit(5).all()
-        except Exception as e:
-            app.logger.error(f"Error getting most liked posts: {str(e)}")
-            most_liked_posts = []
+        # Get recent posts
+        recent_posts = Post.query.order_by(Post.created_at.desc()).limit(4).all()
         
-        return render_template('index.html',
-                             posts=posts,
-                             trending_posts=trending_posts,
-                             most_liked_posts=most_liked_posts)
-                             
-    except Exception as e:
-        app.logger.error(f"Error in index route: {str(e)}")
+        # Get category highlights
+        category_highlights = {}
+        for category_id, _ in CATEGORIES:
+            posts = Post.query.filter_by(category=category_id).order_by(Post.created_at.desc()).limit(3).all()
+            if posts:
+                category_highlights[category_id] = posts
+        
         return render_template('index.html', 
-                             posts=[], 
-                             trending_posts=[], 
-                             most_liked_posts=[])
+                              featured_posts=featured_posts,
+                              recent_posts=recent_posts,
+                              category_highlights=category_highlights,
+                              CATEGORIES=CATEGORIES,
+                              now=datetime.now())
+
+@app.route('/category/<category>')
+def category(category):
+    """Category page"""
+    posts = Post.query.filter_by(category=category).order_by(Post.created_at.desc()).all()
+    
+    # Get category display name
+    category_display = dict(CATEGORIES).get(category, category.capitalize())
+    
+    return render_template('category.html', posts=posts, category=category, 
+                          category_display=category_display, now=datetime.now())
+
+@app.route('/post/<int:post_id>')
+def post(post_id):
+    """Post detail page"""
+    post = Post.query.get_or_404(post_id)
+    return render_template('post.html', post=post, now=datetime.now())
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -507,55 +523,6 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for('index'))
-
-@app.route('/category/<category_name>')
-def category(category_name):
-    """Display posts for a specific category"""
-    try:
-        page = request.args.get('page', 1, type=int)
-        per_page = 10
-        
-        posts = Post.query.filter_by(category=category_name)\
-            .order_by(Post.created_at.desc())\
-            .paginate(page=page, per_page=per_page, error_out=False)
-            
-        if posts is None:
-            app.logger.error(f"No posts found for category: {category_name}")
-            return render_template('category.html', 
-                                posts=[], 
-                                category_name=category_name)
-        
-        return render_template('category.html',
-                             posts=posts,
-                             category_name=category_name)
-                             
-    except Exception as e:
-        app.logger.error(f"Error in category route: {str(e)}")
-        flash('Bir hata oluştu. Lütfen daha sonra tekrar deneyin.', 'error')
-        return redirect(url_for('index'))
-
-@app.route('/post/<int:post_id>')
-def post_detail(post_id):
-    """Display a single post with its full content"""
-    try:
-        post = Post.query.get_or_404(post_id)
-        # Get related posts from the same category
-        related_posts = Post.query.filter(
-            Post.category == post.category,
-            Post.id != post.id
-        ).order_by(Post.created_at.desc()).limit(3).all()
-        
-        return render_template('post_detail.html', 
-                             post=post,
-                             related_posts=related_posts)
-    except Exception as e:
-        app.logger.error(f"Error displaying post {post_id}: {str(e)}")
-        flash('Bu yazıya şu anda ulaşılamıyor.', 'error')
-        return redirect(url_for('index'))
-
-@app.route('/post/<int:post_id>/detail')
-def post_detail_route(post_id):
-    return redirect(url_for('post_detail', post_id=post_id))
 
 @app.route('/post/<int:post_id>/rate/<action>', methods=['POST'])
 def rate_post(post_id, action):
@@ -656,6 +623,6 @@ def initialize_app():
         raise
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
+    port = int(os.environ.get('PORT', 10001))
     app.debug = True
     app.run(host='0.0.0.0', port=port)
