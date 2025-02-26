@@ -3,9 +3,6 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_wtf import FlaskForm, CSRFProtect
 from flask_ckeditor import CKEditor, CKEditorField
-from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
-from datetime import datetime
 from wtforms import StringField, PasswordField, SubmitField, SelectField, FileField
 from wtforms.validators import DataRequired
 from sqlalchemy import or_, func
@@ -15,6 +12,9 @@ from PIL import Image
 import os
 import time
 import re
+from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 
 # Custom exception for validation errors
 class ValidationError(Exception):
@@ -26,7 +26,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.abspath("blog.db")}
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Configure upload folder based on environment
-if os.environ.get('PRODUCTION'):
+if os.environ.get('FLASK_ENV') == 'production':
     app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
     app.config['UPLOAD_URL'] = '/uploads'  # URL path for uploads
 else:
@@ -70,7 +70,15 @@ app.config['CKEDITOR_CONFIG'] = {
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-handler = RotatingFileHandler('logs/hepsihikaye.log', maxBytes=10240, backupCount=10)
+if os.environ.get('FLASK_ENV') == 'production':
+    # In production, log to stdout for Render.com
+    handler = logging.StreamHandler()
+else:
+    # In development, log to a file
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+    handler = RotatingFileHandler('logs/hepsihikaye.log', maxBytes=10240, backupCount=10)
+
 handler.setFormatter(logging.Formatter(
     '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
 ))
@@ -81,12 +89,12 @@ app.logger.info('HepsiHikaye startup')
 
 # Log important configuration
 app.logger.info(f'Upload directory: {app.config["UPLOAD_FOLDER"]}')
-app.logger.info(f'Environment: {"Production" if os.environ.get("PRODUCTION") else "Development"}')
+app.logger.info(f'Environment: {os.environ.get("FLASK_ENV", "Development")}')
 app.logger.info(f'Static folder: {app.static_folder}')
 
 @app.after_request
 def after_request(response):
-    if not os.environ.get('PRODUCTION'):
+    if not os.environ.get('FLASK_ENV') == 'production':
         return response
         
     # Log non-successful responses in production
@@ -246,7 +254,7 @@ def resize_image(image_path, max_size=(800, 800)):
 @app.route('/uploads/<path:filename>')
 def serve_upload(filename):
     """Serve uploaded files in production"""
-    if os.environ.get('PRODUCTION'):
+    if os.environ.get('FLASK_ENV') == 'production':
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
     return redirect(url_for('static', filename=f'uploads/{filename}'))
 
