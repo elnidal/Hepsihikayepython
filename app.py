@@ -27,8 +27,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Configure upload folder based on environment
 if os.environ.get('FLASK_ENV') == 'production':
+    # In production (Render.com), use a directory that persists between deployments
     app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
-    app.config['UPLOAD_URL'] = '/uploads'  # URL path for uploads
+    # URL path for uploads in production
+    app.config['UPLOAD_URL'] = 'uploads'
 else:
     app.config['UPLOAD_FOLDER'] = os.path.join(app.static_folder, 'uploads')
     app.config['UPLOAD_URL'] = 'uploads'  # URL path for uploads
@@ -253,10 +255,13 @@ def resize_image(image_path, max_size=(800, 800)):
 
 @app.route('/uploads/<path:filename>')
 def serve_upload(filename):
-    """Serve uploaded files in production"""
+    """Serve uploaded files"""
     if os.environ.get('FLASK_ENV') == 'production':
+        # In production, serve from the /tmp/uploads directory
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-    return redirect(url_for('static', filename=f'uploads/{filename}'))
+    else:
+        # In development, serve from the static/uploads directory
+        return redirect(url_for('static', filename=f'uploads/{filename}'))
 
 @app.route('/admin')
 @login_required
@@ -324,8 +329,8 @@ def create_post():
                     # Resize image
                     resize_image(filepath)
                     
-                    # Set image URL
-                    new_post.image_url = os.path.join('uploads', unique_filename)
+                    # Set image URL - use the URL path, not the file system path
+                    new_post.image_url = unique_filename
                 except Exception as e:
                     if 'filepath' in locals() and os.path.exists(filepath):
                         os.remove(filepath)
@@ -398,7 +403,7 @@ def edit_post(post_id):
                     resize_image(filepath)
                     
                     # Set image URL
-                    post.image_url = os.path.join('uploads', unique_filename)
+                    post.image_url = unique_filename
                 except Exception as e:
                     if 'filepath' in locals() and os.path.exists(filepath):
                         os.remove(filepath)
