@@ -685,8 +685,8 @@ def index():
                               category='search', 
                               category_display=f'"{search_query}" için arama sonuçları')
     else:
-        # Get featured posts (most liked)
-        featured_posts = Post.query.order_by(Post.likes.desc()).limit(3).all()
+        # Get trending posts based on rating score
+        trending_posts = Post.get_trending_posts(3)
         
         # Get recent posts
         recent_posts = Post.query.order_by(Post.created_at.desc()).limit(4).all()
@@ -699,7 +699,7 @@ def index():
                 category_highlights[category_id] = posts
         
         return render_template('index.html', 
-                              featured_posts=featured_posts,
+                              featured_posts=trending_posts,
                               recent_posts=recent_posts,
                               category_highlights=category_highlights,
                               CATEGORIES=CATEGORIES)

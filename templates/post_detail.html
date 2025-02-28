@@ -25,10 +25,10 @@
                 </div>
                 
                 <div class="post-actions mt-3">
-                    <button onclick="ratePost({{ post.id }}, true)" class="btn btn-sm btn-outline-primary">
+                    <button onclick="ratePost({{ post.id }}, true)" class="btn btn-sm btn-outline-primary like-btn-{{ post.id }}">
                         <i class="fas fa-thumbs-up"></i> Beğen ({{ post.likes }})
                     </button>
-                    <button onclick="ratePost({{ post.id }}, false)" class="btn btn-sm btn-outline-danger">
+                    <button onclick="ratePost({{ post.id }}, false)" class="btn btn-sm btn-outline-danger dislike-btn-{{ post.id }}">
                         <i class="fas fa-thumbs-down"></i> Beğenme ({{ post.dislikes }})
                     </button>
                 </div>

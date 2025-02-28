@@ -4,7 +4,7 @@
 <div class="container">
     <!-- Featured Stories Section -->
     <section class="featured-section mb-5">
-        <h2 class="section-title">Öne Çıkan Hikayeler</h2>
+        <h2 class="section-title">Trend Hikayeler</h2>
         
         <div class="row">
             {% for post in featured_posts %}
@@ -25,6 +25,7 @@
                         <div class="story-meta">
                             <span><i class="far fa-calendar"></i> {{ post.created_at.strftime('%d.%m.%Y') }}</span>
                             <span><i class="far fa-thumbs-up"></i> {{ post.likes }}</span>
+                            <span><i class="far fa-thumbs-down"></i> {{ post.dislikes }}</span>
                         </div>
                         <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-sm btn-primary mt-2">Devamını Oku</a>
                     </div>
