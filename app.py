@@ -15,6 +15,8 @@ import re
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+import googleapiclient.discovery
+import googleapiclient.errors
 
 # Custom exception for validation errors
 class ValidationError(Exception):
@@ -112,6 +114,11 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Lütfen giriş yapın!'
 login_manager.login_message_category = 'warning'
+
+# YouTube API configuration
+YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY', '')
+YOUTUBE_API_SERVICE_NAME = "youtube"
+YOUTUBE_API_VERSION = "v3"
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -240,18 +247,129 @@ def validate_image(stream):
 def resize_image(image_path, max_size=(800, 800)):
     """Resize image if it's larger than max_size while maintaining aspect ratio"""
     try:
-        with Image.open(image_path) as img:
-            # Convert to RGB if necessary
-            if img.mode in ('RGBA', 'P'):
-                img = img.convert('RGB')
-                
-            # Only resize if image is larger than max_size
-            if img.size[0] > max_size[0] or img.size[1] > max_size[1]:
-                img.thumbnail(max_size, Image.Resampling.LANCZOS)
-                img.save(image_path, 'JPEG', quality=85)
-                app.logger.info(f'Resized image: {image_path}')
+        img = Image.open(image_path)
+        img.thumbnail(max_size, Image.LANCZOS)
+        img.save(image_path)
     except Exception as e:
-        app.logger.error(f'Error resizing image {image_path}: {str(e)}')
+        app.logger.error(f"Error resizing image: {e}")
+        raise
+
+def fetch_youtube_videos(channel_identifier, max_results=10):
+    """
+    Fetch videos from a YouTube channel
+    
+    Args:
+        channel_identifier (str): The YouTube channel ID or username (with or without @)
+        max_results (int): Maximum number of videos to fetch
+        
+    Returns:
+        list: List of video dictionaries with title, video_id, thumbnail_url, and published_at
+    """
+    if not YOUTUBE_API_KEY:
+        app.logger.warning("YouTube API key is not set. Cannot fetch videos.")
+        return []
+        
+    try:
+        # Create YouTube API client
+        youtube = googleapiclient.discovery.build(
+            YOUTUBE_API_SERVICE_NAME, 
+            YOUTUBE_API_VERSION, 
+            developerKey=YOUTUBE_API_KEY
+        )
+        
+        # Determine if we're using a channel ID or username
+        channel_param = "id"
+        
+        # If it starts with @, it's a handle
+        if channel_identifier.startswith('@'):
+            channel_param = "forHandle"
+        # If it doesn't start with UC, it might be a username
+        elif not channel_identifier.startswith('UC'):
+            channel_param = "forUsername"
+            # Remove @ if it was included
+            if channel_identifier.startswith('@'):
+                channel_identifier = channel_identifier[1:]
+        
+        # Get channel uploads playlist ID
+        channel_response = youtube.channels().list(
+            part="contentDetails",
+            **{channel_param: channel_identifier}
+        ).execute()
+        
+        if not channel_response.get("items"):
+            app.logger.warning(f"No channel found with identifier: {channel_identifier}")
+            # Try as channel ID if we initially tried as username
+            if channel_param == "forUsername":
+                app.logger.info(f"Trying as channel ID instead: {channel_identifier}")
+                channel_response = youtube.channels().list(
+                    part="contentDetails",
+                    id=channel_identifier
+                ).execute()
+                
+                if not channel_response.get("items"):
+                    app.logger.warning(f"No channel found with ID either: {channel_identifier}")
+                    return []
+            else:
+                return []
+            
+        uploads_playlist_id = channel_response["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
+        
+        # Get videos from uploads playlist
+        playlist_response = youtube.playlistItems().list(
+            part="snippet",
+            playlistId=uploads_playlist_id,
+            maxResults=max_results
+        ).execute()
+        
+        videos = []
+        for item in playlist_response.get("items", []):
+            snippet = item["snippet"]
+            video_id = snippet["resourceId"]["videoId"]
+            
+            video = {
+                "title": snippet["title"],
+                "video_id": video_id,
+                "thumbnail_url": snippet["thumbnails"]["high"]["url"],
+                "published_at": snippet["publishedAt"],
+                "embed_url": f"https://www.youtube.com/embed/{video_id}"
+            }
+            videos.append(video)
+            
+        return videos
+        
+    except googleapiclient.errors.HttpError as e:
+        app.logger.error(f"YouTube API error: {e}")
+        return []
+    except Exception as e:
+        app.logger.error(f"Error fetching YouTube videos: {e}")
+        return []
+
+def sync_youtube_videos(channel_identifier, max_results=10):
+    """
+    Sync videos from a YouTube channel to the database
+    
+    Args:
+        channel_identifier (str): The YouTube channel ID or username (with or without @)
+        max_results (int): Maximum number of videos to fetch
+    """
+    videos = fetch_youtube_videos(channel_identifier, max_results)
+    
+    videos_added = 0
+    for video_data in videos:
+        # Check if video already exists
+        existing_video = Video.query.filter_by(youtube_embed=video_data["video_id"]).first()
+        if not existing_video:
+            # Create new video
+            new_video = Video(
+                title=video_data["title"],
+                youtube_embed=video_data["video_id"],
+                created_at=datetime.utcnow()
+            )
+            db.session.add(new_video)
+            videos_added += 1
+    
+    db.session.commit()
+    return videos_added
 
 @app.route('/uploads/<path:filename>')
 def serve_upload(filename):
@@ -267,7 +385,8 @@ def serve_upload(filename):
 @login_required
 def admin_index():
     posts = Post.query.order_by(Post.created_at.desc()).all()
-    return render_template('admin/index.html', posts=posts, now=datetime.now())
+    videos = Video.query.order_by(Video.created_at.desc()).all()
+    return render_template('admin/index.html', posts=posts, videos=videos)
 
 @app.route('/admin/create', methods=['GET', 'POST'])
 @login_required
@@ -289,7 +408,7 @@ def create_post():
         if not title:
             flash('Lütfen başlık alanını doldurun!', 'danger')
             return render_template('admin/create_post.html', categories=CATEGORIES, 
-                                 now=datetime.now(), form_data={'title': title, 'content': content, 'category': category})
+                                 form_data={'title': title, 'content': content, 'category': category})
         
         # Special check for CKEditor empty content patterns
         is_empty_content = (not content or 
@@ -302,7 +421,7 @@ def create_post():
             app.logger.info(f"Content validation failed: '{content}'")
             flash('Lütfen içerik alanını doldurun!', 'danger')
             return render_template('admin/create_post.html', categories=CATEGORIES, 
-                                 now=datetime.now(), form_data={'title': title, 'content': '', 'category': category})
+                                 form_data={'title': title, 'content': '', 'category': category})
         
         app.logger.info(f"Content validation passed, creating post")
         new_post = Post(
@@ -346,7 +465,7 @@ def create_post():
         return redirect(url_for('admin_index'))
     
     categories = CATEGORIES
-    return render_template('admin/create_post.html', categories=categories, now=datetime.now())
+    return render_template('admin/create_post.html', categories=categories)
 
 @app.route('/admin/edit/<int:post_id>', methods=['GET', 'POST'])
 @login_required
@@ -368,11 +487,11 @@ def edit_post(post_id):
         
         if not title:
             flash('Lütfen başlık alanını doldurun!', 'danger')
-            return render_template('admin/edit_post.html', post=post, categories=CATEGORIES, now=datetime.now())
+            return render_template('admin/edit_post.html', post=post, categories=CATEGORIES)
         
         if not content or content == '<p>&nbsp;</p>' or not content_without_tags:
             flash('Lütfen içerik alanını doldurun!', 'danger')
-            return render_template('admin/edit_post.html', post=post, categories=CATEGORIES, now=datetime.now())
+            return render_template('admin/edit_post.html', post=post, categories=CATEGORIES)
         
         post.title = title
         post.content = content
@@ -421,7 +540,7 @@ def edit_post(post_id):
         return redirect(url_for('admin_index'))
     
     categories = CATEGORIES
-    return render_template('admin/edit_post.html', post=post, categories=categories, now=datetime.now())
+    return render_template('admin/edit_post.html', post=post, categories=categories)
 
 @app.route('/admin/delete/<int:post_id>', methods=['POST'])
 @login_required
@@ -442,6 +561,99 @@ def delete_post(post_id):
     flash('Hikaye başarıyla silindi!', 'success')
     return redirect(url_for('admin_index'))
 
+@app.route('/admin/sync-youtube', methods=['GET', 'POST'])
+@login_required
+def sync_youtube():
+    """Admin page to sync YouTube videos"""
+    if request.method == 'POST':
+        channel_id = request.form.get('channel_id')
+        max_results = int(request.form.get('max_results', 10))
+        
+        if not channel_id:
+            flash('Kanal ID veya kullanıcı adı gereklidir.', 'danger')
+            return redirect(url_for('sync_youtube'))
+        
+        try:
+            videos_count = sync_youtube_videos(channel_id, max_results)
+            flash(f'{videos_count} video başarıyla senkronize edildi.', 'success')
+        except Exception as e:
+            app.logger.error(f"Error syncing videos: {e}")
+            flash(f'Video senkronizasyonu sırasında bir hata oluştu: {str(e)}', 'danger')
+        
+        return redirect(url_for('videos'))
+    
+    return render_template('admin/sync_youtube.html')
+
+@app.route('/admin/video/add', methods=['GET', 'POST'])
+@login_required
+def add_video():
+    """Add a video manually"""
+    form = VideoForm()
+    
+    if form.validate_on_submit():
+        # Extract video ID if full URL is provided
+        youtube_embed = form.youtube_embed.data
+        
+        # Check if it's a full YouTube URL and extract the video ID
+        if 'youtube.com/watch?v=' in youtube_embed:
+            youtube_embed = youtube_embed.split('v=')[1].split('&')[0]
+        elif 'youtu.be/' in youtube_embed:
+            youtube_embed = youtube_embed.split('/')[-1].split('?')[0]
+            
+        # Create new video
+        new_video = Video(
+            title=form.title.data,
+            youtube_embed=youtube_embed,
+            created_at=datetime.utcnow()
+        )
+        
+        db.session.add(new_video)
+        db.session.commit()
+        
+        flash('Video başarıyla eklendi.', 'success')
+        return redirect(url_for('videos'))
+    
+    return render_template('admin/video_form.html', form=form, title='Video Ekle')
+
+@app.route('/admin/video/edit/<int:video_id>', methods=['GET', 'POST'])
+@login_required
+def edit_video(video_id):
+    """Edit a video"""
+    video = Video.query.get_or_404(video_id)
+    form = VideoForm(obj=video)
+    
+    if form.validate_on_submit():
+        # Extract video ID if full URL is provided
+        youtube_embed = form.youtube_embed.data
+        
+        # Check if it's a full YouTube URL and extract the video ID
+        if 'youtube.com/watch?v=' in youtube_embed:
+            youtube_embed = youtube_embed.split('v=')[1].split('&')[0]
+        elif 'youtu.be/' in youtube_embed:
+            youtube_embed = youtube_embed.split('/')[-1].split('?')[0]
+            
+        video.title = form.title.data
+        video.youtube_embed = youtube_embed
+        
+        db.session.commit()
+        
+        flash('Video başarıyla güncellendi.', 'success')
+        return redirect(url_for('videos'))
+    
+    return render_template('admin/video_form.html', form=form, title='Video Düzenle')
+
+@app.route('/admin/video/delete/<int:video_id>', methods=['POST'])
+@login_required
+def delete_video(video_id):
+    """Delete a video"""
+    video = Video.query.get_or_404(video_id)
+    
+    db.session.delete(video)
+    db.session.commit()
+    
+    flash('Video başarıyla silindi.', 'success')
+    return redirect(url_for('videos'))
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -450,6 +662,11 @@ class LoginForm(FlaskForm):
     username = StringField('Kullanıcı Adı', validators=[DataRequired()])
     password = PasswordField('Şifre', validators=[DataRequired()])
     submit = SubmitField('Giriş Yap')
+
+class VideoForm(FlaskForm):
+    title = StringField('Video Başlığı', validators=[DataRequired()])
+    youtube_embed = StringField('YouTube Video ID', validators=[DataRequired()])
+    submit = SubmitField('Kaydet')
 
 @app.route('/')
 def index():
@@ -466,8 +683,7 @@ def index():
         ).order_by(Post.created_at.desc()).all()
         return render_template('category.html', posts=posts, 
                               category='search', 
-                              category_display=f'"{search_query}" için arama sonuçları', 
-                              now=datetime.now())
+                              category_display=f'"{search_query}" için arama sonuçları')
     else:
         # Get featured posts (most liked)
         featured_posts = Post.query.order_by(Post.likes.desc()).limit(3).all()
@@ -486,8 +702,7 @@ def index():
                               featured_posts=featured_posts,
                               recent_posts=recent_posts,
                               category_highlights=category_highlights,
-                              CATEGORIES=CATEGORIES,
-                              now=datetime.now())
+                              CATEGORIES=CATEGORIES)
 
 @app.route('/category/<category>')
 def category(category):
@@ -498,13 +713,13 @@ def category(category):
     category_display = dict(CATEGORIES).get(category, category.capitalize())
     
     return render_template('category.html', posts=posts, category=category, 
-                          category_display=category_display, now=datetime.now())
+                          category_display=category_display)
 
 @app.route('/post/<int:post_id>')
 def post(post_id):
     """Post detail page"""
     post = Post.query.get_or_404(post_id)
-    return render_template('post.html', post=post, now=datetime.now())
+    return render_template('post.html', post=post)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -541,7 +756,14 @@ def login():
 @login_required
 def logout():
     logout_user()
+    flash('Başarıyla çıkış yaptınız.', 'success')
     return redirect(url_for('index'))
+
+@app.route('/videos')
+def videos():
+    """Display all videos from the database"""
+    all_videos = Video.query.order_by(Video.created_at.desc()).all()
+    return render_template('videos.html', videos=all_videos)
 
 @app.route('/post/<int:post_id>/rate/<action>', methods=['POST'])
 def rate_post(post_id, action):
@@ -640,6 +862,10 @@ def initialize_app():
     except Exception as e:
         app.logger.error(f"Error initializing database: {str(e)}")
         raise
+
+@app.context_processor
+def inject_now():
+    return {'now': datetime.utcnow()}
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10001))
