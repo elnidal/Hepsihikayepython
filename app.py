@@ -1146,16 +1146,45 @@ def approve_comment(comment_id):
 @app.route('/admin/comments/delete/<int:comment_id>', methods=['POST'])
 @login_required
 def delete_comment(comment_id):
+    """Delete a comment"""
     try:
+        app.logger.info(f"Attempting to delete comment {comment_id}")
         comment = Comment.query.get_or_404(comment_id)
+        
+        # Store the comment details for logging
+        comment_details = {
+            'id': comment.id,
+            'post_id': comment.post_id,
+            'author': comment.name,
+            'content': comment.content[:50]
+        }
+        
+        # Delete the comment
         db.session.delete(comment)
         db.session.commit()
+        
+        app.logger.info(f"Successfully deleted comment: {comment_details}")
+        
+        # Check if it's an AJAX request
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'success': True,
+                'message': 'Yorum başarıyla silindi.'
+            })
         
         flash('Yorum başarıyla silindi.', 'success')
         return redirect(url_for('admin_comments'))
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Error deleting comment {comment_id}: {str(e)}")
+        
+        # Check if it's an AJAX request
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'success': False,
+                'message': f'Yorum silinirken bir hata oluştu: {str(e)}'
+            }), 500
+        
         flash(f'Yorum silinirken bir hata oluştu: {str(e)}', 'error')
         return redirect(url_for('admin_comments'))
 

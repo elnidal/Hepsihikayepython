@@ -169,7 +169,7 @@
                                                     </div>
                                                     <div class="modal-footer">
                                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
-                                                        <form action="{{ url_for('delete_comment', comment_id=comment.id) }}" method="POST" class="comment-delete-form" data-comment-id="{{ comment.id }}" style="display: inline;">
+                                                        <form action="{{ url_for('delete_comment', comment_id=comment.id) }}" method="POST" class="comment-delete-form" data-comment-id="{{ comment.id }}">
                                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                             <button type="submit" class="btn btn-danger">Sil</button>
                                                         </form>
@@ -253,4 +253,24 @@
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+<script>
+  // Debug script
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('Admin comments page loaded');
+    console.log('Delete forms:', document.querySelectorAll('.comment-delete-form').length);
+    console.log('Delete buttons:', document.querySelectorAll('.modal .btn-danger').length);
+    
+    // Monitor Bootstrap modal events
+    const deleteModals = document.querySelectorAll('.modal');
+    deleteModals.forEach(modal => {
+      modal.addEventListener('shown.bs.modal', function() {
+        console.log('Modal shown:', modal.id);
+      });
+      
+      modal.addEventListener('hidden.bs.modal', function() {
+        console.log('Modal hidden:', modal.id);
+      });
+    });
+  });
+</script>
 {% endblock %} 
