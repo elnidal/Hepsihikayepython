@@ -5,25 +5,33 @@ function ratePost(postId, isLike) {
     const csrfToken = document.querySelector('meta[name="csrf-token"]') ? 
                       document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '';
     
+    console.log(`Rating post ${postId} with action ${action}`); // Debug log
+    
     fetch(`/post/${postId}/rate/${action}`, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
             'X-CSRFToken': csrfToken
         },
+        body: `csrf_token=${csrfToken}`,
         credentials: 'same-origin'
     })
     .then(response => {
+        console.log('Response status:', response.status); // Debug log
         if (!response.ok) {
             throw new Error('Server error: ' + response.status);
         }
         return response.json();
     })
     .then(data => {
+        console.log('Response data:', data); // Debug log
         if (data.success) {
             // Update like/dislike counts
-            document.getElementById(`likes-${postId}`).textContent = data.likes;
-            document.getElementById(`dislikes-${postId}`).textContent = data.dislikes;
+            const likesElem = document.getElementById(`likes-${postId}`);
+            const dislikesElem = document.getElementById(`dislikes-${postId}`);
+            
+            if (likesElem) likesElem.textContent = data.likes;
+            if (dislikesElem) dislikesElem.textContent = data.dislikes;
             
             // Show success message
             showFeedback('Oyunuz kaydedildi!', 'success');
