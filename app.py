@@ -29,16 +29,18 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Configure upload folder based on environment
 if os.environ.get('FLASK_ENV') == 'production':
-    # In production, use /tmp/uploads for file storage
-    app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
+    # In production, use a persistent directory for uploads
+    # Note: On Render.com, /opt/render/project/src is persistent
+    app.config['UPLOAD_FOLDER'] = '/opt/render/project/src/uploads'
     app.config['UPLOAD_URL'] = '/uploads'  # URL path for uploads in production
 else:
     # In development, use static/uploads for file storage
     app.config['UPLOAD_FOLDER'] = os.path.join(app.static_folder, 'uploads')
-    app.config['UPLOAD_URL'] = '/uploads'  # URL path for uploads in development
+    app.config['UPLOAD_URL'] = '/static/uploads'  # URL path for uploads in development
 
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+app.logger.info(f"Upload directory set to: {app.config['UPLOAD_FOLDER']}")
 
 # File upload configuration
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
@@ -425,12 +427,18 @@ def sync_youtube_videos(channel_identifier, max_results=10):
 @app.route('/uploads/<path:filename>')
 def serve_upload(filename):
     """Serve uploaded files"""
-    if os.environ.get('FLASK_ENV') == 'production':
-        # In production, serve from the /tmp/uploads directory
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-    else:
-        # In development, serve from the static/uploads directory
-        return send_from_directory(os.path.join(app.static_folder, 'uploads'), filename)
+    try:
+        if os.environ.get('FLASK_ENV') == 'production':
+            # In production, serve from the /tmp/uploads directory
+            app.logger.info(f"Serving file {filename} from {app.config['UPLOAD_FOLDER']}")
+            return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+        else:
+            # In development, serve from the static/uploads directory
+            app.logger.info(f"Serving file {filename} from {os.path.join(app.static_folder, 'uploads')}")
+            return send_from_directory(os.path.join(app.static_folder, 'uploads'), filename)
+    except Exception as e:
+        app.logger.error(f"Error serving file {filename}: {str(e)}")
+        return f"File not found: {filename}", 404
 
 @app.route('/admin')
 @login_required
@@ -912,30 +920,49 @@ def rate_post(post_id, action):
 @app.route('/upload', methods=['POST'])
 @login_required
 def upload():
-    if 'upload' not in request.files:
-        return jsonify({'error': 'No file part'})
-    
-    f = request.files['upload']
-    if f.filename == '':
-        return jsonify({'error': 'No selected file'})
-    
-    if f and allowed_file(f.filename):
-        filename = secure_filename(f.filename)
-        # Add timestamp to filename to make it unique
-        name, ext = os.path.splitext(filename)
-        filename = f"{name}_{int(time.time())}{ext}"
+    """Handle file uploads from CKEditor and other forms"""
+    try:
+        if 'upload' not in request.files:
+            app.logger.warning("No file part in request")
+            return jsonify({'error': 'No file part'})
         
-        f.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        url = url_for('serve_upload', filename=filename)
+        f = request.files['upload']
+        if f.filename == '':
+            app.logger.warning("No selected file")
+            return jsonify({'error': 'No selected file'})
         
-        # Return in the format CKEditor expects
-        return jsonify({
-            'url': url,
-            "uploaded": 1,
-            "fileName": filename
-        })
-    
-    return jsonify({'error': 'File type not allowed'})
+        if f and allowed_file(f.filename):
+            filename = secure_filename(f.filename)
+            # Add timestamp to filename to make it unique
+            name, ext = os.path.splitext(filename)
+            filename = f"{name}_{int(time.time())}{ext}"
+            
+            # Ensure upload directory exists
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            
+            # Save the file
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            f.save(file_path)
+            
+            app.logger.info(f"File saved to {file_path}")
+            
+            # Generate URL for the file
+            url = url_for('serve_upload', filename=filename)
+            
+            app.logger.info(f"Generated URL: {url}")
+            
+            # Return in the format CKEditor expects
+            return jsonify({
+                'url': url,
+                "uploaded": 1,
+                "fileName": filename
+            })
+        else:
+            app.logger.warning(f"File type not allowed: {f.filename}")
+            return jsonify({'error': 'File type not allowed'})
+    except Exception as e:
+        app.logger.error(f"Error uploading file: {str(e)}")
+        return jsonify({'error': f'Upload error: {str(e)}'}), 500
 
 def init_db():
     """Initialize the database with required tables and default admin user."""

@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 
+{% block head %}
+{{ super() }}
+<meta name="csrf-token" content="{{ csrf_token() }}">
+{% endblock %}
+
 {% block content %}
 <div class="container">
     <div class="row">
@@ -20,19 +25,64 @@
                 <div class="post-meta mt-4">
                     <small class="text-muted">
                         {{ post.created_at.strftime('%d %B %Y %H:%M') }} | 
-                        Kategori: <a href="{{ url_for('category', category_name=post.category) }}">{{ post.category }}</a>
+                        Kategori: <a href="{{ url_for('category', category=post.category) }}">{{ post.get_category_display() }}</a>
                     </small>
                 </div>
                 
                 <div class="post-actions mt-3">
-                    <button onclick="ratePost({{ post.id }}, true)" class="btn btn-sm btn-outline-primary like-btn-{{ post.id }}">
-                        <i class="fas fa-thumbs-up"></i> Beğen ({{ post.likes }})
+                    <div id="message" style="display: none;"></div>
+                    <button onclick="ratePost({{ post.id }}, true)" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-thumbs-up"></i> Beğen (<span id="likes-{{ post.id }}">{{ post.likes }}</span>)
                     </button>
-                    <button onclick="ratePost({{ post.id }}, false)" class="btn btn-sm btn-outline-danger dislike-btn-{{ post.id }}">
-                        <i class="fas fa-thumbs-down"></i> Beğenme ({{ post.dislikes }})
+                    <button onclick="ratePost({{ post.id }}, false)" class="btn btn-sm btn-outline-danger">
+                        <i class="fas fa-thumbs-down"></i> Beğenme (<span id="dislikes-{{ post.id }}">{{ post.dislikes }}</span>)
                     </button>
                 </div>
             </article>
+            
+            <!-- Comments Section -->
+            <div class="comments-section mt-5">
+                <h3>Yorumlar</h3>
+                
+                <!-- Comment Form -->
+                <div class="comment-form mb-4">
+                    <form action="{{ url_for('add_comment', post_id=post.id) }}" method="post">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="form-group">
+                            <label for="name">İsim</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="email">E-posta</label>
+                            <input type="email" class="form-control" id="email" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="content">Yorum</label>
+                            <textarea class="form-control" id="content" name="content" rows="3" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Gönder</button>
+                    </form>
+                </div>
+                
+                <!-- Comments List -->
+                {% if post.comments %}
+                <div class="comments-list">
+                    {% for comment in post.comments %}
+                    {% if comment.is_approved %}
+                    <div class="comment card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ comment.name }}</h5>
+                            <h6 class="card-subtitle mb-2 text-muted">{{ comment.formatted_date }}</h6>
+                            <p class="card-text">{{ comment.content }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p>Henüz yorum yapılmamış. İlk yorumu siz yapın!</p>
+                {% endif %}
+            </div>
         </div>
         
         <div class="col-md-4">
@@ -52,4 +102,7 @@
         </div>
     </div>
 </div>
+
+<!-- Include post.js for rating functionality -->
+<script src="{{ url_for('static', filename='js/post.js') }}"></script>
 {% endblock %}

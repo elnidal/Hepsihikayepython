@@ -1,12 +1,24 @@
 function ratePost(postId, isLike) {
     const action = isLike ? 'like' : 'dislike';
+    
+    // Get CSRF token from meta tag if it exists
+    const csrfToken = document.querySelector('meta[name="csrf-token"]') ? 
+                      document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '';
+    
     fetch(`/post/${postId}/rate/${action}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
         },
+        credentials: 'same-origin'
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Server error: ' + response.status);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             // Update like/dislike counts
@@ -14,25 +26,40 @@ function ratePost(postId, isLike) {
             document.getElementById(`dislikes-${postId}`).textContent = data.dislikes;
             
             // Show success message
-            const messageDiv = document.getElementById('message');
-            messageDiv.textContent = 'Oyunuz kaydedildi!';
-            messageDiv.className = 'alert alert-success';
-            setTimeout(() => {
-                messageDiv.style.display = 'none';
-            }, 3000);
+            showFeedback('Oyunuz kaydedildi!', 'success');
         } else {
             throw new Error(data.message || 'Bir hata oluştu');
         }
     })
     .catch(error => {
-        // Show error message
-        const messageDiv = document.getElementById('message');
-        messageDiv.textContent = error.message;
-        messageDiv.className = 'alert alert-danger';
-        setTimeout(() => {
-            messageDiv.style.display = 'none';
-        }, 3000);
+        console.error('Rating error:', error);
+        showFeedback(error.message || 'Bir hata oluştu. Lütfen daha sonra tekrar deneyin.', 'error');
     });
+}
+
+// Helper function to show feedback messages
+function showFeedback(message, type) {
+    // Create message element if it doesn't exist
+    let messageDiv = document.getElementById('message');
+    if (!messageDiv) {
+        messageDiv = document.createElement('div');
+        messageDiv.id = 'message';
+        document.body.appendChild(messageDiv);
+    }
+    
+    // Set message content and style
+    messageDiv.textContent = message;
+    messageDiv.className = type === 'success' ? 'alert alert-success' : 'alert alert-danger';
+    messageDiv.style.position = 'fixed';
+    messageDiv.style.top = '20px';
+    messageDiv.style.right = '20px';
+    messageDiv.style.zIndex = '9999';
+    messageDiv.style.display = 'block';
+    
+    // Hide message after delay
+    setTimeout(() => {
+        messageDiv.style.display = 'none';
+    }, 3000);
 }
 
 // Wait for the DOM to be fully loaded
