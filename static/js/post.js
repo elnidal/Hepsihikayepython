@@ -1,73 +1,52 @@
 function ratePost(postId, isLike) {
     const action = isLike ? 'like' : 'dislike';
     
-    // Get CSRF token from meta tag if it exists
-    const csrfToken = document.querySelector('meta[name="csrf-token"]') ? 
-                      document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '';
+    // Log to help with debugging
+    console.log(`Attempting to rate post ${postId} with action ${action}`);
     
-    console.log(`Rating post ${postId} with action ${action}`); // Debug log
-    
+    // Basic fetch request with minimal options
     fetch(`/post/${postId}/rate/${action}`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-CSRFToken': csrfToken
-        },
-        body: `csrf_token=${csrfToken}`,
         credentials: 'same-origin'
     })
     .then(response => {
-        console.log('Response status:', response.status); // Debug log
-        if (!response.ok) {
-            throw new Error('Server error: ' + response.status);
-        }
+        console.log(`Server responded with status: ${response.status}`);
         return response.json();
     })
     .then(data => {
-        console.log('Response data:', data); // Debug log
+        console.log('Response data:', data);
         if (data.success) {
-            // Update like/dislike counts
-            const likesElem = document.getElementById(`likes-${postId}`);
-            const dislikesElem = document.getElementById(`dislikes-${postId}`);
+            // Update the like/dislike counts in the UI
+            const likesElement = document.getElementById(`likes-${postId}`);
+            const dislikesElement = document.getElementById(`dislikes-${postId}`);
             
-            if (likesElem) likesElem.textContent = data.likes;
-            if (dislikesElem) dislikesElem.textContent = data.dislikes;
+            console.log('Elements:', likesElement, dislikesElement);
             
-            // Show success message
-            showFeedback('Oyunuz kaydedildi!', 'success');
+            if (likesElement) {
+                likesElement.textContent = data.likes;
+                console.log(`Updated likes to ${data.likes}`);
+            }
+            
+            if (dislikesElement) {
+                dislikesElement.textContent = data.dislikes;
+                console.log(`Updated dislikes to ${data.dislikes}`);
+            }
+            
+            // Show feedback
+            alert('Oyunuz kaydedildi!');
         } else {
-            throw new Error(data.message || 'Bir hata oluştu');
+            alert(data.message || 'Bir hata oluştu');
         }
     })
     .catch(error => {
-        console.error('Rating error:', error);
-        showFeedback(error.message || 'Bir hata oluştu. Lütfen daha sonra tekrar deneyin.', 'error');
+        console.error('Error rating post:', error);
+        alert('Bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
     });
 }
 
-// Helper function to show feedback messages
+// Helper function to show feedback messages - simplified to ensure it works
 function showFeedback(message, type) {
-    // Create message element if it doesn't exist
-    let messageDiv = document.getElementById('message');
-    if (!messageDiv) {
-        messageDiv = document.createElement('div');
-        messageDiv.id = 'message';
-        document.body.appendChild(messageDiv);
-    }
-    
-    // Set message content and style
-    messageDiv.textContent = message;
-    messageDiv.className = type === 'success' ? 'alert alert-success' : 'alert alert-danger';
-    messageDiv.style.position = 'fixed';
-    messageDiv.style.top = '20px';
-    messageDiv.style.right = '20px';
-    messageDiv.style.zIndex = '9999';
-    messageDiv.style.display = 'block';
-    
-    // Hide message after delay
-    setTimeout(() => {
-        messageDiv.style.display = 'none';
-    }, 3000);
+    alert(message);
 }
 
 // Wait for the DOM to be fully loaded

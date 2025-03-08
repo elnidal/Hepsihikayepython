@@ -30,7 +30,7 @@
                 </div>
                 
                 <div class="post-actions mt-3">
-                    <div id="message" style="display: none;"></div>
+                    <div id="rating-message" style="display: none;"></div>
                     <button onclick="ratePost({{ post.id }}, true)" class="btn btn-sm btn-outline-primary">
                         <i class="fas fa-thumbs-up"></i> Beğen (<span id="likes-{{ post.id }}">{{ post.likes }}</span>)
                     </button>
@@ -102,7 +102,18 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <!-- Include post.js for rating functionality -->
 <script src="{{ url_for('static', filename='js/post.js') }}"></script>
+<script>
+  // Add a direct event listener when the page loads
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('Post detail page loaded');
+    console.log('Post ID: {{ post.id }}');
+    console.log('Like count element:', document.getElementById('likes-{{ post.id }}'));
+    console.log('Dislike count element:', document.getElementById('dislikes-{{ post.id }}'));
+  });
+</script>
 {% endblock %}

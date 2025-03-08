@@ -874,63 +874,44 @@ def videos():
     return render_template('videos.html', videos=all_videos)
 
 @app.route('/post/<int:post_id>/rate/<action>', methods=['POST'])
-@csrf.exempt  # Exempt this route from CSRF protection since we handle it manually
+@csrf.exempt
 def rate_post(post_id, action):
     """Handle post rating (like/dislike)"""
     try:
-        app.logger.info(f"Rating post {post_id} with action {action} from IP {request.remote_addr}")
+        # Log the request for debugging
+        app.logger.info(f"Rating request received: post_id={post_id}, action={action}, IP={request.remote_addr}")
         
+        # Validate action
         if action not in ['like', 'dislike']:
-            app.logger.warning(f"Invalid rating action: {action}")
             return jsonify({'success': False, 'message': 'Geçersiz işlem'}), 400
 
+        # Get post
         post = Post.query.get_or_404(post_id)
-        if not post:
-            app.logger.warning(f"Post not found: {post_id}")
-            return jsonify({'success': False, 'message': 'Yazı bulunamadı'}), 404
-            
-        rating = Rating.query.filter_by(
-            post_id=post_id,
-            ip_address=request.remote_addr
-        ).first()
-
-        app.logger.info(f"Existing rating: {rating}")
-
-        if rating:
-            # Update existing rating
-            old_value = rating.is_like
-            if (action == 'like' and not rating.is_like) or (action == 'dislike' and rating.is_like):
-                rating.is_like = (action == 'like')
-                db.session.commit()
-                app.logger.info(f"Updated rating from {old_value} to {rating.is_like}")
-        else:
-            # Create new rating
-            new_rating = Rating(
-                post_id=post_id,
-                ip_address=request.remote_addr,
-                is_like=(action == 'like')
-            )
-            db.session.add(new_rating)
-            db.session.commit()
-            app.logger.info(f"Created new rating with value {new_rating.is_like}")
-
-        # Update post rating counts
-        post.update_rating_counts()
         
-        response_data = {
+        # Simplified rating logic - just increment/decrement without IP checking
+        if action == 'like':
+            post.likes += 1
+        else:
+            post.dislikes += 1
+        
+        db.session.commit()
+        
+        # Log the response for debugging
+        app.logger.info(f"Rating successful: post_id={post_id}, new likes={post.likes}, new dislikes={post.dislikes}")
+        
+        return jsonify({
             'success': True,
             'likes': post.likes,
-            'dislikes': post.dislikes
-        }
-        app.logger.info(f"Rating response: {response_data}")
-        return jsonify(response_data)
+            'dislikes': post.dislikes,
+            'message': 'Rating saved successfully'
+        })
 
     except Exception as e:
         app.logger.error(f"Error rating post {post_id}: {str(e)}")
         db.session.rollback()
         return jsonify({
             'success': False,
-            'message': 'Bir hata oluştu. Lütfen daha sonra tekrar deneyin.'
+            'message': f'Server error: {str(e)}'
         }), 500
 
 @app.route('/upload', methods=['POST'])
