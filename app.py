@@ -1133,22 +1133,34 @@ def admin_comments():
 @app.route('/admin/comments/approve/<int:comment_id>', methods=['POST'])
 @login_required
 def approve_comment(comment_id):
-    comment = Comment.query.get_or_404(comment_id)
-    comment.is_approved = True
-    db.session.commit()
-    
-    flash('Yorum onaylandı.', 'success')
-    return redirect(url_for('admin_comments'))
+    try:
+        comment = Comment.query.get_or_404(comment_id)
+        comment.is_approved = True
+        db.session.commit()
+        
+        flash('Yorum başarıyla onaylandı.', 'success')
+        return redirect(url_for('admin_comments'))
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error approving comment {comment_id}: {str(e)}")
+        flash(f'Yorum onaylanırken bir hata oluştu: {str(e)}', 'error')
+        return redirect(url_for('admin_comments'))
 
 @app.route('/admin/comments/delete/<int:comment_id>', methods=['POST'])
 @login_required
 def delete_comment(comment_id):
-    comment = Comment.query.get_or_404(comment_id)
-    db.session.delete(comment)
-    db.session.commit()
-    
-    flash('Yorum silindi.', 'success')
-    return redirect(url_for('admin_comments'))
+    try:
+        comment = Comment.query.get_or_404(comment_id)
+        db.session.delete(comment)
+        db.session.commit()
+        
+        flash('Yorum başarıyla silindi.', 'success')
+        return redirect(url_for('admin_comments'))
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error deleting comment {comment_id}: {str(e)}")
+        flash(f'Yorum silinirken bir hata oluştu: {str(e)}', 'error')
+        return redirect(url_for('admin_comments'))
 
 @app.route('/test-image')
 def test_image():
