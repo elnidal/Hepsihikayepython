@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <!-- Featured Stories Section -->
+    <section class="featured-section mb-5">
+        <h2 class="section-title">Trend Hikayeler</h2>
+        
+        <div class="row">
+            {% for post in featured_posts %}
+            <div class="col-6 col-md-4 mb-4">
+                <div class="story-card featured-card animate-card {% if loop.index0 < 8 %}delay-{{ loop.index0 + 1 }}{% endif %}">
+                    {% if post.image_url %}
+                    <img src="{{ url_for('serve_upload', filename=post.image_url) }}" alt="{{ post.title }}" class="story-image">
+                    {% else %}
+                    <img src="{{ url_for('static', filename='img/default-story.jpg') }}" alt="{{ post.title }}" class="story-image">
+                    {% endif %}
+                    
+                    <div class="story-content">
+                        <span class="story-category">{{ post.get_category_display() }}</span>
+                        <h3 class="story-title">{{ post.title }}</h3>
+                        <div class="story-excerpt d-none d-md-block">
+                            {{ post.content|striptags|truncate(100) }}
+                        </div>
+                        <div class="story-meta">
+                            <span><i class="far fa-calendar"></i> {{ post.created_at.strftime('%d.%m.%Y') }}</span>
+                            <span class="d-none d-md-inline"><i class="far fa-thumbs-up"></i> {{ post.likes }}</span>
+                            <span class="d-none d-md-inline"><i class="far fa-thumbs-down"></i> {{ post.dislikes }}</span>
+                            {% if post.author %}
+                            <div class="mt-1 d-none d-md-block"><i class="fas fa-user"></i> <a href="{{ url_for('author_posts', author=post.author) }}">{{ post.author }}</a></div>
+                            {% endif %}
+                        </div>
+                        <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-sm btn-primary mt-2">Oku</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    
+    <!-- Recent Stories Section -->
+    <section class="recent-section mb-5">
+        <h2 class="section-title">Son Eklenenler</h2>
+        
+        <div class="row">
+            {% for post in recent_posts %}
+            <div class="col-6 col-md-3 mb-4">
+                <div class="story-card animate-card {% if loop.index0 < 8 %}delay-{{ loop.index0 + 1 }}{% endif %}">
+                    {% if post.image_url %}
+                    <img src="{{ url_for('serve_upload', filename=post.image_url) }}" alt="{{ post.title }}" class="story-image">
+                    {% else %}
+                    <img src="{{ url_for('static', filename='img/default-story.jpg') }}" alt="{{ post.title }}" class="story-image">
+                    {% endif %}
+                    
+                    <div class="story-content">
+                        <span class="story-category">{{ post.get_category_display() }}</span>
+                        <h3 class="story-title">{{ post.title }}</h3>
+                        <div class="story-excerpt d-none d-md-block">
+                            {{ post.content|striptags|truncate(80) }}
+                        </div>
+                        <div class="story-meta">
+                            <span><i class="far fa-calendar"></i> {{ post.created_at.strftime('%d.%m.%Y') }}</span>
+                            <span class="d-none d-md-inline"><i class="far fa-thumbs-up"></i> {{ post.likes }}</span>
+                        </div>
+                        <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-sm btn-primary mt-2">Oku</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    
+    <!-- Popular Stories Section -->
+    <section class="popular-section mb-5">
+        <h2 class="section-title">En Çok Beğenilenler</h2>
+        
+        <div class="row">
+            {% for post in most_liked_posts %}
+            <div class="col-6 col-md-3 mb-4">
+                <div class="story-card animate-card {% if loop.index0 < 8 %}delay-{{ loop.index0 + 1 }}{% endif %}">
+                    {% if post.image_url %}
+                    <img src="{{ url_for('serve_upload', filename=post.image_url) }}" alt="{{ post.title }}" class="story-image">
+                    {% else %}
+                    <img src="{{ url_for('static', filename='img/default-story.jpg') }}" alt="{{ post.title }}" class="story-image">
+                    {% endif %}
+                    
+                    <div class="story-content">
+                        <span class="story-category">{{ post.get_category_display() }}</span>
+                        <h3 class="story-title">{{ post.title }}</h3>
+                        <div class="story-excerpt d-none d-md-block">
+                            {{ post.content|striptags|truncate(80) }}
+                        </div>
+                        <div class="story-meta">
+                            <span><i class="far fa-calendar"></i> {{ post.created_at.strftime('%d.%m.%Y') }}</span>
+                            <span><i class="far fa-thumbs-up"></i> {{ post.likes }}</span>
+                        </div>
+                        <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-sm btn-primary mt-2">Oku</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock %}

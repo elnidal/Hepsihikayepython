@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Videolar</h2>
+        {% if current_user.is_authenticated %}
+        <div>
+            <a href="{{ url_for('add_video') }}" class="btn btn-success me-2">Manuel Video Ekle</a>
+            <a href="{{ url_for('sync_youtube') }}" class="btn btn-primary">YouTube'dan Video Ekle</a>
+        </div>
+        {% endif %}
+    </div>
+    
+    {% if videos %}
+        <div class="row">
+            {% for video in videos %}
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="embed-responsive embed-responsive-16by9">
+                        <iframe class="embed-responsive-item" style="width: 100%; height: 315px;"
+                            src="https://www.youtube.com/embed/{{ video.youtube_embed }}"
+                            frameborder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowfullscreen>
+                        </iframe>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ video.title }}</h5>
+                        <p class="card-text"><small class="text-muted">{{ video.created_at.strftime('%d.%m.%Y %H:%M') }}</small></p>
+                        {% if current_user.is_authenticated %}
+                        <div class="mt-2">
+                            <a href="{{ url_for('edit_video', video_id=video.id) }}" class="btn btn-sm btn-outline-primary">Düzenle</a>
+                            <button type="button" class="btn btn-sm btn-outline-danger" 
+                                    data-bs-toggle="modal" data-bs-target="#deleteVideoModal{{ video.id }}">
+                                Sil
+                            </button>
+                            
+                            <!-- Delete Modal -->
+                            <div class="modal fade" id="deleteVideoModal{{ video.id }}" tabindex="-1" aria-labelledby="deleteVideoModalLabel{{ video.id }}" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="deleteVideoModalLabel{{ video.id }}">Video Silme Onayı</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <p>"{{ video.title }}" başlıklı videoyu silmek istediğinizden emin misiniz?</p>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                                            <form action="{{ url_for('delete_video', video_id=video.id) }}" method="POST" style="display: inline;">
+                                                <button type="submit" class="btn btn-danger">Videoyu Sil</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center empty-message p-5 bg-light rounded">
+            <h4>Henüz video bulunmamaktadır.</h4>
+            {% if current_user.is_authenticated %}
+            <p>Video eklemek için "Manuel Video Ekle" veya "YouTube'dan Video Ekle" butonlarını kullanabilirsiniz.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

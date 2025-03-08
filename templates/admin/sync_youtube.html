@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">YouTube Videoları Senkronizasyonu</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('sync_youtube') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="mb-3">
+                            <label for="channel_id" class="form-label">YouTube Kanal ID</label>
+                            <input type="text" class="form-control" id="channel_id" name="channel_id" value="@hepsihikaye8860" required>
+                            <div class="form-text">
+                                Kanalınız: <a href="https://www.youtube.com/@hepsihikaye8860" target="_blank">https://www.youtube.com/@hepsihikaye8860</a>
+                                <br>YouTube kanal ID'si genellikle şu formattadır: UC... 
+                                <br>Kanal ID'nizi bulmak için: 
+                                <a href="https://www.youtube.com/account_advanced" target="_blank">YouTube Hesap Ayarları</a>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="max_results" class="form-label">Maksimum Video Sayısı</label>
+                            <input type="number" class="form-control" id="max_results" name="max_results" value="10" min="1" max="50">
+                            <div class="form-text">
+                                Kanaldan çekilecek maksimum video sayısı (1-50 arası)
+                            </div>
+                        </div>
+                        
+                        {% if not has_api_key %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i> YouTube API anahtarı ayarlanmamış. 
+                            Videoları senkronize etmek için önce <a href="{{ url_for('admin_settings') }}">Ayarlar</a> sayfasından API anahtarınızı eklemeniz gerekiyor.
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> Bu işlem, belirtilen YouTube kanalından videoları çekecek ve veritabanına kaydedecektir. 
+                            Daha önce eklenmiş videolar tekrar eklenmeyecektir.
+                        </div>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('videos') }}" class="btn btn-secondary">İptal</a>
+                            <button type="submit" class="btn btn-primary" {% if not has_api_key %}disabled{% endif %}>
+                                <i class="fas fa-sync"></i> Videoları Senkronize Et
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            {% if not has_api_key %}
+            <div class="card mt-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">YouTube API Anahtarı Gerekli</h5>
+                </div>
+                <div class="card-body">
+                    <p>YouTube videolarını senkronize etmek için bir API anahtarı gereklidir.</p>
+                    <a href="{{ url_for('admin_settings') }}" class="btn btn-primary">
+                        <i class="fas fa-cog"></i> API Anahtarı Ayarla
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

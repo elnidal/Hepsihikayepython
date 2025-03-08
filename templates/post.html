@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <article class="post-detail">
+                <span class="story-category">{{ post.get_category_display() }}</span>
+                <h1 class="mb-3">{{ post.title }}</h1>
+                
+                <div class="post-meta mb-4">
+                    <span><i class="far fa-calendar"></i> {{ post.created_at.strftime('%d.%m.%Y') }}</span>
+                    {% if post.author %}
+                    <span class="ms-3"><i class="fas fa-user"></i> <a href="{{ url_for('author_posts', author=post.author) }}">{{ post.author }}</a></span>
+                    {% endif %}
+                </div>
+                
+                {% if post.image_url %}
+                <div class="post-image mb-4">
+                    <img src="{{ url_for('serve_upload', filename=post.image_url) }}" alt="{{ post.title }}" class="img-fluid rounded">
+                </div>
+                {% endif %}
+                
+                <div class="post-content">
+                    {{ post.content|safe }}
+                </div>
+                
+                <div class="post-actions mt-4 mb-4">
+                    <div class="d-flex align-items-center">
+                        <div class="rating-buttons me-3">
+                            <button onclick="ratePost({{ post.id }}, true)" class="btn btn-outline-primary like-btn-{{ post.id }}">
+                                <i class="fas fa-thumbs-up"></i> Beğen ({{ post.likes }})
+                            </button>
+                            <button onclick="ratePost({{ post.id }}, false)" class="btn btn-outline-danger dislike-btn-{{ post.id }}">
+                                <i class="fas fa-thumbs-down"></i> Beğenme ({{ post.dislikes }})
+                            </button>
+                        </div>
+                        <div class="rating-info ms-2">
+                            <span class="badge bg-secondary">Toplam Oy: {{ post.likes + post.dislikes }}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Comments Section -->
+                <div class="comments-section mt-5 pt-4 border-top">
+                    <h3 class="mb-4">Yorumlar ({{ comments|length }})</h3>
+                    
+                    {% if comments %}
+                    <div class="comments-list mb-5">
+                        {% for comment in comments %}
+                        <div class="comment mb-4 p-3 border rounded">
+                            <div class="comment-header d-flex justify-content-between">
+                                <div>
+                                    <strong>{{ comment.name }}</strong>
+                                    <span class="text-muted ms-2"><i class="far fa-clock"></i> {{ comment.formatted_date }}</span>
+                                </div>
+                            </div>
+                            <div class="comment-body mt-2">
+                                <p>{{ comment.content }}</p>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-light mb-4">
+                        <p>Henüz yorum yapılmamış. İlk yorumu siz yapın!</p>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Comment Form -->
+                    <div class="comment-form">
+                        <h4 class="mb-3">Yorum Yap</h4>
+                        
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+                        {% endwith %}
+                        
+                        <form action="{{ url_for('add_comment', post_id=post.id) }}" method="post" class="needs-validation" novalidate>
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="name" class="form-label">İsim <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="name" name="name" required>
+                                    <div class="invalid-feedback">
+                                        Lütfen isminizi girin.
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="email" class="form-label">E-posta <span class="text-danger">*</span></label>
+                                    <input type="email" class="form-control" id="email" name="email" required>
+                                    <div class="invalid-feedback">
+                                        Lütfen geçerli bir e-posta adresi girin.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="content" class="form-label">Yorumunuz <span class="text-danger">*</span></label>
+                                <textarea class="form-control" id="content" name="content" rows="4" required></textarea>
+                                <div class="invalid-feedback">
+                                    Lütfen yorumunuzu girin.
+                                </div>
+                            </div>
+                            <div class="mb-3 form-text">
+                                <small class="text-muted">Yorumunuz onaylandıktan sonra yayınlanacaktır.</small>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Yorum Gönder</button>
+                        </form>
+                    </div>
+                </div>
+                
+                <div class="post-footer mt-5 pt-4 border-top">
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-primary"><i class="fas fa-arrow-left"></i> Tüm Hikayelere Dön</a>
+                </div>
+            </article>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail %}
+<script>
+function ratePost(postId, isLike) {
+    fetch(`/post/${postId}/rate/${isLike ? 'like' : 'dislike'}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.querySelector(`.like-btn-${postId}`).innerHTML = `<i class="fas fa-thumbs-up"></i> Beğen (${data.likes})`;
+            document.querySelector(`.dislike-btn-${postId}`).innerHTML = `<i class="fas fa-thumbs-down"></i> Beğenme (${data.dislikes})`;
+            
+            // Add visual feedback
+            const btn = isLike ? document.querySelector(`.like-btn-${postId}`) : document.querySelector(`.dislike-btn-${postId}`);
+            btn.classList.add('active');
+            setTimeout(() => {
+                btn.classList.remove('active');
+            }, 1000);
+        } else {
+            alert(data.message || 'Bir hata oluştu.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Bir hata oluştu.');
+    });
+}
+
+// Form validation
+(function() {
+    'use strict';
+    window.addEventListener('load', function() {
+        var forms = document.getElementsByClassName('needs-validation');
+        Array.prototype.filter.call(forms, function(form) {
+            form.addEventListener('submit', function(event) {
+                if (form.checkValidity() === false) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            }, false);
+        });
+    }, false);
+})();
+</script>
+{% endblock %}

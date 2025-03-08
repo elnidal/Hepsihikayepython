@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Test Image Display</h1>
+            
+            <h2>Method 1: Using url_for('serve_upload')</h2>
+            <div class="post-image mb-4">
+                <img src="{{ url_for('serve_upload', filename='Ekran_Resmi_2025-02-23_11.04.07_1741206479.png') }}" alt="Test Image 1" class="img-fluid">
+            </div>
+            
+            <h2>Method 2: Using direct path</h2>
+            <div class="post-image mb-4">
+                <img src="/uploads/Ekran_Resmi_2025-02-23_11.04.07_1741206479.png" alt="Test Image 2" class="img-fluid">
+            </div>
+            
+            <h2>Method 3: Using static folder</h2>
+            <div class="post-image mb-4">
+                <img src="{{ url_for('static', filename='uploads/Ekran_Resmi_2025-02-23_11.04.07_1741206479.png') }}" alt="Test Image 3" class="img-fluid">
+            </div>
+            
+            <h2>Method 4: Direct HTML img tag</h2>
+            <div class="post-image mb-4">
+                <img src="https://via.placeholder.com/800x400" alt="Test Image 4" class="img-fluid">
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

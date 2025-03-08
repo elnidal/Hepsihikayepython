@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Yorum Yönetimi</h1>
+                <a href="{{ url_for('admin_index') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Yönetim Paneline Dön
+                </a>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <ul class="nav nav-tabs card-header-tabs">
+                        <li class="nav-item">
+                            <a class="nav-link {% if status == 'pending' %}active{% endif %}" 
+                               href="{{ url_for('admin_comments', status='pending') }}">
+                                Onay Bekleyen <span class="badge bg-warning">{{ pending_count }}</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if status == 'approved' %}active{% endif %}" 
+                               href="{{ url_for('admin_comments', status='approved') }}">
+                                Onaylanmış <span class="badge bg-success">{{ approved_count }}</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if status == 'all' %}active{% endif %}" 
+                               href="{{ url_for('admin_comments', status='all') }}">
+                                Tümü <span class="badge bg-primary">{{ total_count }}</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-body">
+                    {% if comments %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Yazı</th>
+                                    <th>İsim</th>
+                                    <th>E-posta</th>
+                                    <th>Yorum</th>
+                                    <th>Tarih</th>
+                                    <th>Durum</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for comment in comments %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('post', post_id=comment.post_id) }}" target="_blank">
+                                            {{ comment.post.title[:30] }}{% if comment.post.title|length > 30 %}...{% endif %}
+                                        </a>
+                                    </td>
+                                    <td>{{ comment.name }}</td>
+                                    <td>{{ comment.email }}</td>
+                                    <td>{{ comment.content[:50] }}{% if comment.content|length > 50 %}...{% endif %}</td>
+                                    <td>{{ comment.formatted_date }}</td>
+                                    <td>
+                                        {% if comment.is_approved %}
+                                        <span class="badge bg-success">Onaylandı</span>
+                                        {% else %}
+                                        <span class="badge bg-warning">Bekliyor</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <button type="button" class="btn btn-sm btn-info" 
+                                                    data-bs-toggle="modal" data-bs-target="#viewCommentModal{{ comment.id }}">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            
+                                            {% if not comment.is_approved %}
+                                            <form action="{{ url_for('approve_comment', comment_id=comment.id) }}" method="POST" style="display: inline;">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-sm btn-success" title="Onayla">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                            
+                                            <button type="button" class="btn btn-sm btn-danger" 
+                                                    data-bs-toggle="modal" data-bs-target="#deleteCommentModal{{ comment.id }}" title="Sil">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                        
+                                        <!-- View Comment Modal -->
+                                        <div class="modal fade" id="viewCommentModal{{ comment.id }}" tabindex="-1" 
+                                             aria-labelledby="viewCommentModalLabel{{ comment.id }}" aria-hidden="true">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title" id="viewCommentModalLabel{{ comment.id }}">Yorum Detayı</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <div class="mb-3">
+                                                            <strong>Yazı:</strong> 
+                                                            <a href="{{ url_for('post', post_id=comment.post_id) }}" target="_blank">
+                                                                {{ comment.post.title }}
+                                                            </a>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <strong>İsim:</strong> {{ comment.name }}
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <strong>E-posta:</strong> {{ comment.email }}
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <strong>IP Adresi:</strong> {{ comment.ip_address }}
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <strong>Tarih:</strong> {{ comment.formatted_date }}
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <strong>Durum:</strong> 
+                                                            {% if comment.is_approved %}
+                                                            <span class="badge bg-success">Onaylandı</span>
+                                                            {% else %}
+                                                            <span class="badge bg-warning">Bekliyor</span>
+                                                            {% endif %}
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <strong>Yorum:</strong>
+                                                            <p class="mt-2">{{ comment.content }}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+                                                        {% if not comment.is_approved %}
+                                                        <form action="{{ url_for('approve_comment', comment_id=comment.id) }}" method="POST" style="display: inline;">
+                                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                            <button type="submit" class="btn btn-success">Onayla</button>
+                                                        </form>
+                                                        {% endif %}
+                                                        <button type="button" class="btn btn-danger" 
+                                                                data-bs-toggle="modal" data-bs-target="#deleteCommentModal{{ comment.id }}"
+                                                                data-bs-dismiss="modal">
+                                                            Sil
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Delete Comment Modal -->
+                                        <div class="modal fade" id="deleteCommentModal{{ comment.id }}" tabindex="-1" 
+                                             aria-labelledby="deleteCommentModalLabel{{ comment.id }}" aria-hidden="true">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title" id="deleteCommentModalLabel{{ comment.id }}">Yorum Silme Onayı</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <p>Bu yorumu silmek istediğinizden emin misiniz?</p>
+                                                        <p><strong>Yorum:</strong> {{ comment.content[:100] }}{% if comment.content|length > 100 %}...{% endif %}</p>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                                                        <form action="{{ url_for('delete_comment', comment_id=comment.id) }}" method="POST" style="display: inline;">
+                                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                            <button type="submit" class="btn btn-danger">Sil</button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    {% if pagination.pages > 1 %}
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination justify-content-center">
+                            {% if pagination.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin_comments', status=status, page=pagination.prev_num) }}">
+                                    <i class="fas fa-chevron-left"></i> Önceki
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link"><i class="fas fa-chevron-left"></i> Önceki</span>
+                            </li>
+                            {% endif %}
+                            
+                            {% for page in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                                {% if page %}
+                                    {% if page == pagination.page %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page }}</span>
+                                    </li>
+                                    {% else %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('admin_comments', status=status, page=page) }}">{{ page }}</a>
+                                    </li>
+                                    {% endif %}
+                                {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if pagination.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin_comments', status=status, page=pagination.next_num) }}">
+                                    Sonraki <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">Sonraki <i class="fas fa-chevron-right"></i></span>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                    
+                    {% else %}
+                    <div class="alert alert-info">
+                        {% if status == 'pending' %}
+                            Onay bekleyen yorum bulunmamaktadır.
+                        {% elif status == 'approved' %}
+                            Onaylanmış yorum bulunmamaktadır.
+                        {% else %}
+                            Henüz hiç yorum yapılmamış.
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

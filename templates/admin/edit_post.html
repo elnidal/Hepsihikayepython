@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block head %}
+{{ ckeditor.load() }}
+{{ ckeditor.config(name='content') }}
+<style>
+    /* Fix CKEditor height */
+    .cke_contents {
+        min-height: 300px !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Hikaye Düzenle</h1>
+                <a href="{{ url_for('admin_index') }}" class="btn btn-secondary">Geri Dön</a>
+            </div>
+            
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Başlık <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="title" name="title" value="{{ post.title }}" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="author" class="form-label">Yazar</label>
+                            <input type="text" class="form-control" id="author" name="author" value="{{ post.author }}">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="category" class="form-label">Kategori</label>
+                            <select class="form-select" id="category" name="category">
+                                {% for value, label in categories %}
+                                <option value="{{ value }}" {% if post.category == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="image" class="form-label">Resim</label>
+                            {% if post.image_url %}
+                            <div class="mb-2">
+                                <img src="{{ url_for('serve_upload', filename=post.image_url) }}" alt="{{ post.title }}" class="img-thumbnail" style="max-height: 200px;">
+                            </div>
+                            {% endif %}
+                            <input type="file" class="form-control" id="image" name="image" accept="image/*">
+                            <small class="form-text text-muted">Yeni bir resim yüklerseniz, mevcut resim değiştirilecektir.</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="content" class="form-label">İçerik <span class="text-danger">*</span></label>
+                            <textarea id="content" name="content" class="form-control">{{ post.content }}</textarea>
+                            {{ ckeditor.load(custom_url=url_for('static', filename='ckeditor/ckeditor.js')) }}
+                            {{ ckeditor.config(name='content') }}
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="submit" class="btn btn-primary">Güncelle</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail %}
+    <script>
+        // Add CSRF token to upload requests
+        CKEDITOR.on('instanceReady', function(evt) {
+            evt.editor.on('fileUploadRequest', function(evt) {
+                var xhr = evt.data.fileLoader.xhr;
+                xhr.setRequestHeader('X-CSRFToken', "{{ csrf_token() }}");
+            });
+        });
+    </script>
+{% endblock %}
