@@ -439,6 +439,11 @@ def admin_index():
     videos = Video.query.order_by(Video.created_at.desc()).all()
     return render_template('admin/index.html', posts=posts, videos=videos)
 
+@app.route('/admin/')
+@login_required
+def admin_index_slash():
+    return redirect(url_for('admin_index'))
+
 @app.route('/admin/create', methods=['GET', 'POST'])
 @login_required
 def create_post():
