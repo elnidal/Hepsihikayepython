@@ -8,7 +8,7 @@ from wtforms.validators import DataRequired
 from sqlalchemy import or_, func
 import logging
 from logging.handlers import RotatingFileHandler
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import os
 import time
 import re
@@ -41,6 +41,28 @@ else:
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 app.logger.info(f"Upload directory set to: {app.config['UPLOAD_FOLDER']}")
+
+# Ensure default image directory exists
+default_img_dir = os.path.join(app.static_folder, 'img')
+os.makedirs(default_img_dir, exist_ok=True)
+
+# Create default placeholder image if it doesn't exist
+default_img_path = os.path.join(default_img_dir, 'default-story.jpg')
+if not os.path.exists(default_img_path):
+    try:
+        # Create a simple placeholder image
+        img = Image.new('RGB', (800, 600), color=(234, 234, 234))
+        d = ImageDraw.Draw(img)
+        
+        # Add text
+        d.rectangle([(200, 200), (600, 400)], fill=(245, 245, 245), outline=(200, 200, 200), width=2)
+        d.text((400, 300), "HepsiHikaye", fill=(100, 100, 100), anchor="mm")
+        
+        # Save the image
+        img.save(default_img_path)
+        app.logger.info(f"Created default placeholder image at {default_img_path}")
+    except Exception as e:
+        app.logger.error(f"Failed to create default placeholder image: {str(e)}")
 
 # File upload configuration
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
@@ -428,17 +450,31 @@ def sync_youtube_videos(channel_identifier, max_results=10):
 def serve_upload(filename):
     """Serve uploaded files"""
     try:
+        # Log the request for debugging
+        app.logger.info(f"Image request received for: {filename}")
+        
+        # Standardize path handling between environments
         if os.environ.get('FLASK_ENV') == 'production':
-            # In production, serve from the /tmp/uploads directory
-            app.logger.info(f"Serving file {filename} from {app.config['UPLOAD_FOLDER']}")
+            # In production, serve from the configured upload folder
+            app.logger.info(f"Serving file in PRODUCTION mode from {app.config['UPLOAD_FOLDER']}")
             return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
         else:
-            # In development, serve from the static/uploads directory
-            app.logger.info(f"Serving file {filename} from {os.path.join(app.static_folder, 'uploads')}")
-            return send_from_directory(os.path.join(app.static_folder, 'uploads'), filename)
+            # In development, always serve from static/uploads
+            upload_dir = os.path.join(app.static_folder, 'uploads')
+            app.logger.info(f"Serving file in DEVELOPMENT mode from {upload_dir}")
+            
+            # Check if the file exists
+            file_path = os.path.join(upload_dir, filename)
+            if os.path.exists(file_path):
+                app.logger.info(f"File exists at {file_path}")
+            else:
+                app.logger.warning(f"File NOT found at {file_path}")
+                
+            return send_from_directory(upload_dir, filename)
     except Exception as e:
         app.logger.error(f"Error serving file {filename}: {str(e)}")
-        return f"File not found: {filename}", 404
+        # Return a placeholder image instead of 404 for better user experience
+        return send_from_directory(app.static_folder, 'img/default-story.jpg')
 
 @app.route('/admin')
 @login_required
@@ -501,42 +537,72 @@ def create_post():
         image_uploaded = False
         if 'image' in request.files and request.files['image'].filename:
             file = request.files['image']
+            app.logger.info(f"Image upload detected: {file.filename}")
             
             if file and allowed_file(file.filename):
                 try:
-                    # Save file
+                    # Sanitize and create a unique filename
                     filename = secure_filename(file.filename)
                     timestamp = int(time.time())
                     name, ext = os.path.splitext(filename)
                     unique_filename = f"{name}_{timestamp}{ext}"
                     
-                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                    # Determine the proper upload directory
+                    if os.environ.get('FLASK_ENV') == 'production':
+                        upload_dir = app.config['UPLOAD_FOLDER']
+                    else:
+                        upload_dir = os.path.join(app.static_folder, 'uploads')
+                    
+                    # Ensure directory exists
+                    os.makedirs(upload_dir, exist_ok=True)
+                    
+                    # Full path to save the file
+                    filepath = os.path.join(upload_dir, unique_filename)
+                    app.logger.info(f"Saving uploaded image to: {filepath}")
+                    
+                    # Save the file
                     file.save(filepath)
+                    app.logger.info(f"File saved successfully")
                     
                     # Resize image
-                    resize_image(filepath)
+                    try:
+                        resize_image(filepath)
+                        app.logger.info(f"Image resized successfully")
+                    except Exception as e:
+                        app.logger.warning(f"Image resize failed: {str(e)}")
                     
-                    # Set image URL - use the URL path, not the file system path
+                    # Set image URL to just the filename, not the full path
                     new_post.image_url = unique_filename
+                    app.logger.info(f"Post image_url set to: {unique_filename}")
                     image_uploaded = True
                 except Exception as e:
+                    app.logger.error(f"Image upload error: {str(e)}")
                     if 'filepath' in locals() and os.path.exists(filepath):
                         os.remove(filepath)
                     flash(f'Resim yüklenirken hata oluştu: {str(e)}', 'danger')
                     return redirect(url_for('create_post'))
             else:
+                app.logger.warning(f"Invalid file type for upload: {file.filename}")
                 flash('Geçersiz dosya türü. Lütfen bir resim dosyası seçin.', 'danger')
                 return redirect(url_for('create_post'))
         
-        db.session.add(new_post)
-        db.session.commit()
-        
-        success_message = 'Hikaye başarıyla oluşturuldu!'
-        if image_uploaded:
-            success_message += ' Resim başarıyla yüklendi.'
-        
-        flash(success_message, 'success')
-        return redirect(url_for('admin_index'))
+        try:
+            db.session.add(new_post)
+            db.session.commit()
+            app.logger.info(f"Post created successfully with ID: {new_post.id}")
+            
+            success_message = 'Hikaye başarıyla oluşturuldu!'
+            if image_uploaded:
+                success_message += ' Resim başarıyla yüklendi.'
+            
+            flash(success_message, 'success')
+            return redirect(url_for('admin_index'))
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Database error creating post: {str(e)}")
+            flash(f'Hikaye kaydedilirken bir hata oluştu: {str(e)}', 'danger')
+            return render_template('admin/create_post.html', categories=CATEGORIES, 
+                               form_data={'title': title, 'content': content, 'category': category, 'author': author})
     
     categories = CATEGORIES
     return render_template('admin/create_post.html', categories=categories)
@@ -581,50 +647,90 @@ def edit_post(post_id):
         image_uploaded = False
         if 'image' in request.files and request.files['image'].filename:
             file = request.files['image']
+            app.logger.info(f"Image upload detected for post {post_id}: {file.filename}")
             
             if file and allowed_file(file.filename):
                 try:
                     # Delete old image if exists
                     if post.image_url:
+                        app.logger.info(f"Existing image for post {post_id}: {post.image_url}")
+                        
+                        # Determine the path of the existing image
                         if os.environ.get('FLASK_ENV') == 'production':
                             old_image_path = os.path.join(app.config['UPLOAD_FOLDER'], post.image_url)
                         else:
-                            old_image_path = os.path.join(app.static_folder, post.image_url)
+                            old_image_path = os.path.join(app.static_folder, 'uploads', post.image_url)
+                            
+                        app.logger.info(f"Checking for old image at: {old_image_path}")
+                        
+                        # Delete if exists
                         if os.path.exists(old_image_path):
+                            app.logger.info(f"Deleting old image at: {old_image_path}")
                             os.remove(old_image_path)
+                            app.logger.info(f"Old image deleted successfully")
+                        else:
+                            app.logger.warning(f"Old image not found at: {old_image_path}")
                     
-                    # Save new file
+                    # Sanitize and create a unique filename
                     filename = secure_filename(file.filename)
                     timestamp = int(time.time())
                     name, ext = os.path.splitext(filename)
                     unique_filename = f"{name}_{timestamp}{ext}"
                     
-                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                    # Determine the proper upload directory
+                    if os.environ.get('FLASK_ENV') == 'production':
+                        upload_dir = app.config['UPLOAD_FOLDER']
+                    else:
+                        upload_dir = os.path.join(app.static_folder, 'uploads')
+                    
+                    # Ensure directory exists
+                    os.makedirs(upload_dir, exist_ok=True)
+                    
+                    # Full path to save the file
+                    filepath = os.path.join(upload_dir, unique_filename)
+                    app.logger.info(f"Saving new image to: {filepath}")
+                    
+                    # Save the file
                     file.save(filepath)
+                    app.logger.info(f"New image saved successfully")
                     
                     # Resize image
-                    resize_image(filepath)
+                    try:
+                        resize_image(filepath)
+                        app.logger.info(f"New image resized successfully")
+                    except Exception as e:
+                        app.logger.warning(f"Image resize failed: {str(e)}")
                     
-                    # Set image URL
+                    # Update image URL
                     post.image_url = unique_filename
+                    app.logger.info(f"Post image_url updated to: {unique_filename}")
                     image_uploaded = True
                 except Exception as e:
+                    app.logger.error(f"Image upload error: {str(e)}")
                     if 'filepath' in locals() and os.path.exists(filepath):
                         os.remove(filepath)
                     flash(f'Resim yüklenirken hata oluştu: {str(e)}', 'danger')
                     return redirect(url_for('edit_post', post_id=post_id))
             else:
+                app.logger.warning(f"Invalid file type for upload: {file.filename}")
                 flash('Geçersiz dosya türü. Lütfen bir resim dosyası seçin.', 'danger')
                 return redirect(url_for('edit_post', post_id=post_id))
         
-        db.session.commit()
-        
-        success_message = 'Hikaye başarıyla güncellendi!'
-        if image_uploaded:
-            success_message += ' Resim başarıyla yüklendi.'
-        
-        flash(success_message, 'success')
-        return redirect(url_for('admin_index'))
+        try:
+            db.session.commit()
+            app.logger.info(f"Post {post_id} updated successfully")
+            
+            success_message = 'Hikaye başarıyla güncellendi!'
+            if image_uploaded:
+                success_message += ' Resim başarıyla yüklendi.'
+            
+            flash(success_message, 'success')
+            return redirect(url_for('admin_index'))
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Database error updating post {post_id}: {str(e)}")
+            flash(f'Hikaye güncellenirken bir hata oluştu: {str(e)}', 'danger')
+            return redirect(url_for('edit_post', post_id=post_id))
     
     categories = CATEGORIES
     return render_template('admin/edit_post.html', post=post, categories=categories)
@@ -1239,6 +1345,37 @@ def delete_comment(comment_id):
 def test_image():
     """Test route for image display"""
     return render_template('test_image.html')
+
+@app.route('/image-diagnostics')
+@login_required
+def image_diagnostics():
+    """Diagnostic tool for image uploads and serving"""
+    # Get info about the upload directories
+    if os.environ.get('FLASK_ENV') == 'production':
+        upload_dir = app.config['UPLOAD_FOLDER']
+    else:
+        upload_dir = os.path.join(app.static_folder, 'uploads')
+    
+    # Check if directory exists
+    dir_exists = os.path.exists(upload_dir)
+    
+    # List files in the directory
+    if dir_exists:
+        files = os.listdir(upload_dir)
+        files = [f for f in files if os.path.isfile(os.path.join(upload_dir, f)) and not f.startswith('.')]
+    else:
+        files = []
+    
+    # Get image_url from some recent posts
+    posts_with_images = Post.query.filter(Post.image_url.isnot(None)).order_by(Post.created_at.desc()).limit(5).all()
+    
+    return render_template('admin/image_diagnostics.html', 
+                          upload_dir=upload_dir,
+                          dir_exists=dir_exists,
+                          file_count=len(files),
+                          files=files[:10],  # Show only first 10 files
+                          posts=posts_with_images,
+                          env=os.environ.get('FLASK_ENV', 'development'))
 
 @app.errorhandler(404)
 def page_not_found(e):
