@@ -125,7 +125,6 @@
 </div>
 {% endblock %}
 
-{% block tail %}
-{{ super() }}
+{% block extra_js %}
 <script src="{{ url_for('static', filename='js/post.js') }}"></script>
 {% endblock %}

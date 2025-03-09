@@ -4,23 +4,23 @@ function ratePost(postId, isLike) {
     // Log to help with debugging
     console.log(`Attempting to rate post ${postId} with action ${action}`);
     
-    // Get CSRF token if available
+    // Get CSRF token from meta tag
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    console.log('CSRF Token found:', !!csrfToken);
     
-    // Set up headers
-    const headers = {
-        'Content-Type': 'application/x-www-form-urlencoded',
-    };
-    
-    // Add CSRF token if available
+    // Create form data
+    const formData = new FormData();
     if (csrfToken) {
-        headers['X-CSRFToken'] = csrfToken;
+        formData.append('csrf_token', csrfToken);
     }
     
-    // Make the fetch request with appropriate headers
+    // Make the fetch request
     fetch(`/post/${postId}/rate/${action}`, {
         method: 'POST',
-        headers: headers,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData,
         credentials: 'same-origin'
     })
     .then(response => {

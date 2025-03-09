@@ -879,7 +879,7 @@ def videos():
     return render_template('videos.html', videos=all_videos)
 
 @app.route('/post/<int:post_id>/rate/<action>', methods=['POST'])
-@csrf.exempt
+@csrf.exempt  # Since we're handling CSRF in JavaScript
 def rate_post(post_id, action):
     """Handle post rating (like/dislike)"""
     try:
@@ -893,47 +893,13 @@ def rate_post(post_id, action):
         # Get post
         post = Post.query.get_or_404(post_id)
         
-        # Check if this IP has already rated this post
-        existing_rating = Rating.query.filter_by(
-            post_id=post_id, 
-            ip_address=request.remote_addr
-        ).first()
+        # Simplified rating approach - just increment/decrement
+        if action == 'like':
+            post.likes += 1
+        else:
+            post.dislikes += 1
         
-        if existing_rating:
-            # Only allow changing from like to dislike or vice versa
-            if (existing_rating.is_like and action == 'dislike') or (not existing_rating.is_like and action == 'like'):
-                # Update the existing rating
-                existing_rating.is_like = (action == 'like')
-                db.session.commit()
-                
-                # Update the post's like/dislike counts
-                post.update_rating_counts()
-                
-                return jsonify({
-                    'success': True,
-                    'likes': post.likes,
-                    'dislikes': post.dislikes,
-                    'message': 'Oyunuz güncellendi'
-                })
-            else:
-                # User is trying to rate again with the same action
-                return jsonify({
-                    'success': False,
-                    'message': 'Bu yazıyı zaten oyladınız'
-                })
-        
-        # Create a new rating
-        new_rating = Rating(
-            post_id=post_id,
-            ip_address=request.remote_addr,
-            is_like=(action == 'like')
-        )
-        
-        db.session.add(new_rating)
         db.session.commit()
-        
-        # Update the post's like/dislike counts
-        post.update_rating_counts()
         
         # Log the response for debugging
         app.logger.info(f"Rating successful: post_id={post_id}, new likes={post.likes}, new dislikes={post.dislikes}")
