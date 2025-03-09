@@ -90,14 +90,6 @@
             {% endif %}
         </div>
     {% endif %}
-    
-    <!-- Debug information -->
-    <div id="debug-info" class="mt-4 p-3 bg-light rounded">
-        <h5>Debug Info:</h5>
-        <p>Authentication Status: {% if current_user.is_authenticated %}Authenticated ({{ current_user.username }}){% else %}Not Authenticated{% endif %}</p>
-        <p>Is Anonymous: {% if current_user.is_anonymous %}Yes{% else %}No{% endif %}</p>
-        <p>Current User Type: {{ current_user.__class__.__name__ }}</p>
-    </div>
 </div>
 {% endblock %}
 
@@ -105,15 +97,6 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         console.log("Videos page loaded");
-        var debugElement = document.getElementById('debug-info');
-        if (debugElement) {
-            var authText = debugElement.querySelector('p:nth-child(2)').textContent;
-            console.log("Authentication status from client side: " + 
-                (authText.includes('Authenticated') ? 
-                'User is authenticated' : 'User is NOT authenticated'));
-        } else {
-            console.log("Debug element not found");
-        }
     });
 </script>
 {% endblock %}

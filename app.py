@@ -489,6 +489,7 @@ def create_post():
                                  form_data={'title': title, 'content': '', 'category': category, 'author': author})
         
         app.logger.info(f"Content validation passed, creating post")
+        
         new_post = Post(
             title=title,
             content=content,
@@ -497,6 +498,7 @@ def create_post():
         )
         
         # Handle image upload
+        image_uploaded = False
         if 'image' in request.files and request.files['image'].filename:
             file = request.files['image']
             
@@ -516,6 +518,7 @@ def create_post():
                     
                     # Set image URL - use the URL path, not the file system path
                     new_post.image_url = unique_filename
+                    image_uploaded = True
                 except Exception as e:
                     if 'filepath' in locals() and os.path.exists(filepath):
                         os.remove(filepath)
@@ -527,7 +530,12 @@ def create_post():
         
         db.session.add(new_post)
         db.session.commit()
-        flash('Hikaye başarıyla oluşturuldu!', 'success')
+        
+        success_message = 'Hikaye başarıyla oluşturuldu!'
+        if image_uploaded:
+            success_message += ' Resim başarıyla yüklendi.'
+        
+        flash(success_message, 'success')
         return redirect(url_for('admin_index'))
     
     categories = CATEGORIES
@@ -544,28 +552,33 @@ def edit_post(post_id):
         category = request.form.get('category')
         author = request.form.get('author')
         
-        # Debug logging
-        app.logger.info(f"Edit form data - Title: {title}, Category: {category}, Author: {author}, Content length: {len(content) if content else 0}")
+        # Check if title is empty
+        if not title:
+            flash('Lütfen başlık alanını doldurun!', 'danger')
+            return redirect(url_for('edit_post', post_id=post_id))
         
         # Check if content is empty or just contains HTML tags with no actual content
         content_without_tags = re.sub(r'<[^>]*>', '', content or '')
         content_without_tags = content_without_tags.strip()
-        app.logger.info(f"Content without tags: '{content_without_tags}'")
         
-        if not title:
-            flash('Lütfen başlık alanını doldurun!', 'danger')
-            return render_template('admin/edit_post.html', post=post, categories=CATEGORIES)
+        is_empty_content = (not content or 
+                           content == '<p>&nbsp;</p>' or 
+                           content == '<p>None</p>' or
+                           content == 'None' or
+                           not content_without_tags)
         
-        if not content or content == '<p>&nbsp;</p>' or not content_without_tags:
+        if is_empty_content:
             flash('Lütfen içerik alanını doldurun!', 'danger')
-            return render_template('admin/edit_post.html', post=post, categories=CATEGORIES)
+            return redirect(url_for('edit_post', post_id=post_id))
         
+        # Update post
         post.title = title
         post.content = content
         post.category = category
         post.author = author
         
         # Handle image upload
+        image_uploaded = False
         if 'image' in request.files and request.files['image'].filename:
             file = request.files['image']
             
@@ -594,6 +607,7 @@ def edit_post(post_id):
                     
                     # Set image URL
                     post.image_url = unique_filename
+                    image_uploaded = True
                 except Exception as e:
                     if 'filepath' in locals() and os.path.exists(filepath):
                         os.remove(filepath)
@@ -604,7 +618,12 @@ def edit_post(post_id):
                 return redirect(url_for('edit_post', post_id=post_id))
         
         db.session.commit()
-        flash('Hikaye başarıyla güncellendi!', 'success')
+        
+        success_message = 'Hikaye başarıyla güncellendi!'
+        if image_uploaded:
+            success_message += ' Resim başarıyla yüklendi.'
+        
+        flash(success_message, 'success')
         return redirect(url_for('admin_index'))
     
     categories = CATEGORIES

@@ -11,7 +11,7 @@
             <div class="col-6 col-md-4 mb-4">
                 <div class="story-card featured-card animate-card {% if loop.index0 < 8 %}delay-{{ loop.index0 + 1 }}{% endif %}">
                     {% if post.image_url %}
-                    <img src="{{ url_for('static', filename='uploads/' + post.image_url) }}" alt="{{ post.title }}" class="story-image">
+                    <img src="{{ url_for('serve_upload', filename=post.image_url) }}" alt="{{ post.title }}" class="story-image">
                     {% else %}
                     <img src="{{ url_for('static', filename='img/default-story.jpg') }}" alt="{{ post.title }}" class="story-image">
                     {% endif %}
@@ -47,7 +47,7 @@
             <div class="col-6 col-md-3 mb-4">
                 <div class="story-card animate-card {% if loop.index0 < 8 %}delay-{{ loop.index0 + 1 }}{% endif %}">
                     {% if post.image_url %}
-                    <img src="{{ url_for('static', filename='uploads/' + post.image_url) }}" alt="{{ post.title }}" class="story-image">
+                    <img src="{{ url_for('serve_upload', filename=post.image_url) }}" alt="{{ post.title }}" class="story-image">
                     {% else %}
                     <img src="{{ url_for('static', filename='img/default-story.jpg') }}" alt="{{ post.title }}" class="story-image">
                     {% endif %}
@@ -79,7 +79,7 @@
             <div class="col-6 col-md-3 mb-4">
                 <div class="story-card animate-card {% if loop.index0 < 8 %}delay-{{ loop.index0 + 1 }}{% endif %}">
                     {% if post.image_url %}
-                    <img src="{{ url_for('static', filename='uploads/' + post.image_url) }}" alt="{{ post.title }}" class="story-image">
+                    <img src="{{ url_for('serve_upload', filename=post.image_url) }}" alt="{{ post.title }}" class="story-image">
                     {% else %}
                     <img src="{{ url_for('static', filename='img/default-story.jpg') }}" alt="{{ post.title }}" class="story-image">
                     {% endif %}

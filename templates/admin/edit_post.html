@@ -48,11 +48,14 @@
                             <label for="image" class="form-label">Resim</label>
                             {% if post.image_url %}
                             <div class="mb-2">
-                                <img src="{{ url_for('static', filename='uploads/' + post.image_url) }}" alt="{{ post.title }}" class="img-thumbnail" style="max-height: 200px;">
+                                <img src="{{ url_for('serve_upload', filename=post.image_url) }}" alt="{{ post.title }}" class="img-thumbnail" style="max-height: 200px;">
                             </div>
                             {% endif %}
                             <input type="file" class="form-control" id="image" name="image" accept="image/*">
                             <small class="form-text text-muted">Yeni bir resim yüklerseniz, mevcut resim değiştirilecektir.</small>
+                            <div id="imageSuccessMessage" class="mt-2 alert alert-success" style="display: none;">
+                                <i class="fas fa-check-circle"></i> Resim başarıyla seçildi! Kaydetmek için formu gönderiniz.
+                            </div>
                         </div>
                         
                         <div class="mb-3">
@@ -80,6 +83,22 @@
             evt.editor.on('fileUploadRequest', function(evt) {
                 var xhr = evt.data.fileLoader.xhr;
                 xhr.setRequestHeader('X-CSRFToken', "{{ csrf_token() }}");
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Handle image file selection success message
+            const imageInput = document.getElementById('image');
+            const successMessage = document.getElementById('imageSuccessMessage');
+            
+            imageInput.addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    successMessage.style.display = 'block';
+                    // Hide message after 5 seconds
+                    setTimeout(function() {
+                        successMessage.style.display = 'none';
+                    }, 5000);
+                }
             });
         });
     </script>

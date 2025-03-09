@@ -179,6 +179,10 @@
                                                     <p>Resim seçilmedi</p>
                                                 </div>
                                             </div>
+                                            
+                                            <div id="imageSuccessMessage" class="mt-2 alert alert-success" style="display: none;">
+                                                <i class="fas fa-check-circle"></i> Resim başarıyla seçildi! Kaydetmek için formu gönderiniz.
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -217,6 +221,7 @@
         const imagePreview = document.getElementById('imagePreview');
         const imagePlaceholder = document.getElementById('imagePlaceholder');
         const previewImg = document.getElementById('previewImg');
+        const successMessage = document.getElementById('imageSuccessMessage');
         
         // Show placeholder initially
         imagePlaceholder.style.display = 'block';
@@ -229,12 +234,21 @@
                     previewImg.src = e.target.result;
                     imagePreview.style.display = 'block';
                     imagePlaceholder.style.display = 'none';
+                    
+                    // Show success message
+                    successMessage.style.display = 'block';
+                    
+                    // Hide success message after 5 seconds
+                    setTimeout(function() {
+                        successMessage.style.display = 'none';
+                    }, 5000);
                 }
                 
                 reader.readAsDataURL(this.files[0]);
             } else {
                 imagePreview.style.display = 'none';
                 imagePlaceholder.style.display = 'block';
+                successMessage.style.display = 'none';
             }
         });
     });
