@@ -83,7 +83,7 @@
                         {% endif %}
                         {% endwith %}
                         
-                        <form action="{{ url_for('add_comment', post_id=post.id) }}" method="post" class="needs-validation" novalidate>
+                        <form action="{{ url_for('add_comment', post_id=post.id) }}" method="POST" class="needs-validation" novalidate>
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
@@ -127,4 +127,26 @@
 
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/post.js') }}"></script>
+<script>
+    // Form validation for comments
+    document.addEventListener('DOMContentLoaded', function() {
+        // Fetch all forms with the 'needs-validation' class
+        var forms = document.querySelectorAll('.needs-validation');
+        
+        // Add submit event handler to each form
+        Array.from(forms).forEach(function(form) {
+            form.addEventListener('submit', function(event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    console.log('Comment form validation failed');
+                } else {
+                    console.log('Comment form validation successful');
+                }
+                
+                form.classList.add('was-validated');
+            }, false);
+        });
+    });
+</script>
 {% endblock %}

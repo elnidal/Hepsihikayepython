@@ -1096,35 +1096,51 @@ def admin_settings():
 
 @app.route('/post/<int:post_id>/comment', methods=['POST'])
 def add_comment(post_id):
-    post = Post.query.get_or_404(post_id)
-    
-    name = request.form.get('name')
-    email = request.form.get('email')
-    content = request.form.get('content')
-    
-    if not name or not email or not content:
-        flash('Lütfen tüm alanları doldurun.', 'danger')
+    """Handle comment submission for a post"""
+    try:
+        app.logger.info(f"Comment submission received for post {post_id}")
+        app.logger.info(f"Form data: {request.form}")
+        
+        post = Post.query.get_or_404(post_id)
+        
+        name = request.form.get('name')
+        email = request.form.get('email')
+        content = request.form.get('content')
+        
+        app.logger.info(f"Extracted data - Name: {name}, Email: {email}, Content length: {len(content) if content else 0}")
+        
+        if not name or not email or not content:
+            app.logger.warning(f"Missing required fields - Name: {bool(name)}, Email: {bool(email)}, Content: {bool(content)}")
+            flash('Lütfen tüm alanları doldurun.', 'danger')
+            return redirect(url_for('post', post_id=post_id))
+        
+        # Simple email validation
+        if '@' not in email or '.' not in email:
+            app.logger.warning(f"Invalid email format: {email}")
+            flash('Geçerli bir e-posta adresi girin.', 'danger')
+            return redirect(url_for('post', post_id=post_id))
+        
+        # Create new comment
+        comment = Comment(
+            post_id=post_id,
+            name=name,
+            email=email,
+            content=content,
+            ip_address=request.remote_addr
+        )
+        
+        db.session.add(comment)
+        db.session.commit()
+        
+        app.logger.info(f"Comment created successfully with ID: {comment.id}")
+        flash('Yorumunuz gönderildi ve onay bekliyor.', 'success')
         return redirect(url_for('post', post_id=post_id))
-    
-    # Simple email validation
-    if '@' not in email or '.' not in email:
-        flash('Geçerli bir e-posta adresi girin.', 'danger')
+    except Exception as e:
+        db.session.rollback()
+        error_msg = str(e)
+        app.logger.error(f"Error adding comment to post {post_id}: {error_msg}")
+        flash(f'Yorum gönderilirken bir hata oluştu: {error_msg}', 'danger')
         return redirect(url_for('post', post_id=post_id))
-    
-    # Create new comment
-    comment = Comment(
-        post_id=post_id,
-        name=name,
-        email=email,
-        content=content,
-        ip_address=request.remote_addr
-    )
-    
-    db.session.add(comment)
-    db.session.commit()
-    
-    flash('Yorumunuz gönderildi ve onay bekliyor.', 'success')
-    return redirect(url_for('post', post_id=post_id))
 
 @app.route('/admin/comments')
 @login_required
@@ -1223,6 +1239,12 @@ def delete_comment(comment_id):
 def test_image():
     """Test route for image display"""
     return render_template('test_image.html')
+
+@app.errorhandler(404)
+def page_not_found(e):
+    """Handle 404 errors with a custom template"""
+    app.logger.warning(f"404 error: {request.path}")
+    return render_template('errors/404.html'), 404
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10001))
