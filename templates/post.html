@@ -29,16 +29,17 @@
                     <div class="d-flex align-items-center">
                         <div class="rating-buttons me-3">
                             <button onclick="ratePost({{ post.id }}, true)" class="btn btn-outline-primary like-btn-{{ post.id }}">
-                                <i class="fas fa-thumbs-up"></i> Beğen ({{ post.likes }})
+                                <i class="fas fa-thumbs-up"></i> Beğen (<span id="likes-{{ post.id }}">{{ post.likes }}</span>)
                             </button>
                             <button onclick="ratePost({{ post.id }}, false)" class="btn btn-outline-danger dislike-btn-{{ post.id }}">
-                                <i class="fas fa-thumbs-down"></i> Beğenme ({{ post.dislikes }})
+                                <i class="fas fa-thumbs-down"></i> Beğenme (<span id="dislikes-{{ post.id }}">{{ post.dislikes }}</span>)
                             </button>
                         </div>
                         <div class="rating-info ms-2">
                             <span class="badge bg-secondary">Toplam Oy: {{ post.likes + post.dislikes }}</span>
                         </div>
                     </div>
+                    <div id="rating-message" class="mt-2" style="display: none;"></div>
                 </div>
                 
                 <!-- Comments Section -->
@@ -125,52 +126,6 @@
 {% endblock %}
 
 {% block tail %}
-<script>
-function ratePost(postId, isLike) {
-    fetch(`/post/${postId}/rate/${isLike ? 'like' : 'dislike'}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token() }}'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            document.querySelector(`.like-btn-${postId}`).innerHTML = `<i class="fas fa-thumbs-up"></i> Beğen (${data.likes})`;
-            document.querySelector(`.dislike-btn-${postId}`).innerHTML = `<i class="fas fa-thumbs-down"></i> Beğenme (${data.dislikes})`;
-            
-            // Add visual feedback
-            const btn = isLike ? document.querySelector(`.like-btn-${postId}`) : document.querySelector(`.dislike-btn-${postId}`);
-            btn.classList.add('active');
-            setTimeout(() => {
-                btn.classList.remove('active');
-            }, 1000);
-        } else {
-            alert(data.message || 'Bir hata oluştu.');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Bir hata oluştu.');
-    });
-}
-
-// Form validation
-(function() {
-    'use strict';
-    window.addEventListener('load', function() {
-        var forms = document.getElementsByClassName('needs-validation');
-        Array.prototype.filter.call(forms, function(form) {
-            form.addEventListener('submit', function(event) {
-                if (form.checkValidity() === false) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                }
-                form.classList.add('was-validated');
-            }, false);
-        });
-    }, false);
-})();
-</script>
+{{ super() }}
+<script src="{{ url_for('static', filename='js/post.js') }}"></script>
 {% endblock %}

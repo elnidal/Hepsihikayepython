@@ -888,13 +888,47 @@ def rate_post(post_id, action):
         # Get post
         post = Post.query.get_or_404(post_id)
         
-        # Simplified rating logic - just increment/decrement without IP checking
-        if action == 'like':
-            post.likes += 1
-        else:
-            post.dislikes += 1
+        # Check if this IP has already rated this post
+        existing_rating = Rating.query.filter_by(
+            post_id=post_id, 
+            ip_address=request.remote_addr
+        ).first()
         
+        if existing_rating:
+            # Only allow changing from like to dislike or vice versa
+            if (existing_rating.is_like and action == 'dislike') or (not existing_rating.is_like and action == 'like'):
+                # Update the existing rating
+                existing_rating.is_like = (action == 'like')
+                db.session.commit()
+                
+                # Update the post's like/dislike counts
+                post.update_rating_counts()
+                
+                return jsonify({
+                    'success': True,
+                    'likes': post.likes,
+                    'dislikes': post.dislikes,
+                    'message': 'Oyunuz güncellendi'
+                })
+            else:
+                # User is trying to rate again with the same action
+                return jsonify({
+                    'success': False,
+                    'message': 'Bu yazıyı zaten oyladınız'
+                })
+        
+        # Create a new rating
+        new_rating = Rating(
+            post_id=post_id,
+            ip_address=request.remote_addr,
+            is_like=(action == 'like')
+        )
+        
+        db.session.add(new_rating)
         db.session.commit()
+        
+        # Update the post's like/dislike counts
+        post.update_rating_counts()
         
         # Log the response for debugging
         app.logger.info(f"Rating successful: post_id={post_id}, new likes={post.likes}, new dislikes={post.dislikes}")
@@ -903,7 +937,7 @@ def rate_post(post_id, action):
             'success': True,
             'likes': post.likes,
             'dislikes': post.dislikes,
-            'message': 'Rating saved successfully'
+            'message': 'Oyunuz kaydedildi'
         })
 
     except Exception as e:
@@ -911,7 +945,7 @@ def rate_post(post_id, action):
         db.session.rollback()
         return jsonify({
             'success': False,
-            'message': f'Server error: {str(e)}'
+            'message': f'Bir hata oluştu. Lütfen daha sonra tekrar deneyin.'
         }), 500
 
 @app.route('/upload', methods=['POST'])

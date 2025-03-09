@@ -4,9 +4,23 @@ function ratePost(postId, isLike) {
     // Log to help with debugging
     console.log(`Attempting to rate post ${postId} with action ${action}`);
     
-    // Basic fetch request with minimal options
+    // Get CSRF token if available
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    
+    // Set up headers
+    const headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+    };
+    
+    // Add CSRF token if available
+    if (csrfToken) {
+        headers['X-CSRFToken'] = csrfToken;
+    }
+    
+    // Make the fetch request with appropriate headers
     fetch(`/post/${postId}/rate/${action}`, {
         method: 'POST',
+        headers: headers,
         credentials: 'same-origin'
     })
     .then(response => {
@@ -16,11 +30,11 @@ function ratePost(postId, isLike) {
     .then(data => {
         console.log('Response data:', data);
         if (data.success) {
-            // Update the like/dislike counts in the UI
+            // Update like/dislike counts in all possible UI elements
+            
+            // Method 1: Update by ID (used in post_detail.html)
             const likesElement = document.getElementById(`likes-${postId}`);
             const dislikesElement = document.getElementById(`dislikes-${postId}`);
-            
-            console.log('Elements:', likesElement, dislikesElement);
             
             if (likesElement) {
                 likesElement.textContent = data.likes;
@@ -32,21 +46,61 @@ function ratePost(postId, isLike) {
                 console.log(`Updated dislikes to ${data.dislikes}`);
             }
             
-            // Show feedback
-            alert('Oyunuz kaydedildi!');
+            // Method 2: Update by class (used in post.html)
+            const likeBtn = document.querySelector(`.like-btn-${postId}`);
+            const dislikeBtn = document.querySelector(`.dislike-btn-${postId}`);
+            
+            if (likeBtn) {
+                likeBtn.innerHTML = `<i class="fas fa-thumbs-up"></i> Beğen (${data.likes})`;
+            }
+            
+            if (dislikeBtn) {
+                dislikeBtn.innerHTML = `<i class="fas fa-thumbs-down"></i> Beğenme (${data.dislikes})`;
+            }
+            
+            // Add visual feedback by adding 'active' class
+            const clickedBtn = isLike ? 
+                (likeBtn || document.querySelector(`.btn[onclick*="ratePost(${postId}, true)"]`)) : 
+                (dislikeBtn || document.querySelector(`.btn[onclick*="ratePost(${postId}, false)"]`));
+                
+            if (clickedBtn) {
+                clickedBtn.classList.add('active');
+                setTimeout(() => {
+                    clickedBtn.classList.remove('active');
+                }, 1000);
+            }
+            
+            // Show success feedback
+            showFeedback('Oyunuz kaydedildi!', 'success');
         } else {
-            alert(data.message || 'Bir hata oluştu');
+            showFeedback(data.message || 'Bir hata oluştu', 'error');
         }
     })
     .catch(error => {
         console.error('Error rating post:', error);
-        alert('Bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+        showFeedback('Bir hata oluştu. Lütfen daha sonra tekrar deneyin.', 'error');
     });
 }
 
-// Helper function to show feedback messages - simplified to ensure it works
+// Helper function to show feedback messages
 function showFeedback(message, type) {
-    alert(message);
+    // First try to find a message container
+    const messageContainer = document.getElementById('rating-message');
+    
+    if (messageContainer) {
+        // Use the dedicated message container if available
+        messageContainer.textContent = message;
+        messageContainer.className = `alert alert-${type === 'success' ? 'success' : 'danger'}`;
+        messageContainer.style.display = 'block';
+        
+        // Hide after 3 seconds
+        setTimeout(() => {
+            messageContainer.style.display = 'none';
+        }, 3000);
+    } else {
+        // Fall back to alert if no container
+        alert(message);
+    }
 }
 
 // Wait for the DOM to be fully loaded
