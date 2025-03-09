@@ -28,7 +28,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.abspath("blog.db")}
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Configure upload folder based on environment
-if os.environ.get('FLASK_ENV') == 'production':
+is_production = os.environ.get('FLASK_ENV') == 'production'
+
+if is_production:
     # In production, use a persistent directory for uploads
     # Note: On Render.com, /opt/render/project/src is persistent
     app.config['UPLOAD_FOLDER'] = '/opt/render/project/src/uploads'
@@ -38,9 +40,18 @@ else:
     app.config['UPLOAD_FOLDER'] = os.path.join(app.static_folder, 'uploads')
     app.config['UPLOAD_URL'] = '/static/uploads'  # URL path for uploads in development
 
+# Normalize upload path - ensure it doesn't have trailing slash
+app.config['UPLOAD_FOLDER'] = app.config['UPLOAD_FOLDER'].rstrip('/')
+app.config['UPLOAD_URL'] = app.config['UPLOAD_URL'].rstrip('/')
+
+# Store current environment mode for easy reference
+app.config['IS_PRODUCTION'] = is_production
+
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 app.logger.info(f"Upload directory set to: {app.config['UPLOAD_FOLDER']}")
+app.logger.info(f"Upload URL path set to: {app.config['UPLOAD_URL']}")
+app.logger.info(f"Running in {'PRODUCTION' if is_production else 'DEVELOPMENT'} mode")
 
 # Ensure default image directory exists
 default_img_dir = os.path.join(app.static_folder, 'img')
@@ -448,29 +459,37 @@ def sync_youtube_videos(channel_identifier, max_results=10):
 
 @app.route('/uploads/<path:filename>')
 def serve_upload(filename):
-    """Serve uploaded files"""
+    """Serve uploaded files consistently across environments"""
     try:
         # Log the request for debugging
         app.logger.info(f"Image request received for: {filename}")
         
-        # Standardize path handling between environments
-        if os.environ.get('FLASK_ENV') == 'production':
-            # In production, serve from the configured upload folder
+        # Normalize filename - remove any leading slashes
+        filename = filename.lstrip('/')
+        
+        # Determine file path based on environment
+        if app.config['IS_PRODUCTION']:
+            # In production environment
             app.logger.info(f"Serving file in PRODUCTION mode from {app.config['UPLOAD_FOLDER']}")
-            return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         else:
-            # In development, always serve from static/uploads
+            # In development environment
             upload_dir = os.path.join(app.static_folder, 'uploads')
             app.logger.info(f"Serving file in DEVELOPMENT mode from {upload_dir}")
-            
-            # Check if the file exists
             file_path = os.path.join(upload_dir, filename)
-            if os.path.exists(file_path):
-                app.logger.info(f"File exists at {file_path}")
-            else:
-                app.logger.warning(f"File NOT found at {file_path}")
-                
-            return send_from_directory(upload_dir, filename)
+        
+        # Check if the file exists
+        if os.path.exists(file_path):
+            app.logger.info(f"File exists at {file_path}")
+        else:
+            app.logger.warning(f"File NOT found at {file_path}, serving default image instead")
+            return send_from_directory(app.static_folder, 'img/default-story.jpg')
+            
+        # Get the correct directory to serve from
+        serve_dir = os.path.dirname(file_path)
+        serve_filename = os.path.basename(file_path)
+        
+        return send_from_directory(serve_dir, serve_filename)
     except Exception as e:
         app.logger.error(f"Error serving file {filename}: {str(e)}")
         # Return a placeholder image instead of 404 for better user experience
@@ -547,11 +566,8 @@ def create_post():
                     name, ext = os.path.splitext(filename)
                     unique_filename = f"{name}_{timestamp}{ext}"
                     
-                    # Determine the proper upload directory
-                    if os.environ.get('FLASK_ENV') == 'production':
-                        upload_dir = app.config['UPLOAD_FOLDER']
-                    else:
-                        upload_dir = os.path.join(app.static_folder, 'uploads')
+                    # Use the configured upload folder directly
+                    upload_dir = app.config['UPLOAD_FOLDER']
                     
                     # Ensure directory exists
                     os.makedirs(upload_dir, exist_ok=True)
@@ -655,11 +671,8 @@ def edit_post(post_id):
                     if post.image_url:
                         app.logger.info(f"Existing image for post {post_id}: {post.image_url}")
                         
-                        # Determine the path of the existing image
-                        if os.environ.get('FLASK_ENV') == 'production':
-                            old_image_path = os.path.join(app.config['UPLOAD_FOLDER'], post.image_url)
-                        else:
-                            old_image_path = os.path.join(app.static_folder, 'uploads', post.image_url)
+                        # Use the configured upload folder directly
+                        old_image_path = os.path.join(app.config['UPLOAD_FOLDER'], post.image_url)
                             
                         app.logger.info(f"Checking for old image at: {old_image_path}")
                         
@@ -677,11 +690,8 @@ def edit_post(post_id):
                     name, ext = os.path.splitext(filename)
                     unique_filename = f"{name}_{timestamp}{ext}"
                     
-                    # Determine the proper upload directory
-                    if os.environ.get('FLASK_ENV') == 'production':
-                        upload_dir = app.config['UPLOAD_FOLDER']
-                    else:
-                        upload_dir = os.path.join(app.static_folder, 'uploads')
+                    # Use the configured upload folder directly
+                    upload_dir = app.config['UPLOAD_FOLDER']
                     
                     # Ensure directory exists
                     os.makedirs(upload_dir, exist_ok=True)
@@ -738,21 +748,51 @@ def edit_post(post_id):
 @app.route('/admin/delete/<int:post_id>', methods=['POST'])
 @login_required
 def delete_post(post_id):
-    post = Post.query.get_or_404(post_id)
+    try:
+        post = Post.query.get_or_404(post_id)
+        app.logger.info(f"Attempting to delete post {post_id}: {post.title}")
+        
+        # Delete image if exists
+        if post.image_url:
+            try:
+                # Get the appropriate path based on environment
+                image_path = os.path.join(app.config['UPLOAD_FOLDER'], post.image_url)
+                app.logger.info(f"Checking for image at {image_path}")
+                
+                if os.path.exists(image_path):
+                    os.remove(image_path)
+                    app.logger.info(f"Deleted image at {image_path}")
+                else:
+                    app.logger.warning(f"Image not found at {image_path} during post deletion")
+            except Exception as e:
+                app.logger.error(f"Error deleting image: {str(e)}")
+                # Continue with post deletion even if image deletion fails
+        
+        # Delete associated comments
+        comments = Comment.query.filter_by(post_id=post_id).all()
+        for comment in comments:
+            db.session.delete(comment)
+            app.logger.info(f"Deleted comment {comment.id} associated with post {post_id}")
+        
+        # Delete associated ratings
+        ratings = Rating.query.filter_by(post_id=post_id).all()
+        for rating in ratings:
+            db.session.delete(rating)
+            app.logger.info(f"Deleted rating {rating.id} associated with post {post_id}")
+        
+        # Delete the post
+        db.session.delete(post)
+        db.session.commit()
+        
+        app.logger.info(f"Post {post_id} successfully deleted")
+        flash('Hikaye başarıyla silindi!', 'success')
+        return redirect(url_for('admin_index'))
     
-    # Delete image if exists
-    if post.image_url:
-        if os.environ.get('FLASK_ENV') == 'production':
-            image_path = os.path.join(app.config['UPLOAD_FOLDER'], post.image_url)
-        else:
-            image_path = os.path.join(app.static_folder, post.image_url)
-        if os.path.exists(image_path):
-            os.remove(image_path)
-    
-    db.session.delete(post)
-    db.session.commit()
-    flash('Hikaye başarıyla silindi!', 'success')
-    return redirect(url_for('admin_index'))
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error deleting post {post_id}: {str(e)}", exc_info=True)
+        flash(f'Hikaye silinirken bir hata oluştu: {str(e)}', 'danger')
+        return redirect(url_for('admin_index'))
 
 @app.route('/admin/sync-youtube', methods=['GET', 'POST'])
 @login_required
@@ -1068,16 +1108,19 @@ def upload():
             name, ext = os.path.splitext(filename)
             filename = f"{name}_{int(time.time())}{ext}"
             
+            # Use the configured upload folder directly
+            upload_dir = app.config['UPLOAD_FOLDER']
+            
             # Ensure upload directory exists
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            os.makedirs(upload_dir, exist_ok=True)
             
             # Save the file
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file_path = os.path.join(upload_dir, filename)
             f.save(file_path)
             
             app.logger.info(f"File saved to {file_path}")
             
-            # Generate URL for the file
+            # Generate URL for the file - ensure consistent URL path
             url = url_for('serve_upload', filename=filename)
             
             app.logger.info(f"Generated URL: {url}")
