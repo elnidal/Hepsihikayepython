@@ -235,4 +235,49 @@ select.form-control {
 /* Adjust pagination */
 .pagination .page-link {
     padding: 0.375rem 0.75rem;
+}
+
+/* Mobile Navigation Bar */
+.mobile-nav-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: #1a2a42;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 10px 0;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+}
+
+.mobile-nav-item {
+    color: #fff;
+    text-decoration: none;
+    text-align: center;
+    flex: 1;
+    padding: 5px;
+    transition: all 0.3s ease;
+    font-size: 0.8rem;
+}
+
+.mobile-nav-item.active {
+    color: #17a2b8;
+}
+
+.mobile-nav-item i {
+    display: block;
+    font-size: 1.2rem;
+    margin-bottom: 5px;
+}
+
+/* When user is authenticated, adjust items to make room for 4 items */
+.mobile-nav-bar.with-admin .mobile-nav-item {
+    font-size: 0.75rem;
+}
+
+.mobile-nav-bar.with-admin .mobile-nav-item i {
+    font-size: 1rem;
+    margin-bottom: 3px;
 } 

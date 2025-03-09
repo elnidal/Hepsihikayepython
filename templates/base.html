@@ -82,6 +82,21 @@
             to { opacity: 1; }
         }
         
+        /* Admin Login Button */
+        .admin-login-btn {
+            opacity: 0.6;
+            transition: opacity 0.3s ease;
+            font-size: 0.8rem;
+        }
+        
+        .admin-login-btn:hover {
+            opacity: 1;
+        }
+        
+        .admin-badge {
+            font-size: 0.8rem;
+        }
+        
         /* Improved Back to Top Button */
         .back-to-top-btn {
             opacity: 0;
@@ -122,14 +137,30 @@
     
     <header class="site-header">
         <div class="container">
-            <a href="{{ url_for('index') }}" class="text-decoration-none text-white">
-                <h1 class="site-title">
-                    <span class="logo-part">H E P S İ</span>
-                    <span class="logo-icon"><i class="fas fa-play-circle"></i></span>
-                    <span class="logo-part">H İ K A Y E</span>
-                </h1>
-            </a>
-            <p class="site-tagline">Kafamızda Çok Kuruyoruz</p>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <a href="{{ url_for('index') }}" class="text-decoration-none text-white">
+                        <h1 class="site-title">
+                            <span class="logo-part">H E P S İ</span>
+                            <span class="logo-icon"><i class="fas fa-play-circle"></i></span>
+                            <span class="logo-part">H İ K A Y E</span>
+                        </h1>
+                    </a>
+                    <p class="site-tagline">Kafamızda Çok Kuruyoruz</p>
+                </div>
+                <div class="admin-login-container">
+                    {% if current_user.is_authenticated %}
+                    <div class="d-flex align-items-center admin-badge">
+                        <span class="badge bg-success me-2"><i class="fas fa-user-shield"></i> Admin</span>
+                        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-light">Çıkış Yap</a>
+                    </div>
+                    {% else %}
+                    <a href="{{ url_for('login') }}" class="btn btn-sm btn-outline-light admin-login-btn">
+                        <i class="fas fa-lock"></i> Admin Girişi
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </header>
     
@@ -199,7 +230,7 @@
     </footer>
     
     <!-- Mobile Bottom Navigation -->
-    <div class="mobile-nav-bar d-md-none">
+    <div class="mobile-nav-bar d-md-none {% if current_user.is_authenticated %}with-admin{% endif %}">
         <a href="{{ url_for('index') }}" class="mobile-nav-item {% if request.path == url_for('index') %}active{% endif %}">
             <i class="fas fa-home"></i>
             <span>Ana Sayfa</span>
@@ -210,13 +241,17 @@
         </a>
         {% if current_user.is_authenticated %}
         <a href="{{ url_for('admin_index') }}" class="mobile-nav-item {% if '/admin' in request.path %}active{% endif %}">
-            <i class="fas fa-user"></i>
-            <span>Yönetim</span>
+            <i class="fas fa-user-shield"></i>
+            <span>Admin</span>
+        </a>
+        <a href="{{ url_for('logout') }}" class="mobile-nav-item {% if '/logout' in request.path %}active{% endif %}">
+            <i class="fas fa-sign-out-alt"></i>
+            <span>Çıkış</span>
         </a>
         {% else %}
         <a href="{{ url_for('login') }}" class="mobile-nav-item {% if '/login' in request.path %}active{% endif %}">
-            <i class="fas fa-sign-in-alt"></i>
-            <span>Giriş</span>
+            <i class="fas fa-lock"></i>
+            <span>Admin Girişi</span>
         </a>
         {% endif %}
     </div>
