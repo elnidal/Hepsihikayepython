@@ -89,10 +89,13 @@
                                             </form>
                                             {% endif %}
                                             
-                                            <button type="button" class="btn btn-sm btn-danger" 
-                                                    data-bs-toggle="modal" data-bs-target="#deleteCommentModal{{ comment.id }}" title="Sil">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
+                                            <!-- Replace modal button with direct form submission -->
+                                            <form action="{{ url_for('delete_comment', comment_id=comment.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Bu yorumu silmek istediğinizden emin misiniz?');">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-sm btn-danger" title="Sil">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
                                         </div>
                                         
                                         <!-- View Comment Modal -->
@@ -144,32 +147,9 @@
                                                             <button type="submit" class="btn btn-success">Onayla</button>
                                                         </form>
                                                         {% endif %}
-                                                        <button type="button" class="btn btn-danger" 
-                                                                data-bs-toggle="modal" data-bs-target="#deleteCommentModal{{ comment.id }}"
-                                                                data-bs-dismiss="modal">
-                                                            Sil
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- Delete Comment Modal -->
-                                        <div class="modal fade" id="deleteCommentModal{{ comment.id }}" tabindex="-1" 
-                                             aria-labelledby="deleteCommentModalLabel{{ comment.id }}" aria-hidden="true">
-                                            <div class="modal-dialog">
-                                                <div class="modal-content">
-                                                    <div class="modal-header">
-                                                        <h5 class="modal-title" id="deleteCommentModalLabel{{ comment.id }}">Yorum Silme Onayı</h5>
-                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                    </div>
-                                                    <div class="modal-body">
-                                                        <p>Bu yorumu silmek istediğinizden emin misiniz?</p>
-                                                        <p><strong>Yorum:</strong> {{ comment.content[:100] }}{% if comment.content|length > 100 %}...{% endif %}</p>
-                                                    </div>
-                                                    <div class="modal-footer">
-                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
-                                                        <form action="{{ url_for('delete_comment', comment_id=comment.id) }}" method="POST" class="comment-delete-form" data-comment-id="{{ comment.id }}">
+                                                        
+                                                        <!-- Direct delete button in modal -->
+                                                        <form action="{{ url_for('delete_comment', comment_id=comment.id) }}" method="POST" style="display: inline;">
                                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                             <button type="submit" class="btn btn-danger">Sil</button>
                                                         </form>
@@ -252,25 +232,9 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
 <script>
-  // Debug script
   document.addEventListener('DOMContentLoaded', function() {
     console.log('Admin comments page loaded');
-    console.log('Delete forms:', document.querySelectorAll('.comment-delete-form').length);
-    console.log('Delete buttons:', document.querySelectorAll('.modal .btn-danger').length);
-    
-    // Monitor Bootstrap modal events
-    const deleteModals = document.querySelectorAll('.modal');
-    deleteModals.forEach(modal => {
-      modal.addEventListener('shown.bs.modal', function() {
-        console.log('Modal shown:', modal.id);
-      });
-      
-      modal.addEventListener('hidden.bs.modal', function() {
-        console.log('Modal hidden:', modal.id);
-      });
-    });
   });
 </script>
 {% endblock %} 

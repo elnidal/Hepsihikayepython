@@ -803,6 +803,11 @@ def category(category):
     page = request.args.get('page', 1, type=int)
     per_page = 10
     
+    # Special handling for 'video' category
+    if category == 'video':
+        # Redirect to videos page
+        return redirect(url_for('videos'))
+    
     posts_query = Post.query.filter_by(category=category).order_by(Post.created_at.desc())
     posts_pagination = posts_query.paginate(page=page, per_page=per_page, error_out=False)
     posts = posts_pagination.items
