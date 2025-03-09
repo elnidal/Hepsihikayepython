@@ -97,6 +97,39 @@
             font-size: 0.8rem;
         }
         
+        /* Admin Corner Login */
+        .admin-corner-login {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 999;
+            opacity: 0.3;
+            transition: opacity 0.3s ease;
+        }
+        
+        .admin-corner-login:hover {
+            opacity: 1;
+        }
+        
+        .admin-corner-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: rgba(26, 42, 66, 0.7);
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        
+        .admin-corner-btn:hover {
+            background-color: rgba(26, 42, 66, 1);
+            color: white;
+            transform: scale(1.1);
+        }
+        
         /* Improved Back to Top Button */
         .back-to-top-btn {
             opacity: 0;
@@ -147,18 +180,6 @@
                         </h1>
                     </a>
                     <p class="site-tagline">Kafamızda Çok Kuruyoruz</p>
-                </div>
-                <div class="admin-login-container">
-                    {% if current_user.is_authenticated %}
-                    <div class="d-flex align-items-center admin-badge">
-                        <span class="badge bg-success me-2"><i class="fas fa-user-shield"></i> Admin</span>
-                        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-light">Çıkış Yap</a>
-                    </div>
-                    {% else %}
-                    <a href="{{ url_for('login') }}" class="btn btn-sm btn-outline-light admin-login-btn">
-                        <i class="fas fa-lock"></i> Admin Girişi
-                    </a>
-                    {% endif %}
                 </div>
             </div>
         </div>
@@ -252,6 +273,22 @@
         <a href="{{ url_for('login') }}" class="mobile-nav-item {% if '/login' in request.path %}active{% endif %}">
             <i class="fas fa-lock"></i>
             <span>Admin Girişi</span>
+        </a>
+        {% endif %}
+    </div>
+    
+    <!-- Add subtle admin login button to bottom left -->
+    <div class="admin-corner-login">
+        {% if current_user.is_authenticated %}
+        <a href="{{ url_for('admin_index') }}" class="admin-corner-btn">
+            <i class="fas fa-user-shield"></i>
+        </a>
+        <a href="{{ url_for('logout') }}" class="admin-corner-btn ms-2">
+            <i class="fas fa-sign-out-alt"></i>
+        </a>
+        {% else %}
+        <a href="{{ url_for('login') }}" class="admin-corner-btn">
+            <i class="fas fa-lock"></i>
         </a>
         {% endif %}
     </div>
