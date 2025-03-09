@@ -4,7 +4,7 @@
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="section-title">Videolar</h1>
-        {% if current_user.is_authenticated %}
+        {% if current_user and current_user.is_authenticated and not current_user.is_anonymous %}
         <div>
             <a href="{{ url_for('add_video') }}" class="btn btn-success me-2">
                 <i class="fas fa-plus-circle"></i> Manuel Video Ekle
@@ -34,7 +34,7 @@
                         <p class="card-text text-muted">
                             <small><i class="far fa-calendar-alt"></i> {{ video.created_at.strftime('%d.%m.%Y') }}</small>
                         </p>
-                        {% if current_user.is_authenticated %}
+                        {% if current_user and current_user.is_authenticated and not current_user.is_anonymous %}
                         <div class="mt-2 d-flex justify-content-between">
                             <a href="{{ url_for('edit_video', video_id=video.id) }}" class="btn btn-sm btn-outline-primary">
                                 <i class="fas fa-edit"></i> Düzenle
@@ -75,7 +75,7 @@
     {% else %}
         <div class="text-center empty-message p-5 bg-light rounded">
             <h4>Henüz video bulunmamaktadır.</h4>
-            {% if current_user.is_authenticated %}
+            {% if current_user and current_user.is_authenticated and not current_user.is_anonymous %}
             <div class="mt-3">
                 <p>Video eklemek için "Manuel Video Ekle" veya "YouTube'dan Video Ekle" butonlarını kullanabilirsiniz.</p>
                 <div class="mt-4">
@@ -90,5 +90,30 @@
             {% endif %}
         </div>
     {% endif %}
+    
+    <!-- Debug information -->
+    <div id="debug-info" class="mt-4 p-3 bg-light rounded">
+        <h5>Debug Info:</h5>
+        <p>Authentication Status: {% if current_user.is_authenticated %}Authenticated ({{ current_user.username }}){% else %}Not Authenticated{% endif %}</p>
+        <p>Is Anonymous: {% if current_user.is_anonymous %}Yes{% else %}No{% endif %}</p>
+        <p>Current User Type: {{ current_user.__class__.__name__ }}</p>
+    </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("Videos page loaded");
+        var debugElement = document.getElementById('debug-info');
+        if (debugElement) {
+            var authText = debugElement.querySelector('p:nth-child(2)').textContent;
+            console.log("Authentication status from client side: " + 
+                (authText.includes('Authenticated') ? 
+                'User is authenticated' : 'User is NOT authenticated'));
+        } else {
+            console.log("Debug element not found");
+        }
+    });
+</script>
 {% endblock %}

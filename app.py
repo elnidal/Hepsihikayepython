@@ -876,6 +876,10 @@ def logout():
 def videos():
     """Display all videos from the database"""
     all_videos = Video.query.order_by(Video.created_at.desc()).all()
+    
+    # Add debug logging to check authentication status
+    app.logger.info(f"Videos route: current_user.is_authenticated = {current_user.is_authenticated if hasattr(current_user, 'is_authenticated') else 'Not available'}")
+    
     return render_template('videos.html', videos=all_videos)
 
 @app.route('/post/<int:post_id>/rate/<action>', methods=['POST'])

@@ -48,7 +48,7 @@
                             <label for="image" class="form-label">Resim</label>
                             {% if post.image_url %}
                             <div class="mb-2">
-                                <img src="{{ url_for('serve_upload', filename=post.image_url) }}" alt="{{ post.title }}" class="img-thumbnail" style="max-height: 200px;">
+                                <img src="{{ url_for('static', filename='uploads/' + post.image_url) }}" alt="{{ post.title }}" class="img-thumbnail" style="max-height: 200px;">
                             </div>
                             {% endif %}
                             <input type="file" class="form-control" id="image" name="image" accept="image/*">
