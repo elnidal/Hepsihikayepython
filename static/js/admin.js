@@ -3,43 +3,74 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Set up delete buttons
     setupDeleteButtons();
+    
+    // Log for debugging
+    console.log('Admin JS loaded');
+    console.log('Delete forms found:', document.querySelectorAll('.comment-delete-form').length);
 });
 
 function setupDeleteButtons() {
     console.log('Setting up delete buttons');
     
-    // Get all delete buttons in modals
-    const deleteButtons = document.querySelectorAll('.modal .btn-danger');
+    // Get all delete forms
+    const deleteForms = document.querySelectorAll('.comment-delete-form');
     
-    deleteButtons.forEach(button => {
-        // Only handle buttons that are direct children of the modals (not in forms)
-        if (!button.closest('form')) {
-            return;
-        }
+    deleteForms.forEach(form => {
+        console.log('Setting up form:', form);
         
-        button.addEventListener('click', function(e) {
-            console.log('Delete button clicked');
-            
-            // Get the parent form
-            const form = button.closest('form');
-            const commentId = form.getAttribute('data-comment-id');
-            
-            console.log('Form:', form);
-            console.log('Comment ID:', commentId);
+        form.addEventListener('submit', function(e) {
+            console.log('Delete form submitted');
             
             // Prevent default form submission
             e.preventDefault();
             
+            const commentId = form.getAttribute('data-comment-id');
+            console.log('Comment ID:', commentId);
+            
             // Close the modal
-            const modal = button.closest('.modal');
-            const bsModal = bootstrap.Modal.getInstance(modal);
-            if (bsModal) {
-                bsModal.hide();
+            const modal = form.closest('.modal');
+            if (modal) {
+                const bsModal = bootstrap.Modal.getInstance(modal);
+                if (bsModal) {
+                    bsModal.hide();
+                }
             }
             
             // Manually submit with fetch
             performDelete(form.action, commentId);
         });
+    });
+    
+    // Also handle direct button clicks as a fallback
+    const deleteButtons = document.querySelectorAll('.modal .btn-danger');
+    deleteButtons.forEach(button => {
+        // Only handle buttons inside forms
+        if (button.closest('form.comment-delete-form')) {
+            button.addEventListener('click', function(e) {
+                console.log('Delete button clicked directly');
+                
+                // The form's submit event should handle this, but as a fallback:
+                const form = button.closest('form.comment-delete-form');
+                if (form) {
+                    e.preventDefault();
+                    
+                    const commentId = form.getAttribute('data-comment-id');
+                    console.log('Comment ID from button click:', commentId);
+                    
+                    // Close the modal
+                    const modal = button.closest('.modal');
+                    if (modal) {
+                        const bsModal = bootstrap.Modal.getInstance(modal);
+                        if (bsModal) {
+                            bsModal.hide();
+                        }
+                    }
+                    
+                    // Manually submit with fetch
+                    performDelete(form.action, commentId);
+                }
+            });
+        }
     });
 }
 
@@ -68,6 +99,11 @@ function performDelete(url, commentId) {
         if (!response.ok) {
             throw new Error('Delete failed: ' + response.status);
         }
+        
+        return response.json();
+    })
+    .then(data => {
+        console.log('Delete response data:', data);
         
         // Remove the row from the table
         const row = document.querySelector(`tr[data-comment-id="${commentId}"]`);

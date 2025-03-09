@@ -1203,23 +1203,26 @@ def delete_comment(comment_id):
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({
                 'success': True,
-                'message': 'Yorum başarıyla silindi.'
+                'message': 'Yorum başarıyla silindi.',
+                'comment_id': comment_id
             })
         
         flash('Yorum başarıyla silindi.', 'success')
         return redirect(url_for('admin_comments'))
     except Exception as e:
         db.session.rollback()
-        app.logger.error(f"Error deleting comment {comment_id}: {str(e)}")
+        error_msg = str(e)
+        app.logger.error(f"Error deleting comment {comment_id}: {error_msg}")
         
         # Check if it's an AJAX request
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({
                 'success': False,
-                'message': f'Yorum silinirken bir hata oluştu: {str(e)}'
+                'message': f'Yorum silinirken bir hata oluştu: {error_msg}',
+                'comment_id': comment_id
             }), 500
         
-        flash(f'Yorum silinirken bir hata oluştu: {str(e)}', 'error')
+        flash(f'Yorum silinirken bir hata oluştu: {error_msg}', 'danger')
         return redirect(url_for('admin_comments'))
 
 @app.route('/test-image')
