@@ -343,6 +343,12 @@ class Setting(db.Model):
         db.session.commit()
         return setting
 
+# Login Form
+class LoginForm(FlaskForm):
+    username = StringField('Kullanıcı Adı', validators=[DataRequired()])
+    password = PasswordField('Şifre', validators=[DataRequired()])
+    submit = SubmitField('Giriş Yap')
+
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 def allowed_file(filename):
@@ -932,3 +938,47 @@ def videos():
         videos=all_videos,
         categories=categories
     )
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login page"""
+    if current_user.is_authenticated:
+        return redirect(url_for('admin_index'))
+        
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = User.get_by_username(form.username.data)
+        if user and user.check_password(form.password.data):
+            login_user(user)
+            next_page = request.args.get('next')
+            if next_page and next_page.startswith('/'):
+                return redirect(next_page)
+            return redirect(url_for('admin_index'))
+        else:
+            flash('Hatalı kullanıcı adı veya şifre!', 'danger')
+    
+    # Get categories with post counts for sidebar
+    category_counts = db.session.query(
+        Post.category, 
+        func.count(Post.id).label('count')
+    ).group_by(Post.category).all()
+    
+    # Format categories for the template
+    categories = []
+    category_dict = dict(CATEGORIES)
+    for cat_key, count in category_counts:
+        categories.append({
+            'slug': cat_key,
+            'name': category_dict.get(cat_key, cat_key.capitalize()),
+            'count': count
+        })
+    
+    return render_template('login.html', form=form, categories=categories)
+
+@app.route('/logout')
+@login_required
+def logout():
+    """Logout route"""
+    logout_user()
+    flash('Başarıyla çıkış yapıldı.', 'success')
+    return redirect(url_for('index'))
