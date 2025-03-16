@@ -24,6 +24,8 @@ wheels/
 # Virtual Environment
 venv/
 ENV/
+env/
+.env
 
 # IDE
 .idea/
@@ -36,6 +38,7 @@ instance/
 .webassets-cache
 
 # Logs
+logs/
 *.log
 
 # Local development settings
@@ -43,6 +46,17 @@ instance/
 
 # Database
 *.db
+*.sqlite3
 
 # Uploaded files in development
 # static/uploads/
+uploads/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

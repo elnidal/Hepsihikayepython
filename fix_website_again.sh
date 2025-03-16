@@ -23,4 +23,4 @@ echo ""
 echo "=== Update Complete ==="
 echo "Changes have been pushed to GitHub and will automatically deploy to Render.com"
 echo "Your website should now be fully functional with all posts displaying correctly!"
-echo "=========================================== 
+echo "============================================" 

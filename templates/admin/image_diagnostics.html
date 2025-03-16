@@ -3,102 +3,118 @@
 {% block title %}Image Diagnostics{% endblock %}
 
 {% block content %}
-<div class="container my-5">
+<div class="container">
+    <h1 class="mb-4">Image Diagnostics</h1>
+    
     <div class="row">
-        <div class="col-12">
-            <h1 class="mb-4">Image Upload & Display Diagnostics</h1>
-            
+        <div class="col-md-6">
             <div class="card mb-4">
                 <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">Environment Information</h4>
+                    <h4 class="mb-0">System Configuration</h4>
                 </div>
                 <div class="card-body">
-                    <p><strong>Environment:</strong> {{ env }}</p>
-                    <p><strong>Upload Directory:</strong> {{ upload_dir }}</p>
-                    <p><strong>Directory Exists:</strong> {% if dir_exists %}<span class="text-success">Yes</span>{% else %}<span class="text-danger">No</span>{% endif %}</p>
-                    <p><strong>File Count:</strong> {{ file_count }}</p>
-                </div>
-            </div>
-            
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="card mb-4">
-                        <div class="card-header bg-info text-white">
-                            <h4 class="mb-0">Files in Upload Directory</h4>
-                        </div>
-                        <div class="card-body">
-                            {% if files %}
-                                <ul class="list-group">
-                                {% for file in files %}
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        {{ file }}
-                                        <div>
-                                            <a href="{{ url_for('serve_upload', filename=file) }}" class="btn btn-sm btn-outline-primary" target="_blank">View</a>
-                                        </div>
-                                    </li>
-                                {% endfor %}
-                                </ul>
-                                {% if file_count > 10 %}
-                                    <div class="text-muted mt-3">Showing first 10 files of {{ file_count }} total</div>
-                                {% endif %}
-                            {% else %}
-                                <div class="alert alert-warning">No files found in upload directory</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="col-md-6">
-                    <div class="card mb-4">
-                        <div class="card-header bg-success text-white">
-                            <h4 class="mb-0">Recent Posts with Images</h4>
-                        </div>
-                        <div class="card-body">
-                            {% if posts %}
-                                <div class="list-group">
-                                {% for post in posts %}
-                                    <div class="list-group-item">
-                                        <h5>{{ post.title }}</h5>
-                                        <p class="text-muted">Image URL: {{ post.image_url }}</p>
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <h6>Method 1: serve_upload</h6>
-                                                <img src="{{ url_for('serve_upload', filename=post.image_url) }}" class="img-fluid img-thumbnail" alt="{{ post.title }}">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <h6>Method 2: static path</h6>
-                                                <img src="{{ url_for('static', filename='uploads/' + post.image_url) }}" class="img-fluid img-thumbnail" alt="{{ post.title }}">
-                                            </div>
-                                        </div>
-                                    </div>
-                                {% endfor %}
-                                </div>
-                            {% else %}
-                                <div class="alert alert-warning">No posts with images found</div>
-                            {% endif %}
-                        </div>
-                    </div>
+                    <table class="table">
+                        <tr>
+                            <th>Upload Folder</th>
+                            <td>{{ upload_info.upload_folder }}</td>
+                        </tr>
+                        <tr>
+                            <th>Upload URL</th>
+                            <td>{{ upload_info.upload_url }}</td>
+                        </tr>
+                        <tr>
+                            <th>Static Folder</th>
+                            <td>{{ upload_info.static_folder }}</td>
+                        </tr>
+                        <tr>
+                            <th>Environment</th>
+                            <td>{% if upload_info.is_production %}Production{% else %}Development{% endif %}</td>
+                        </tr>
+                    </table>
                 </div>
             </div>
             
             <div class="card mb-4">
-                <div class="card-header bg-dark text-white">
-                    <h4 class="mb-0">Troubleshooting</h4>
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0">Files in Upload Directory</h4>
                 </div>
                 <div class="card-body">
-                    <h5>Common Issues:</h5>
-                    <ul>
-                        <li>Upload directory path mismatch between production and development</li>
-                        <li>Permissions issues on the upload directory</li>
-                        <li>Template using the wrong URL pattern for images</li>
-                        <li>Images being saved with the wrong filename or path</li>
-                    </ul>
+                    {% if upload_files %}
+                        <div class="list-group">
+                        {% for file in upload_files %}
+                            <div class="list-group-item">
+                                <div>{{ file }}</div>
+                                <div class="mt-2">
+                                    <a href="{{ url_for('serve_upload', filename=file) }}" class="btn btn-sm btn-outline-primary" target="_blank">View</a>
+                                </div>
+                            </div>
+                        {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning">No files found in upload directory</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">Recent Posts with Images</h4>
+                </div>
+                <div class="card-body">
+                    {% if posts %}
+                        <div class="list-group">
+                        {% for post in posts %}
+                            <div class="list-group-item">
+                                <h5>{{ post.title }}</h5>
+                                <p class="text-muted">Image URL: {{ post.image_url }}</p>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Method 1: serve_upload</h6>
+                                        <img src="{{ url_for('serve_upload', filename=post.image_url) }}" class="img-fluid img-thumbnail" alt="{{ post.title }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Method 2: static path</h6>
+                                        <img src="{{ url_for('static', filename='uploads/' + post.image_url) }}" class="img-fluid img-thumbnail" alt="{{ post.title }}">
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning">No posts with images found</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header bg-warning">
+                    <h4 class="mb-0">Fix Suggestions</h4>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <h5>1. Update Templates</h5>
+                        <p>Update all templates to use <code>{{ "{{ url_for('serve_upload', filename=post.image_url) }}" }}</code> for image display.</p>
+                    </div>
                     
-                    <div class="mt-4">
-                        <h5>Test Image Upload</h5>
-                        <form action="{{ url_for('admin_index') }}" method="GET" class="d-inline">
-                            <button type="submit" class="btn btn-primary">Return to Admin Panel</button>
-                        </form>
+                    <div class="mb-3">
+                        <h5>2. Use Context Processor</h5>
+                        <p>Use the context processor to build image URLs: <code>{{ "{{ upload_url }}/{{ post.image_url }}" }}</code></p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h5>3. Check File Permissions</h5>
+                        <p>Ensure that the upload directory has proper permissions for the web server to access.</p>
+                    </div>
+                    
+                    <div>
+                        <h5>4. Verify File Existence</h5>
+                        <p>Confirm that the image files actually exist in the upload directory.</p>
                     </div>
                 </div>
             </div>
