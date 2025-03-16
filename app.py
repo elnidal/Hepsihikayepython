@@ -23,6 +23,7 @@ from functools import wraps
 import subprocess
 from urllib.parse import urlparse
 import sys
+from sqlalchemy import text
 
 # Load environment variables from .env file in development mode
 if os.path.exists('.env') and not os.environ.get('FLASK_ENV') == 'production':
@@ -550,8 +551,8 @@ def get_db_connection():
             connection = db.engine.connect()
             app.logger.info("Successfully connected to the database")
             
-            # Test a simple query
-            result = connection.execute("SELECT 1")
+            # Test a simple query using SQLAlchemy 2.0 syntax
+            result = connection.execute(text("SELECT 1"))
             result.close()
             connection.close()
             

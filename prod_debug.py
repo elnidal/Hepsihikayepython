@@ -1,7 +1,7 @@
 import os
 import sys
 import logging
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 # Configure logging
@@ -66,8 +66,8 @@ def check_database():
         connection = engine.connect()
         logger.info("Database connection successful!")
         
-        # Test a simple query
-        result = connection.execute("SELECT 1")
+        # Test a simple query using SQLAlchemy 2.0 syntax
+        result = connection.execute(text("SELECT 1"))
         logger.info(f"Query result: {result.fetchone()}")
         
         # Close connection
