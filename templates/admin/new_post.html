@@ -1,0 +1,89 @@
+{% extends "admin/base.html" %}
+
+{% block admin_content %}
+<div class="container-fluid p-0">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Yeni Hikaye Ekle</h1>
+        <a href="{{ url_for('admin_index') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Geri Dön
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" enctype="multipart/form-data">
+                {{ form.hidden_tag() }}
+                
+                <div class="mb-3">
+                    <label for="title" class="form-label">Başlık</label>
+                    {{ form.title(class="form-control", placeholder="Hikaye başlığını girin") }}
+                    {% if form.title.errors %}
+                        <div class="text-danger">
+                            {% for error in form.title.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    <label for="category" class="form-label">Kategori</label>
+                    {{ form.category(class="form-control", placeholder="Kategori") }}
+                    {% if form.category.errors %}
+                        <div class="text-danger">
+                            {% for error in form.category.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    <small class="text-muted">Yeni kategori eklemek için yazmanız yeterli.</small>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="image" class="form-label">Görsel (Opsiyonel)</label>
+                    {{ form.image(class="form-control") }}
+                    {% if form.image.errors %}
+                        <div class="text-danger">
+                            {% for error in form.image.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    <small class="text-muted">Desteklenen formatlar: JPG, JPEG, PNG, GIF</small>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="content" class="form-label">İçerik</label>
+                    {{ form.content(class="form-control", rows=15, id="content-editor", placeholder="Hikaye içeriğini girin...") }}
+                    {% if form.content.errors %}
+                        <div class="text-danger">
+                            {% for error in form.content.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <button type="reset" class="btn btn-secondary me-md-2">Temizle</button>
+                    <button type="submit" class="btn btn-primary">Hikayeyi Yayınla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Include CKEditor -->
+<script src="https://cdn.ckeditor.com/ckeditor5/35.1.0/classic/ckeditor.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        ClassicEditor
+            .create(document.querySelector('#content-editor'), {
+                toolbar: ['heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', '|', 'indent', 'outdent', '|', 'blockQuote', 'insertTable', 'mediaEmbed', 'undo', 'redo']
+            })
+            .catch(error => {
+                console.error(error);
+            });
+    });
+</script>
+{% endblock %} 

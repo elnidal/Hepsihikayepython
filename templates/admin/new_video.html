@@ -1,0 +1,82 @@
+{% extends "admin/base.html" %}
+
+{% block admin_content %}
+<div class="container-fluid p-0">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Yeni Video Ekle</h1>
+        <a href="{{ url_for('admin_index') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Geri Dön
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST">
+                {{ form.hidden_tag() }}
+                
+                <div class="mb-3">
+                    <label for="title" class="form-label">Video Başlığı</label>
+                    {{ form.title(class="form-control", placeholder="Video başlığını girin") }}
+                    {% if form.title.errors %}
+                        <div class="text-danger">
+                            {% for error in form.title.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    <label for="youtube_id" class="form-label">YouTube Video ID</label>
+                    {{ form.youtube_id(class="form-control", placeholder="Örnek: dQw4w9WgXcQ") }}
+                    {% if form.youtube_id.errors %}
+                        <div class="text-danger">
+                            {% for error in form.youtube_id.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    <small class="text-muted">YouTube video bağlantısından ID'yi kopyalayın. Örnek: https://www.youtube.com/watch?v=<b>dQw4w9WgXcQ</b></small>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="description" class="form-label">Açıklama</label>
+                    {{ form.description(class="form-control", rows=5, placeholder="Video hakkında açıklama...") }}
+                    {% if form.description.errors %}
+                        <div class="text-danger">
+                            {% for error in form.description.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <button type="reset" class="btn btn-secondary me-md-2">Temizle</button>
+                    <button type="submit" class="btn btn-primary">Videoyu Ekle</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- YouTube ID Help Section -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">YouTube Video ID'sini Nasıl Bulurum?</h5>
+        </div>
+        <div class="card-body">
+            <p>YouTube video ID'si, video URL'sinde <code>v=</code> parametresinden sonra gelen koddur.</p>
+            <div class="alert alert-secondary">
+                <strong>Örnek URL:</strong> https://www.youtube.com/watch?v=<mark>dQw4w9WgXcQ</mark><br>
+                <strong>Video ID:</strong> dQw4w9WgXcQ
+            </div>
+            
+            <p class="mb-0">Kısa URL'lerden ID nasıl alınır:</p>
+            <div class="alert alert-secondary">
+                <strong>Kısa URL:</strong> https://youtu.be/<mark>dQw4w9WgXcQ</mark><br>
+                <strong>Video ID:</strong> dQw4w9WgXcQ
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

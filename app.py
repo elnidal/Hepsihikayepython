@@ -25,6 +25,7 @@ from urllib.parse import urlparse
 import sys
 from sqlalchemy import text
 from decorators import handle_db_error
+from sqlalchemy.orm import joinedload
 
 # Load environment variables from .env file in development mode
 if os.path.exists('.env') and not os.environ.get('FLASK_ENV') == 'production':
@@ -590,8 +591,8 @@ def admin_index():
             app.logger.error(f"Error retrieving videos: {str(e)}")
             flash('Videolar yüklenirken bir hata oluştu.', 'warning')
         
-        # Render the template with whatever data we have
-        return render_template('admin/index.html', posts=posts, videos=videos)
+        # Render the new dashboard template with active page set
+        return render_template('admin/dashboard.html', posts=posts, videos=videos, active_page='dashboard')
     except Exception as e:
         app.logger.error(f"Unhandled error in admin_index: {str(e)}")
         import traceback
@@ -1175,72 +1176,108 @@ def add_comment(post_id):
         flash('Bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.', 'danger')
         return redirect(url_for('post', post_id=post_id))
 
+@app.route('/admin/comments')
+@login_required
+def admin_comments():
+    """Admin comments management page"""
+    try:
+        # Get filter parameters
+        status = request.args.get('status', 'all')
+        post_id = request.args.get('post_id')
+        search = request.args.get('search', '')
+        
+        # Build query
+        query = Comment.query
+        
+        # Apply filters
+        if status != 'all':
+            query = query.filter(Comment.status == status)
+        
+        if post_id and post_id.isdigit():
+            query = query.filter(Comment.post_id == int(post_id))
+        
+        if search:
+            query = query.filter(Comment.content.ilike(f'%{search}%'))
+        
+        # Order by newest first
+        query = query.order_by(Comment.created_at.desc())
+        
+        # Get comments with post relationship eagerly loaded
+        comments = query.options(joinedload(Comment.post)).all()
+        
+        # Get all posts for filter dropdown
+        posts = Post.query.order_by(Post.title).all()
+        
+        return render_template('admin/comments.html', 
+                               comments=comments, 
+                               posts=posts,
+                               active_page='comments')
+    except Exception as e:
+        app.logger.error(f"Unhandled error in admin_comments: {str(e)}")
+        import traceback
+        app.logger.error(traceback.format_exc())
+        flash('Bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.', 'danger')
+        return render_template('errors/500.html'), 500
+
 @app.route('/admin/comment/<int:comment_id>/approve', methods=['POST'])
 @login_required
-def approve_comment(comment_id):
+def admin_approve_comment(comment_id):
     """Approve a comment"""
     try:
         comment = Comment.query.get_or_404(comment_id)
-        comment.is_approved = True
-        db.session.commit()
-        flash('Yorum başarıyla onaylandı.', 'success')
+        comment.status = 'approved'
+        
+        try:
+            db.session.commit()
+            app.logger.info(f"Comment {comment_id} approved by admin")
+            return jsonify({'success': True})
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error approving comment {comment_id}: {str(e)}")
+            return jsonify({'success': False, 'message': str(e)})
     except Exception as e:
-        app.logger.error(f"Error approving comment {comment_id}: {str(e)}")
-        db.session.rollback()
-        flash('Yorum onaylanırken bir hata oluştu.', 'danger')
-    
-    return redirect(url_for('admin_comments'))
+        app.logger.error(f"Unhandled error in admin_approve_comment: {str(e)}")
+        return jsonify({'success': False, 'message': 'Bir hata oluştu.'}), 500
+
+@app.route('/admin/comment/<int:comment_id>/spam', methods=['POST'])
+@login_required
+def admin_spam_comment(comment_id):
+    """Mark a comment as spam"""
+    try:
+        comment = Comment.query.get_or_404(comment_id)
+        comment.status = 'spam'
+        
+        try:
+            db.session.commit()
+            app.logger.info(f"Comment {comment_id} marked as spam by admin")
+            return jsonify({'success': True})
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error marking comment {comment_id} as spam: {str(e)}")
+            return jsonify({'success': False, 'message': str(e)})
+    except Exception as e:
+        app.logger.error(f"Unhandled error in admin_spam_comment: {str(e)}")
+        return jsonify({'success': False, 'message': 'Bir hata oluştu.'}), 500
 
 @app.route('/admin/comment/<int:comment_id>/delete', methods=['POST'])
 @login_required
-def delete_comment(comment_id):
+def admin_delete_comment(comment_id):
     """Delete a comment"""
     try:
         comment = Comment.query.get_or_404(comment_id)
-        db.session.delete(comment)
-        db.session.commit()
-        flash('Yorum başarıyla silindi.', 'success')
+        
+        try:
+            db.session.delete(comment)
+            db.session.commit()
+            app.logger.info(f"Comment {comment_id} deleted by admin")
+            return jsonify({'success': True})
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error deleting comment {comment_id}: {str(e)}")
+            return jsonify({'success': False, 'message': str(e)})
     except Exception as e:
-        app.logger.error(f"Error deleting comment {comment_id}: {str(e)}")
-        db.session.rollback()
-        flash('Yorum silinirken bir hata oluştu.', 'danger')
-    
-    return redirect(url_for('admin_comments'))
-
-@app.route('/admin/comments')
-@app.route('/admin/comments/<status>')
-@login_required
-@handle_db_error
-def admin_comments(status='pending'):
-    """Admin comments management page"""
-    page = request.args.get('page', 1, type=int)
-    per_page = 15
-    
-    # Get comments based on status
-    if status == 'approved':
-        comments = Comment.query.filter_by(is_approved=True)
-    elif status == 'pending':
-        comments = Comment.query.filter_by(is_approved=False)
-    else:  # status == 'all'
-        comments = Comment.query.order_by(Comment.created_at.desc())
-    
-    # Count for tabs
-    pending_count = Comment.query.filter_by(is_approved=False).count()
-    approved_count = Comment.query.filter_by(is_approved=True).count()
-    total_count = Comment.query.count()
-    
-    # Paginate comments
-    pagination = comments.order_by(Comment.created_at.desc()).paginate(page=page, per_page=per_page)
-    
-    return render_template(
-        'admin/comments.html',
-        comments=pagination.items,
-        pagination=pagination,
-        status=status,
-        pending_count=pending_count,
-        approved_count=approved_count,
-        total_count=total_count
-    )
+        app.logger.error(f"Unhandled error in admin_delete_comment: {str(e)}")
+        return jsonify({'success': False, 'message': 'Bir hata oluştu.'}), 500
 
 @app.route('/post/<int:post_id>/rate/<action>', methods=['POST'])
 def rate_post(post_id, action):
@@ -1301,69 +1338,63 @@ def rate_post(post_id, action):
         app.logger.error(f"Error rating post {post_id}: {str(e)}")
         return jsonify({'success': False, 'message': 'Bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.'}), 500
 
-@app.route('/admin/post/create', methods=['GET', 'POST'])
+@app.route('/admin/new_post', methods=['GET', 'POST'])
 @login_required
-def create_post():
+def admin_new_post():
     """Create a new post"""
-    form = PostForm()
-    
-    if form.validate_on_submit():
-        try:
-            # Handle image upload
-            image_filename = None
+    try:
+        form = PostForm()
+        if form.validate_on_submit():
+            # Get form data
+            title = form.title.data
+            content = form.content.data
+            category = form.category.data
+            
+            # Process image if present
+            image_url = None
             if form.image.data:
-                f = form.image.data
-                if allowed_file(f.filename):
-                    # Process the file
-                    try:
-                        f.stream.seek(0)
-                        validate_image(f.stream)
-                        f.stream.seek(0)
-                        
-                        # Save image with timestamp to prevent duplicates
-                        filename = secure_filename(f.filename)
-                        timestamp = int(time.time())
-                        image_filename = f"{timestamp}_{filename}"
-                        
-                        # Ensure uploads directory exists
-                        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-                        
-                        # Save the file
-                        file_path = os.path.join(app.config['UPLOAD_FOLDER'], image_filename)
-                        f.save(file_path)
-                        
-                        # Resize image for performance
-                        resize_image(file_path)
-                        
-                    except ValidationError as e:
-                        flash(f'Görsel yüklenirken hata oluştu: {str(e)}', 'danger')
-                        app.logger.error(f"Image validation error: {str(e)}")
-                        return render_template('admin/create_post.html', form=form)
-                else:
-                    flash('Desteklenmeyen dosya formatı. Lütfen PNG, JPG, JPEG veya GIF dosyası yükleyin.', 'danger')
-                    return render_template('admin/create_post.html', form=form)
+                try:
+                    # Save the image and get back the URL
+                    image_url = save_image(form.image.data)
+                except Exception as e:
+                    app.logger.error(f"Error saving image: {str(e)}")
+                    flash('Resim yüklenirken bir hata oluştu. Yazı resim olmadan kaydedildi.', 'warning')
             
             # Create new post
-            post = Post(
-                title=form.title.data,
-                content=form.content.data,
-                category=form.category.data,
-                author=form.author.data,
-                image_url=image_filename
+            new_post = Post(
+                title=title,
+                content=content,
+                category=category,
+                image_url=image_url
             )
             
-            db.session.add(post)
-            db.session.commit()
-            
-            flash('Yazı başarıyla oluşturuldu!', 'success')
-            return redirect(url_for('admin_index'))
-            
+            # Add and commit to DB
+            try:
+                db.session.add(new_post)
+                db.session.commit()
+                app.logger.info(f"Created new post: {title} in category: {category}")
+                flash('Yazı başarıyla oluşturuldu.', 'success')
+                return redirect(url_for('admin_index'))
+            except Exception as e:
+                db.session.rollback()
+                app.logger.error(f"Database error creating post: {str(e)}")
+                flash('Yazı kaydedilirken bir hata oluştu.', 'danger')
+        
+        # Get all existing categories to populate dropdown
+        try:
+            categories = get_all_categories()
         except Exception as e:
-            db.session.rollback()
-            app.logger.error(f"Error creating post: {str(e)}")
-            flash(f'Yazı oluşturulurken bir hata oluştu: {str(e)}', 'danger')
-    
-    return render_template('admin/create_post.html', form=form)
+            app.logger.error(f"Error retrieving categories: {str(e)}")
+            categories = []
+            flash('Kategoriler yüklenirken bir hata oluştu.', 'warning')
+        
+        return render_template('admin/new_post.html', form=form, categories=categories, active_page='new_post')
+    except Exception as e:
+        app.logger.error(f"Unhandled error in admin_new_post: {str(e)}")
+        import traceback
+        app.logger.error(traceback.format_exc())
+        flash('Bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.', 'danger')
+        return render_template('errors/500.html'), 500
 
 @app.route('/admin/post/<int:post_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -1485,3 +1516,119 @@ def sync_youtube():
         youtube_channel_id=youtube_channel_id,
         youtube_api_key=youtube_api_key
     )
+
+@app.route('/admin/new_video', methods=['GET', 'POST'])
+@login_required
+def admin_new_video():
+    """Add a new video"""
+    try:
+        form = VideoForm()
+        if form.validate_on_submit():
+            # Get form data
+            title = form.title.data
+            youtube_id = form.youtube_id.data
+            description = form.description.data
+            
+            # Create new video
+            new_video = Video(
+                title=title,
+                youtube_embed=youtube_id,
+                created_at=datetime.now(UTC)
+            )
+            
+            # Add and commit to DB
+            try:
+                db.session.add(new_video)
+                db.session.commit()
+                app.logger.info(f"Added new video: {title} with YouTube ID: {youtube_id}")
+                flash('Video başarıyla eklendi.', 'success')
+                return redirect(url_for('admin_index'))
+            except Exception as e:
+                db.session.rollback()
+                app.logger.error(f"Database error adding video: {str(e)}")
+                flash('Video eklenirken bir hata oluştu.', 'danger')
+        
+        return render_template('admin/new_video.html', form=form, active_page='new_video')
+    except Exception as e:
+        app.logger.error(f"Unhandled error in admin_new_video: {str(e)}")
+        import traceback
+        app.logger.error(traceback.format_exc())
+        flash('Bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.', 'danger')
+        return render_template('errors/500.html'), 500
+
+@app.route('/admin/youtube_sync', methods=['GET', 'POST'])
+@login_required
+def admin_youtube_sync():
+    """YouTube Video Sync Page"""
+    try:
+        form = YoutubeSyncForm()
+        sync_results = None
+        
+        if form.validate_on_submit():
+            try:
+                channel_id = form.channel_id.data
+                max_results = form.max_results.data
+                
+                # Call the sync function
+                sync_results = sync_youtube_videos(channel_id, max_results)
+                
+                if sync_results['success']:
+                    flash(f"Senkronizasyon başarılı: {sync_results['videos_added']} video eklendi.", 'success')
+                else:
+                    flash(f"Senkronizasyon hatası: {sync_results['error']}", 'danger')
+            except Exception as e:
+                app.logger.error(f"YouTube sync error: {str(e)}")
+                flash(f"Video senkronizasyonu sırasında bir hata oluştu: {str(e)}", 'danger')
+        
+        return render_template('admin/youtube_sync.html', form=form, sync_results=sync_results, active_page='youtube_sync')
+    except Exception as e:
+        app.logger.error(f"Unhandled error in admin_youtube_sync: {str(e)}")
+        import traceback
+        app.logger.error(traceback.format_exc())
+        flash('Bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.', 'danger')
+        return render_template('errors/500.html'), 500
+
+@app.route('/admin/settings', methods=['GET', 'POST'])
+@login_required
+def admin_settings():
+    """Admin settings page"""
+    try:
+        # Create form instances
+        form = SiteSettingsForm()
+        social_form = SocialMediaForm()
+        api_form = APISettingsForm()
+        password_form = ChangePasswordForm()
+        
+        # Get current settings from db or use defaults
+        try:
+            settings = Settings.query.first()
+            if settings:
+                form.site_title.data = settings.site_title
+                form.site_description.data = settings.site_description
+                form.contact_email.data = settings.contact_email
+                form.posts_per_page.data = settings.posts_per_page
+                form.comments_enabled.data = settings.comments_enabled
+                form.auto_approve_comments.data = settings.auto_approve_comments
+                
+                social_form.facebook_url.data = settings.facebook_url
+                social_form.twitter_url.data = settings.twitter_url
+                social_form.instagram_url.data = settings.instagram_url
+                social_form.youtube_url.data = settings.youtube_url
+                
+                api_form.youtube_api_key.data = settings.youtube_api_key
+        except Exception as e:
+            app.logger.error(f"Error retrieving settings: {str(e)}")
+            flash('Ayarlar yüklenirken bir hata oluştu.', 'warning')
+        
+        return render_template('admin/settings.html', 
+                               form=form, 
+                               social_form=social_form, 
+                               api_form=api_form, 
+                               password_form=password_form,
+                               active_page='settings')
+    except Exception as e:
+        app.logger.error(f"Unhandled error in admin_settings: {str(e)}")
+        import traceback
+        app.logger.error(traceback.format_exc())
+        flash('Bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.', 'danger')
+        return render_template('errors/500.html'), 500

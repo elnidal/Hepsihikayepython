@@ -1,0 +1,150 @@
+{% extends "admin/base.html" %}
+
+{% block admin_content %}
+<div class="container-fluid p-0">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>YouTube Senkronizasyon</h1>
+        <a href="{{ url_for('admin_index') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Geri Dön
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fab fa-youtube text-danger"></i> YouTube Videolarını Senkronize Et</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="mb-3">
+                            <label for="channel_id" class="form-label">YouTube Kanal ID</label>
+                            {{ form.channel_id(class="form-control", placeholder="Örnek: UCxxx...") }}
+                            {% if form.channel_id.errors %}
+                                <div class="text-danger">
+                                    {% for error in form.channel_id.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="text-muted">YouTube kanal URL'sinden kanal ID'sini kopyalayın</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="max_results" class="form-label">Maksimum Video Sayısı</label>
+                            {{ form.max_results(class="form-control", min=1, max=50) }}
+                            {% if form.max_results.errors %}
+                                <div class="text-danger">
+                                    {% for error in form.max_results.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="text-muted">Alınacak maksimum video sayısı (1-50 arası)</small>
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-sync-alt"></i> Videoları Senkronize Et
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Kanal ID'sini Nasıl Bulurum?</h5>
+                </div>
+                <div class="card-body">
+                    <p>YouTube kanal ID'nizi bulmak için:</p>
+                    <ol>
+                        <li>YouTube kanalınıza gidin</li>
+                        <li>URL'ye bakın: <code>https://www.youtube.com/channel/<mark>UCxxxxx...</mark></code></li>
+                        <li><code>UCxxxxx...</code> ile başlayan kısım kanal ID'nizdir</li>
+                    </ol>
+                    <p>Kanalınızın özel URL'si varsa:</p>
+                    <ol>
+                        <li>Kanalınızın "Hakkında" kısmına gidin</li>
+                        <li>"Paylaş" düğmesine tıklayın</li>
+                        <li>Orada kanal ID'nizin bulunduğu URL'yi göreceksiniz</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6">
+            {% if sync_results %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-list-alt"></i> Senkronizasyon Sonuçları</h5>
+                </div>
+                <div class="card-body">
+                    {% if sync_results.success %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> Senkronizasyon başarılı!
+                    </div>
+                    
+                    <p><strong>Eklenen video sayısı:</strong> {{ sync_results.videos_added }}</p>
+                    <p><strong>Zaten mevcut video sayısı:</strong> {{ sync_results.videos_skipped }}</p>
+                    
+                    {% if sync_results.added_videos %}
+                    <h6 class="mt-4">Eklenen Videolar:</h6>
+                    <ul class="list-group">
+                        {% for video in sync_results.added_videos %}
+                        <li class="list-group-item">
+                            <div class="d-flex align-items-center">
+                                <img src="https://img.youtube.com/vi/{{ video.youtube_id }}/default.jpg" class="me-3" alt="{{ video.title }}">
+                                <div>
+                                    <h6 class="mb-0">{{ video.title }}</h6>
+                                    <small class="text-muted">ID: {{ video.youtube_id }}</small>
+                                </div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    
+                    {% else %}
+                    <div class="alert alert-danger">
+                        <i class="fas fa-times-circle"></i> Senkronizasyon başarısız!
+                    </div>
+                    <p><strong>Hata:</strong> {{ sync_results.error }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> YouTube API Hakkında</h5>
+                </div>
+                <div class="card-body">
+                    <p>Bu özellik, YouTube API kullanarak belirtilen kanaldan videoları otomatik olarak siteye ekler.</p>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-lightbulb"></i> <strong>İpucu:</strong> Düzenli senkronizasyon için bu formu her yeni video eklendiğinde çalıştırabilirsiniz.
+                    </div>
+                    
+                    <h6 class="mt-4">Senkronizasyon Nasıl Çalışır?</h6>
+                    <ol>
+                        <li>Belirtilen kanal ID'sinden YouTube API'yi kullanarak videoları alır</li>
+                        <li>Her video için aşağıdaki bilgileri kaydeder:
+                            <ul>
+                                <li>Video başlığı</li>
+                                <li>Video ID'si</li>
+                                <li>Açıklama</li>
+                                <li>Yayınlanma tarihi</li>
+                            </ul>
+                        </li>
+                        <li>Sistemde zaten mevcut olan videolar atlanır (tekrar eklenmez)</li>
+                        <li>Yeni videolar sisteme eklenir</li>
+                    </ol>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

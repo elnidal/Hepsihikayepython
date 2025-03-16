@@ -1,54 +1,255 @@
-{% extends "base.html" %}
+{% extends "admin/base.html" %}
 
-{% block content %}
-<div class="container mt-4">
+{% block admin_content %}
+<div class="container-fluid p-0">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Site Ayarları</h1>
+        <a href="{{ url_for('admin_index') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Geri Dön
+        </a>
+    </div>
+
     <div class="row">
-        <div class="col-md-8 offset-md-2">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2>Site Ayarları</h2>
-                <a href="{{ url_for('admin_index') }}" class="btn btn-secondary">
-                    <i class="fas fa-arrow-left"></i> Admin Paneline Dön
-                </a>
-            </div>
-            
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">YouTube API Ayarları</h4>
+        <div class="col-lg-8">
+            <!-- General Settings -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-cog"></i> Genel Ayarlar</h5>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="{{ url_for('admin_settings') }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <form method="POST" action="{{ url_for('admin_settings_save') }}">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="mb-3">
+                            <label for="site_title" class="form-label">Site Başlığı</label>
+                            {{ form.site_title(class="form-control") }}
+                            {% if form.site_title.errors %}
+                                <div class="text-danger">
+                                    {% for error in form.site_title.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="site_description" class="form-label">Site Açıklaması</label>
+                            {{ form.site_description(class="form-control", rows=3) }}
+                            {% if form.site_description.errors %}
+                                <div class="text-danger">
+                                    {% for error in form.site_description.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="text-muted">Meta açıklaması olarak kullanılır</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="contact_email" class="form-label">İletişim E-posta</label>
+                            {{ form.contact_email(class="form-control", type="email") }}
+                            {% if form.contact_email.errors %}
+                                <div class="text-danger">
+                                    {% for error in form.contact_email.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="posts_per_page" class="form-label">Sayfa Başına Yazı Sayısı</label>
+                            {{ form.posts_per_page(class="form-control", type="number", min=1, max=50) }}
+                            {% if form.posts_per_page.errors %}
+                                <div class="text-danger">
+                                    {% for error in form.posts_per_page.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="form-check form-switch mb-3">
+                            {{ form.comments_enabled(class="form-check-input") }}
+                            <label class="form-check-label" for="comments_enabled">Yorumları Etkinleştir</label>
+                            {% if form.comments_enabled.errors %}
+                                <div class="text-danger">
+                                    {% for error in form.comments_enabled.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="form-check form-switch mb-3">
+                            {{ form.auto_approve_comments(class="form-check-input") }}
+                            <label class="form-check-label" for="auto_approve_comments">Yorumları Otomatik Onayla</label>
+                            {% if form.auto_approve_comments.errors %}
+                                <div class="text-danger">
+                                    {% for error in form.auto_approve_comments.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">Bu seçenek işaretlenirse, yorumlar otomatik olarak onaylanacaktır.</div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Ayarları Kaydet
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Social Media Settings -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-share-alt"></i> Sosyal Medya Ayarları</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('admin_social_settings_save') }}">
+                        {{ social_form.hidden_tag() }}
+                        
+                        <div class="mb-3">
+                            <label for="facebook_url" class="form-label">Facebook URL</label>
+                            {{ social_form.facebook_url(class="form-control", placeholder="https://facebook.com/...") }}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="twitter_url" class="form-label">Twitter URL</label>
+                            {{ social_form.twitter_url(class="form-control", placeholder="https://twitter.com/...") }}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="instagram_url" class="form-label">Instagram URL</label>
+                            {{ social_form.instagram_url(class="form-control", placeholder="https://instagram.com/...") }}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="youtube_url" class="form-label">YouTube URL</label>
+                            {{ social_form.youtube_url(class="form-control", placeholder="https://youtube.com/...") }}
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Sosyal Medya Ayarlarını Kaydet
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <!-- API Settings -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-key"></i> API Ayarları</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('admin_api_settings_save') }}">
+                        {{ api_form.hidden_tag() }}
                         
                         <div class="mb-3">
                             <label for="youtube_api_key" class="form-label">YouTube API Anahtarı</label>
-                            <input type="text" class="form-control" id="youtube_api_key" name="youtube_api_key" 
-                                   value="{{ youtube_api_key }}" placeholder="YouTube API anahtarınızı girin">
-                            <div class="form-text">
-                                Bu API anahtarı, YouTube videolarını otomatik olarak senkronize etmek için kullanılır.
-                            </div>
+                            {{ api_form.youtube_api_key(class="form-control") }}
+                            <small class="text-muted">YouTube API'sinden video senkronizasyonu için gereklidir</small>
                         </div>
                         
-                        <div class="alert alert-info">
-                            <h5><i class="fas fa-info-circle"></i> YouTube API Anahtarı Nasıl Alınır?</h5>
-                            <ol>
-                                <li>Google Cloud Console'a gidin: <a href="https://console.cloud.google.com/" target="_blank">https://console.cloud.google.com/</a></li>
-                                <li>Yeni bir proje oluşturun veya mevcut bir projeyi seçin</li>
-                                <li>"API ve Servisler" > "Kütüphane" bölümüne gidin</li>
-                                <li>"YouTube Data API v3"yi arayın ve etkinleştirin</li>
-                                <li>"Kimlik Bilgileri" bölümüne gidin ve "Kimlik Bilgisi Oluştur" > "API Anahtarı" seçeneğini tıklayın</li>
-                                <li>Oluşturulan API anahtarını kopyalayın ve yukarıdaki alana yapıştırın</li>
-                            </ol>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> API Ayarlarını Kaydet
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Cache Settings -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-database"></i> Önbellek Yönetimi</h5>
+                </div>
+                <div class="card-body">
+                    <p>Önbelleği temizlemeniz, değişikliklerin anında görüntülenmesini sağlar.</p>
+                    
+                    <button id="clear-cache-btn" class="btn btn-warning mb-3">
+                        <i class="fas fa-broom"></i> Önbelleği Temizle
+                    </button>
+                    
+                    <div id="cache-result" class="alert alert-info d-none">
+                        Önbellek temizleniyor...
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Admin Password -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-lock"></i> Şifre Değiştir</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('admin_change_password') }}">
+                        {{ password_form.hidden_tag() }}
+                        
+                        <div class="mb-3">
+                            <label for="current_password" class="form-label">Mevcut Şifre</label>
+                            {{ password_form.current_password(class="form-control", type="password") }}
                         </div>
                         
-                        <div class="d-flex justify-content-end">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> Ayarları Kaydet
-                            </button>
+                        <div class="mb-3">
+                            <label for="new_password" class="form-label">Yeni Şifre</label>
+                            {{ password_form.new_password(class="form-control", type="password") }}
                         </div>
+                        
+                        <div class="mb-3">
+                            <label for="confirm_password" class="form-label">Yeni Şifre (Tekrar)</label>
+                            {{ password_form.confirm_password(class="form-control", type="password") }}
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Şifreyi Değiştir
+                        </button>
                     </form>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Cache clearing functionality
+        const clearCacheBtn = document.getElementById('clear-cache-btn');
+        const cacheResult = document.getElementById('cache-result');
+        
+        if (clearCacheBtn) {
+            clearCacheBtn.addEventListener('click', function() {
+                cacheResult.classList.remove('d-none', 'alert-success', 'alert-danger');
+                cacheResult.classList.add('alert-info');
+                cacheResult.textContent = 'Önbellek temizleniyor...';
+                
+                fetch('/admin/clear-cache', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token() }}'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    cacheResult.classList.remove('alert-info');
+                    if (data.success) {
+                        cacheResult.classList.add('alert-success');
+                        cacheResult.textContent = 'Önbellek başarıyla temizlendi!';
+                    } else {
+                        cacheResult.classList.add('alert-danger');
+                        cacheResult.textContent = 'Önbellek temizlenirken bir hata oluştu: ' + data.message;
+                    }
+                })
+                .catch(error => {
+                    cacheResult.classList.remove('alert-info');
+                    cacheResult.classList.add('alert-danger');
+                    cacheResult.textContent = 'Bir hata oluştu: ' + error;
+                });
+            });
+        }
+    });
+</script>
 {% endblock %} 

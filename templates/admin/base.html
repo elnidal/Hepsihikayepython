@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}HepsiHikaye Admin{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<style>
+    /* Admin Sidebar Styles */
+    .admin-container {
+        display: flex;
+        min-height: calc(100vh - 56px);
+    }
+    
+    .admin-sidebar {
+        width: 250px;
+        background-color: #343a40;
+        color: #fff;
+        padding: 20px 0;
+    }
+    
+    .admin-content {
+        flex: 1;
+        padding: 20px;
+        background-color: #f8f9fa;
+    }
+    
+    .admin-sidebar h5 {
+        padding: 0 20px;
+        margin-bottom: 20px;
+        font-weight: bold;
+    }
+    
+    .admin-sidebar .nav-link {
+        color: rgba(255, 255, 255, 0.8);
+        padding: 10px 20px;
+        border-left: 3px solid transparent;
+    }
+    
+    .admin-sidebar .nav-link:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        color: #fff;
+    }
+    
+    .admin-sidebar .nav-link.active {
+        color: #fff;
+        background-color: rgba(255, 255, 255, 0.1);
+        border-left: 3px solid #0d6efd;
+    }
+    
+    .admin-sidebar .nav-link i {
+        margin-right: 10px;
+        width: 20px;
+        text-align: center;
+    }
+    
+    /* Small screens */
+    @media (max-width: 768px) {
+        .admin-container {
+            flex-direction: column;
+        }
+        
+        .admin-sidebar {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <!-- Sidebar Navigation -->
+    <div class="admin-sidebar">
+        <h5>Admin Panel</h5>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if active_page == 'dashboard' }}" href="{{ url_for('admin_index') }}">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if active_page == 'new_post' }}" href="{{ url_for('admin_new_post') }}">
+                    <i class="fas fa-pen"></i> Yeni Hikaye
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if active_page == 'new_video' }}" href="{{ url_for('admin_new_video') }}">
+                    <i class="fas fa-video"></i> Video Ekle
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if active_page == 'youtube_sync' }}" href="{{ url_for('admin_youtube_sync') }}">
+                    <i class="fab fa-youtube"></i> YouTube Senkronizasyon
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if active_page == 'comments' }}" href="{{ url_for('admin_comments') }}">
+                    <i class="fas fa-comments"></i> Yorumlar
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if active_page == 'settings' }}" href="{{ url_for('admin_settings') }}">
+                    <i class="fas fa-cog"></i> Ayarlar
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('index') }}">
+                    <i class="fas fa-arrow-left"></i> Siteye Dön
+                </a>
+            </li>
+        </ul>
+    </div>
+    
+    <!-- Main Content Area -->
+    <div class="admin-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% block admin_content %}
+        {% endblock %}
+    </div>
+</div>
+{% endblock %} 

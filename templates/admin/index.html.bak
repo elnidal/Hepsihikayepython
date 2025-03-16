@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid admin-container mt-4">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3 col-lg-2 admin-sidebar-col mb-4">
+            <div class="admin-sidebar card">
+                <div class="card-body p-0">
+                    <div class="admin-sidebar-header p-3">
+                        <h5 class="mb-0"><i class="fas fa-tachometer-alt me-2"></i> Admin Panel</h5>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        <a href="{{ url_for('admin_index') }}" class="list-group-item list-group-item-action active">
+                            <i class="fas fa-home me-2"></i> Dashboard
+                        </a>
+                        <a href="{{ url_for('create_post') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-plus-circle me-2"></i> Yeni Hikaye
+                        </a>
+                        <a href="{{ url_for('add_video') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-video me-2"></i> Video Ekle
+                        </a>
+                        <a href="{{ url_for('sync_youtube') }}" class="list-group-item list-group-item-action">
+                            <i class="fab fa-youtube me-2"></i> YouTube Senkronizasyon
+                        </a>
+                        <a href="{{ url_for('admin_comments') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-comments me-2"></i> Yorumlar
+                        </a>
+                        <a href="{{ url_for('admin_settings') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-cog me-2"></i> Ayarlar
+                        </a>
+                        <a href="{{ url_for('index') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-arrow-left me-2"></i> Siteye Dön
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="col-md-9 col-lg-10">
+            <h1 class="admin-header mb-4">
+                <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+            </h1>
+            
+            <!-- Stats Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3 mb-3">
+                    <div class="card admin-stat-card">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <div class="admin-stat-icon bg-primary">
+                                    <i class="fas fa-book"></i>
+                                </div>
+                                <div class="ms-3">
+                                    <h5 class="admin-stat-number">{{ posts|length }}</h5>
+                                    <p class="admin-stat-label mb-0">Hikayeler</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card admin-stat-card">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <div class="admin-stat-icon bg-success">
+                                    <i class="fas fa-video"></i>
+                                </div>
+                                <div class="ms-3">
+                                    <h5 class="admin-stat-number">{{ videos|length }}</h5>
+                                    <p class="admin-stat-label mb-0">Videolar</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card admin-stat-card">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <div class="admin-stat-icon bg-info">
+                                    <i class="fas fa-comments"></i>
+                                </div>
+                                <div class="ms-3">
+                                    <h5 class="admin-stat-number">{{ comment_count }}</h5>
+                                    <p class="admin-stat-label mb-0">Yorumlar</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card admin-stat-card">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <div class="admin-stat-icon bg-warning">
+                                    <i class="fas fa-eye"></i>
+                                </div>
+                                <div class="ms-3">
+                                    <h5 class="admin-stat-number">{{ view_count }}</h5>
+                                    <p class="admin-stat-label mb-0">Görüntülenme</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Hikayeler Section -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-book me-2"></i> Hikayeler</h5>
+                    <a href="{{ url_for('create_post') }}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus-circle me-1"></i> Yeni Hikaye Ekle
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Başlık</th>
+                                    <th>Kategori</th>
+                                    <th>Tarih</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for post in posts %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="admin-table-img me-2">
+                                                {% if post.image %}
+                                                <img src="{{ url_for('static', filename='uploads/' + post.image) }}" alt="{{ post.title }}">
+                                                {% else %}
+                                                <div class="admin-table-img-placeholder">
+                                                    <i class="fas fa-book"></i>
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                            <span>{{ post.title }}</span>
+                                        </div>
+                                    </td>
+                                    <td><span class="badge bg-primary">{{ post.get_category_display() }}</span></td>
+                                    <td>{{ post.created_at.strftime('%d.%m.%Y') }}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-sm btn-outline-info" target="_blank">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{{ url_for('edit_post', post_id=post.id) }}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <button class="btn btn-sm btn-outline-danger delete-post" data-post-id="{{ post.id }}">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% if not posts %}
+                                <tr>
+                                    <td colspan="4" class="text-center">Henüz hikaye eklenmemiş. Hikaye eklemek için "Yeni Hikaye Ekle" butonunu kullanabilirsiniz.</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Videolar Section -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-video me-2"></i> Videolar</h5>
+                    <div>
+                        <a href="{{ url_for('add_video') }}" class="btn btn-success btn-sm me-2">
+                            <i class="fas fa-plus-circle me-1"></i> Manuel Video Ekle
+                        </a>
+                        <a href="{{ url_for('sync_youtube') }}" class="btn btn-danger btn-sm">
+                            <i class="fab fa-youtube me-1"></i> YouTube'dan Ekle
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Başlık</th>
+                                    <th>Tarih</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for video in videos %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="admin-table-img me-2">
+                                                <img src="https://img.youtube.com/vi/{{ video.youtube_embed }}/default.jpg" alt="{{ video.title }}">
+                                            </div>
+                                            <span>{{ video.title }}</span>
+                                        </div>
+                                    </td>
+                                    <td>{{ video.created_at.strftime('%d.%m.%Y') }}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <a href="https://www.youtube.com/watch?v={{ video.youtube_embed }}" target="_blank" class="btn btn-sm btn-outline-info">
+                                                <i class="fas fa-play"></i>
+                                            </a>
+                                            <a href="{{ url_for('edit_video', video_id=video.id) }}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                    data-bs-toggle="modal" data-bs-target="#deleteVideoModal{{ video.id }}">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                        
+                                        <!-- Delete Video Modal -->
+                                        <div class="modal fade" id="deleteVideoModal{{ video.id }}" tabindex="-1" aria-labelledby="deleteVideoModalLabel{{ video.id }}" aria-hidden="true">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title" id="deleteVideoModalLabel{{ video.id }}">Video Silme Onayı</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <p>"{{ video.title }}" başlıklı videoyu silmek istediğinizden emin misiniz?</p>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                                                        <form action="{{ url_for('delete_video', video_id=video.id) }}" method="POST" style="display: inline;">
+                                                            <button type="submit" class="btn btn-danger">Videoyu Sil</button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% if not videos %}
+                                <tr>
+                                    <td colspan="3" class="text-center">Henüz video eklenmemiş. Video eklemek için "Manuel Video Ekle" veya "YouTube'dan Video Ekle" butonlarını kullanabilirsiniz.</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">Hikayeyi Sil</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Bu hikayeyi silmek istediğinizden emin misiniz?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                <form id="deleteForm" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger">Sil</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set up delete post functionality
+        const deleteButtons = document.querySelectorAll('.delete-post');
+        const deleteForm = document.getElementById('deleteForm');
+        
+        deleteButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const postId = this.getAttribute('data-post-id');
+                deleteForm.action = `/admin/delete/${postId}`;
+                var deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+                deleteModal.show();
+            });
+        });
+        
+        // Add event listener to the delete form
+        deleteForm.addEventListener('submit', function(e) {
+            // Show loading state
+            const submitButton = deleteForm.querySelector('button[type="submit"]');
+            const originalText = submitButton.innerHTML;
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Siliniyor...';
+            
+            // Continue with form submission
+            // (the form will be submitted normally, allowing the server to handle it)
+        });
+        
+        // Check for flash messages from server
+        const urlParams = new URLSearchParams(window.location.search);
+        const error = urlParams.get('error');
+        if (error) {
+            showMessage(decodeURIComponent(error), 'danger');
+        }
+    });
+    
+    // Function to show messages to the user
+    function showMessage(message, type) {
+        // Create toast element
+        const toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+        toastContainer.style.zIndex = '1050';
+        
+        const toast = document.createElement('div');
+        toast.className = `toast align-items-center text-white bg-${type} border-0`;
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+        toast.setAttribute('aria-atomic', 'true');
+        
+        toast.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        `;
+        
+        toastContainer.appendChild(toast);
+        document.body.appendChild(toastContainer);
+        
+        // Initialize and show toast
+        const bsToast = new bootstrap.Toast(toast, {
+            delay: 5000
+        });
+        bsToast.show();
+        
+        // Remove from DOM after hiding
+        toast.addEventListener('hidden.bs.toast', function() {
+            document.body.removeChild(toastContainer);
+        });
+    }
+</script>
+{% endblock %}
