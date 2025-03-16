@@ -788,156 +788,167 @@ def inject_upload_url():
     """Make upload URL available to all templates"""
     return {'upload_url': app.config['UPLOAD_URL']}
 
+@app.context_processor
+def inject_categories():
+    """Make categories available to all templates"""
+    try:
+        # Get categories with post counts for sidebar
+        category_counts = db.session.query(
+            Post.category, 
+            func.count(Post.id).label('count')
+        ).group_by(Post.category).all()
+        
+        # Format categories for the template
+        categories = []
+        category_dict = dict(CATEGORIES)
+        for cat_key, count in category_counts:
+            categories.append({
+                'slug': cat_key,
+                'name': category_dict.get(cat_key, cat_key.capitalize()),
+                'count': count
+            })
+        
+        # If no categories were found in posts, use the defined categories
+        if not categories:
+            for cat_key, cat_name in CATEGORIES:
+                categories.append({
+                    'slug': cat_key,
+                    'name': cat_name,
+                    'count': 0
+                })
+                
+        return {'categories': categories}
+    except Exception as e:
+        # Log the error but don't crash - return empty categories
+        app.logger.error(f"Error injecting categories: {str(e)}")
+        return {'categories': []}
+
 @app.route('/')
 def index():
     """Home page showing featured and recent posts"""
-    # Get trending/featured posts
-    featured_posts = Post.get_trending_posts(12)
-    
-    # Get recent posts
-    recent_posts = Post.query.order_by(Post.created_at.desc()).limit(12).all()
-    
-    # Get categories with post counts
-    category_counts = db.session.query(
-        Post.category, 
-        func.count(Post.id).label('count')
-    ).group_by(Post.category).all()
-    
-    # Format categories for the template
-    categories = []
-    category_dict = dict(CATEGORIES)
-    for cat_key, count in category_counts:
-        categories.append({
-            'slug': cat_key,
-            'name': category_dict.get(cat_key, cat_key.capitalize()),
-            'count': count
-        })
-    
-    # Get video content if any
-    videos = Video.query.order_by(Video.created_at.desc()).limit(4).all()
-    
-    return render_template(
-        'index.html', 
-        featured_posts=featured_posts,
-        recent_posts=recent_posts,
-        categories=categories,
-        videos=videos
-    )
+    try:
+        # Get trending/featured posts
+        featured_posts = Post.get_trending_posts(12)
+        
+        # Get recent posts
+        recent_posts = Post.query.order_by(Post.created_at.desc()).limit(12).all()
+        
+        # Get most liked posts
+        most_liked_posts = Post.get_most_liked_posts(5)
+        
+        # Get video content if any
+        videos = Video.query.order_by(Video.created_at.desc()).limit(4).all()
+        
+        return render_template(
+            'index.html', 
+            featured_posts=featured_posts,
+            recent_posts=recent_posts,
+            most_liked_posts=most_liked_posts,
+            videos=videos
+        )
+    except Exception as e:
+        # Log the detailed error
+        app.logger.error(f"Error displaying index: {str(e)}")
+        app.logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        # Re-raise to be caught by the error handler
+        raise
 
 @app.route('/category/<category>')
 def category(category):
     """Display posts for a specific category"""
-    # Get posts for the category
-    posts = Post.query.filter_by(category=category).order_by(Post.created_at.desc()).all()
-    
-    # Get categories with post counts for sidebar
-    category_counts = db.session.query(
-        Post.category, 
-        func.count(Post.id).label('count')
-    ).group_by(Post.category).all()
-    
-    # Format categories for the template
-    categories = []
-    category_dict = dict(CATEGORIES)
-    for cat_key, count in category_counts:
-        categories.append({
-            'slug': cat_key,
-            'name': category_dict.get(cat_key, cat_key.capitalize()),
-            'count': count
-        })
-    
-    # Get the display name for the category
-    category_display = category_dict.get(category, category.capitalize())
-    
-    return render_template(
-        'category.html',
-        posts=posts,
-        category=category,
-        category_display=category_display,
-        categories=categories
-    )
+    try:
+        # Get posts for the category
+        posts = Post.query.filter_by(category=category).order_by(Post.created_at.desc()).all()
+        
+        # Get the display name for the category
+        category_dict = dict(CATEGORIES)
+        category_display = category_dict.get(category, category.capitalize())
+        
+        return render_template(
+            'category.html',
+            posts=posts,
+            category=category,
+            category_display=category_display
+        )
+    except Exception as e:
+        # Log the detailed error
+        app.logger.error(f"Error displaying category {category}: {str(e)}")
+        app.logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        # Re-raise to be caught by the error handler
+        raise
 
 @app.route('/post/<int:post_id>')
 def post(post_id):
     """Display a single post"""
-    post = Post.query.get_or_404(post_id)
-    
-    # Get categories with post counts for sidebar
-    category_counts = db.session.query(
-        Post.category, 
-        func.count(Post.id).label('count')
-    ).group_by(Post.category).all()
-    
-    # Format categories for the template
-    categories = []
-    category_dict = dict(CATEGORIES)
-    for cat_key, count in category_counts:
-        categories.append({
-            'slug': cat_key,
-            'name': category_dict.get(cat_key, cat_key.capitalize()),
-            'count': count
-        })
-    
-    return render_template(
-        'post_detail.html',
-        post=post,
-        categories=categories
-    )
+    try:
+        # Get the post or return 404
+        post = Post.query.get_or_404(post_id)
+        
+        # Track page view for analytics (optional)
+        app.logger.info(f"Post {post_id} viewed: {post.title}")
+        
+        return render_template(
+            'post_detail.html',
+            post=post
+        )
+    except Exception as e:
+        # Log the detailed error
+        app.logger.error(f"Error displaying post {post_id}: {str(e)}")
+        app.logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        # Re-raise to be caught by the error handler
+        raise
 
 @app.route('/author/<author>')
 def author_posts(author):
     """Display posts by a specific author"""
-    posts = Post.query.filter_by(author=author).order_by(Post.created_at.desc()).all()
-    
-    # Get categories with post counts for sidebar
-    category_counts = db.session.query(
-        Post.category, 
-        func.count(Post.id).label('count')
-    ).group_by(Post.category).all()
-    
-    # Format categories for the template
-    categories = []
-    category_dict = dict(CATEGORIES)
-    for cat_key, count in category_counts:
-        categories.append({
-            'slug': cat_key,
-            'name': category_dict.get(cat_key, cat_key.capitalize()),
-            'count': count
-        })
-    
-    return render_template(
-        'author.html',
-        author=author,
-        posts=posts,
-        categories=categories
-    )
+    try:
+        # Get posts for the author
+        posts = Post.query.filter_by(author=author).order_by(Post.created_at.desc()).all()
+        
+        return render_template(
+            'author.html',
+            author=author,
+            posts=posts
+        )
+    except Exception as e:
+        # Log the detailed error
+        app.logger.error(f"Error displaying author {author}: {str(e)}")
+        app.logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        # Re-raise to be caught by the error handler
+        raise
 
 @app.route('/videos')
 def videos():
     """Display video content"""
-    all_videos = Video.query.order_by(Video.created_at.desc()).all()
-    
-    # Get categories with post counts for sidebar
-    category_counts = db.session.query(
-        Post.category, 
-        func.count(Post.id).label('count')
-    ).group_by(Post.category).all()
-    
-    # Format categories for the template
-    categories = []
-    category_dict = dict(CATEGORIES)
-    for cat_key, count in category_counts:
-        categories.append({
-            'slug': cat_key,
-            'name': category_dict.get(cat_key, cat_key.capitalize()),
-            'count': count
-        })
-    
-    return render_template(
-        'videos.html',
-        videos=all_videos,
-        categories=categories
-    )
+    try:
+        # Get all videos ordered by creation date
+        all_videos = Video.query.order_by(Video.created_at.desc()).all()
+        
+        return render_template(
+            'videos.html',
+            videos=all_videos
+        )
+    except Exception as e:
+        # Log the detailed error
+        app.logger.error(f"Error displaying videos: {str(e)}")
+        app.logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        # Re-raise to be caught by the error handler
+        raise
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
