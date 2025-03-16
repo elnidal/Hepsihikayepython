@@ -82,7 +82,26 @@ app.config['UPLOAD_URL'] = app.config['UPLOAD_URL'].rstrip('/')
 app.config['IS_PRODUCTION'] = is_production
 
 # Ensure upload directory exists
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+try:
+    # Fix any potential issues with the upload folder path
+    upload_folder = app.config['UPLOAD_FOLDER']
+    app.logger.info(f"Ensuring upload directory exists at: {upload_folder}")
+    
+    # Create the directory if it doesn't exist
+    os.makedirs(upload_folder, exist_ok=True)
+    
+    # Verify the directory was created
+    if os.path.exists(upload_folder) and os.path.isdir(upload_folder):
+        app.logger.info(f"Upload directory confirmed at: {upload_folder}")
+    else:
+        app.logger.error(f"Failed to create upload directory at: {upload_folder}")
+except Exception as e:
+    app.logger.error(f"Error creating upload directory: {str(e)}")
+    # Fallback to a directory we know will work
+    app.config['UPLOAD_FOLDER'] = os.path.join(app.static_folder, 'uploads')
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    app.logger.info(f"Using fallback upload directory: {app.config['UPLOAD_FOLDER']}")
+
 app.logger.info(f"Upload directory set to: {app.config['UPLOAD_FOLDER']}")
 app.logger.info(f"Upload URL path set to: {app.config['UPLOAD_URL']}")
 app.logger.info(f"Running in {'PRODUCTION' if is_production else 'DEVELOPMENT'} mode")
@@ -786,41 +805,85 @@ def image_diagnostics():
 @app.context_processor
 def inject_upload_url():
     """Make upload URL available to all templates"""
-    return {'upload_url': app.config['UPLOAD_URL']}
+    try:
+        app.logger.info(f"Injecting upload_url: {app.config['UPLOAD_URL']}")
+        
+        # Fix any potential formatting issues with the upload URL
+        upload_url = app.config['UPLOAD_URL'].rstrip('/')
+        
+        # Ensure there's always a leading slash
+        if not upload_url.startswith('/'):
+            upload_url = '/' + upload_url
+            
+        app.logger.info(f"Final upload_url being provided to templates: {upload_url}")
+        return {'upload_url': upload_url}
+    except Exception as e:
+        # Log any errors but return a default value
+        app.logger.error(f"Error injecting upload_url: {str(e)}")
+        # Default to /static/uploads if there's an error
+        return {'upload_url': '/static/uploads'}
 
 @app.context_processor
 def inject_categories():
     """Make categories available to all templates"""
     try:
-        # Get categories with post counts for sidebar
-        category_counts = db.session.query(
-            Post.category, 
-            func.count(Post.id).label('count')
-        ).group_by(Post.category).all()
+        app.logger.info("Injecting categories for template")
         
-        # Format categories for the template
-        categories = []
+        # Get all defined categories from the global CATEGORIES list
+        all_categories = []
         category_dict = dict(CATEGORIES)
-        for cat_key, count in category_counts:
-            categories.append({
-                'slug': cat_key,
-                'name': category_dict.get(cat_key, cat_key.capitalize()),
-                'count': count
-            })
         
-        # If no categories were found in posts, use the defined categories
-        if not categories:
+        # Try to get category counts from database
+        try:
+            # Log database connection status
+            app.logger.info("Attempting to query database for post categories")
+            
+            # Get categories with post counts for sidebar
+            category_counts = db.session.query(
+                Post.category, 
+                func.count(Post.id).label('count')
+            ).group_by(Post.category).all()
+            
+            app.logger.info(f"Found {len(category_counts)} categories with posts")
+            
+            # Format categories with posts
+            for cat_key, count in category_counts:
+                cat_name = category_dict.get(cat_key, cat_key.capitalize())
+                all_categories.append({
+                    'slug': cat_key,
+                    'name': cat_name,
+                    'count': count
+                })
+                
+        except SQLAlchemyError as e:
+            # Log database error but continue with empty counts
+            app.logger.error(f"Database error when querying categories: {str(e)}")
+            app.logger.error(f"Error type: {type(e).__name__}")
+            import traceback
+            app.logger.error(f"Traceback: {traceback.format_exc()}")
+            db.session.rollback()
+        
+        # If no categories found with posts, use all defined categories with zero counts
+        if not all_categories:
+            app.logger.info("No categories with posts found, using defined categories")
             for cat_key, cat_name in CATEGORIES:
-                categories.append({
+                all_categories.append({
                     'slug': cat_key,
                     'name': cat_name,
                     'count': 0
                 })
                 
-        return {'categories': categories}
+        app.logger.info(f"Returning {len(all_categories)} categories to template")
+        return {'categories': all_categories}
+        
     except Exception as e:
-        # Log the error but don't crash - return empty categories
-        app.logger.error(f"Error injecting categories: {str(e)}")
+        # Log any other errors but don't crash - return empty categories
+        app.logger.error(f"Unexpected error injecting categories: {str(e)}")
+        app.logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        # Always return a valid list, even if empty
         return {'categories': []}
 
 @app.route('/')
