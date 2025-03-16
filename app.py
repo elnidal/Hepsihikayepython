@@ -776,3 +776,29 @@ def image_diagnostics():
 def inject_upload_url():
     """Make upload URL available to all templates"""
     return {'upload_url': app.config['UPLOAD_URL']}
+
+@app.route('/')
+def index():
+    """Home page showing featured and recent posts"""
+    # Get trending/featured posts
+    featured_posts = Post.get_trending_posts(12)
+    
+    # Get recent posts
+    recent_posts = Post.query.order_by(Post.created_at.desc()).limit(12).all()
+    
+    # Get categories with post counts
+    categories = db.session.query(
+        Post.category, 
+        func.count(Post.id).label('count')
+    ).group_by(Post.category).all()
+    
+    # Get video content if any
+    videos = Video.query.order_by(Video.created_at.desc()).limit(4).all()
+    
+    return render_template(
+        'index.html', 
+        featured_posts=featured_posts,
+        recent_posts=recent_posts,
+        categories=categories,
+        videos=videos
+    )
