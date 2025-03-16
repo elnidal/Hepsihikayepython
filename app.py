@@ -24,6 +24,7 @@ import subprocess
 from urllib.parse import urlparse
 import sys
 from sqlalchemy import text
+from decorators import handle_db_error
 
 # Load environment variables from .env file in development mode
 if os.path.exists('.env') and not os.environ.get('FLASK_ENV') == 'production':
@@ -548,15 +549,7 @@ def serve_upload(filename):
         app.logger.error(f"Error serving file {filename}: {str(e)}")
         # Return a default image if the file doesn't exist
         return redirect(url_for('static', filename='uploads/default_post_image.png'))
-def serve_upload(filename):
-    """Serve uploaded files from the static/uploads directory"""
-    try:
-        # In production, serve from static/uploads
-        return redirect(url_for('static', filename=f'uploads/{filename}'))
-    except Exception as e:
-        app.logger.error(f"Error serving file {filename}: {str(e)}")
-        # Return a default image if the file doesn't exist
-        return redirect(url_for('static', filename='uploads/default_post_image.png'))
+
 @app.route('/admin')
 @login_required
 @handle_db_error
@@ -755,67 +748,6 @@ def inject_categories():
                 'name': cat_name,
                 'count': count
             })
-                
-        app.logger.info(f"Returning {len(all_categories)} categories to template")
-        return {'categories': all_categories}
-        
-    except Exception as e:
-        # Log any other errors but don't crash - return empty categories
-        app.logger.error(f"Unexpected error injecting categories: {str(e)}")
-        app.logger.error(f"Error type: {type(e).__name__}")
-        import traceback
-        app.logger.error(f"Traceback: {traceback.format_exc()}")
-        
-        # Always return a valid list, even if empty
-        return {'categories': []}
-def inject_categories():
-    """Make categories available to all templates"""
-    try:
-        app.logger.info("Injecting categories for template")
-        
-        # Get all defined categories from the global CATEGORIES list
-        all_categories = []
-        category_dict = dict(CATEGORIES)
-        
-        # Try to get category counts from database
-        try:
-            # Log database connection status
-            app.logger.info("Attempting to query database for post categories")
-            
-            # Get categories with post counts for sidebar
-            category_counts = db.session.query(
-                Post.category, 
-                func.count(Post.id).label('count')
-            ).group_by(Post.category).all()
-            
-            app.logger.info(f"Found {len(category_counts)} categories with posts")
-            
-            # Format categories with posts
-            for cat_key, count in category_counts:
-                cat_name = category_dict.get(cat_key, cat_key.capitalize())
-                all_categories.append({
-                    'slug': cat_key,
-                    'name': cat_name,
-                    'count': count
-                })
-                
-        except SQLAlchemyError as e:
-            # Log database error but continue with empty counts
-            app.logger.error(f"Database error when querying categories: {str(e)}")
-            app.logger.error(f"Error type: {type(e).__name__}")
-            import traceback
-            app.logger.error(f"Traceback: {traceback.format_exc()}")
-            db.session.rollback()
-        
-        # If no categories found with posts, use all defined categories with zero counts
-        if not all_categories:
-            app.logger.info("No categories with posts found, using defined categories")
-            for cat_key, cat_name in CATEGORIES:
-                all_categories.append({
-                    'slug': cat_key,
-                    'name': cat_name,
-                    'count': 0
-                })
                 
         app.logger.info(f"Returning {len(all_categories)} categories to template")
         return {'categories': all_categories}
