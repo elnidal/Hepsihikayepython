@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block head %}
+{{ super() }}
 {{ ckeditor.load() }}
 {{ ckeditor.config(name='content') }}
 <style>
@@ -12,61 +13,69 @@
 {% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container">
     <div class="row">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1>Hikaye Düzenle</h1>
-                <a href="{{ url_for('admin_index') }}" class="btn btn-secondary">Geri Dön</a>
-            </div>
+        <div class="col-md-12">
+            <h1>Yazı Düzenle: {{ post.title }}</h1>
             
             <div class="card">
                 <div class="card-body">
-                    <form method="POST" enctype="multipart/form-data">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <form method="post" enctype="multipart/form-data">
+                        {{ form.csrf_token }}
                         
                         <div class="mb-3">
-                            <label for="title" class="form-label">Başlık <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="title" name="title" value="{{ post.title }}" required>
+                            {{ form.title.label(class="form-label") }}
+                            {{ form.title(class="form-control") }}
+                            {% for error in form.title.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
                         </div>
                         
                         <div class="mb-3">
-                            <label for="author" class="form-label">Yazar</label>
-                            <input type="text" class="form-control" id="author" name="author" value="{{ post.author }}">
+                            {{ form.category.label(class="form-label") }}
+                            {{ form.category(class="form-select") }}
+                            {% for error in form.category.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
                         </div>
                         
                         <div class="mb-3">
-                            <label for="category" class="form-label">Kategori</label>
-                            <select class="form-select" id="category" name="category">
-                                {% for value, label in categories %}
-                                <option value="{{ value }}" {% if post.category == value %}selected{% endif %}>{{ label }}</option>
-                                {% endfor %}
-                            </select>
+                            {{ form.author.label(class="form-label") }}
+                            {{ form.author(class="form-control") }}
+                            {% for error in form.author.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
                         </div>
                         
                         <div class="mb-3">
-                            <label for="image" class="form-label">Resim</label>
+                            <label class="form-label">Mevcut Resim</label>
                             {% if post.image_url %}
-                            <div class="mb-2">
-                                <img src="{{ url_for('serve_upload', filename=post.image_url) }}" alt="{{ post.title }}" class="img-thumbnail" style="max-height: 200px;">
-                            </div>
+                                <div class="mb-2">
+                                    <img src="{{ post.get_image_url() }}" alt="{{ post.title }}" style="max-width: 200px; max-height: 200px;" class="img-thumbnail">
+                                </div>
+                            {% else %}
+                                <p>Kapak resmi bulunmuyor</p>
                             {% endif %}
-                            <input type="file" class="form-control" id="image" name="image" accept="image/*">
-                            <small class="form-text text-muted">Yeni bir resim yüklerseniz, mevcut resim değiştirilecektir.</small>
-                            <div id="imageSuccessMessage" class="mt-2 alert alert-success" style="display: none;">
-                                <i class="fas fa-check-circle"></i> Resim başarıyla seçildi! Kaydetmek için formu gönderiniz.
-                            </div>
+                            
+                            {{ form.image.label(class="form-label") }}
+                            {{ form.image(class="form-control") }}
+                            {% for error in form.image.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                            <small class="form-text text-muted">Yeni bir resim yüklerseniz mevcut resim değiştirilecektir.</small>
                         </div>
                         
                         <div class="mb-3">
-                            <label for="content" class="form-label">İçerik <span class="text-danger">*</span></label>
-                            <textarea id="content" name="content" class="form-control">{{ post.content }}</textarea>
-                            {{ ckeditor.load(custom_url=url_for('static', filename='ckeditor/ckeditor.js')) }}
-                            {{ ckeditor.config(name='content') }}
+                            {{ form.content.label(class="form-label") }}
+                            {{ form.content() }}
+                            {% for error in form.content.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
                         </div>
                         
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <button type="submit" class="btn btn-primary">Güncelle</button>
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('admin_index') }}" class="btn btn-secondary">İptal</a>
+                            {{ form.submit(class="btn btn-primary") }}
                         </div>
                     </form>
                 </div>

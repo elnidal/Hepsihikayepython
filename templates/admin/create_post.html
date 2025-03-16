@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+{{ super() }}
 {{ ckeditor.load() }}
 {{ ckeditor.config(name='content') }}
 <style>
@@ -78,124 +78,60 @@
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid admin-container mt-4">
+<div class="container">
     <div class="row">
-        <!-- Sidebar -->
-        <div class="col-md-3 col-lg-2 admin-sidebar-col mb-4">
-            <div class="admin-sidebar card">
-                <div class="card-body p-0">
-                    <div class="admin-sidebar-header p-3">
-                        <h5 class="mb-0"><i class="fas fa-tachometer-alt me-2"></i> Admin Panel</h5>
-                    </div>
-                    <div class="list-group list-group-flush">
-                        <a href="{{ url_for('admin_index') }}" class="list-group-item list-group-item-action">
-                            <i class="fas fa-home me-2"></i> Dashboard
-                        </a>
-                        <a href="{{ url_for('create_post') }}" class="list-group-item list-group-item-action active">
-                            <i class="fas fa-plus-circle me-2"></i> Yeni Hikaye
-                        </a>
-                        <a href="{{ url_for('add_video') }}" class="list-group-item list-group-item-action">
-                            <i class="fas fa-video me-2"></i> Video Ekle
-                        </a>
-                        <a href="{{ url_for('sync_youtube') }}" class="list-group-item list-group-item-action">
-                            <i class="fab fa-youtube me-2"></i> YouTube Senkronizasyon
-                        </a>
-                        <a href="{{ url_for('admin_comments') }}" class="list-group-item list-group-item-action">
-                            <i class="fas fa-comments me-2"></i> Yorumlar
-                        </a>
-                        <a href="{{ url_for('admin_settings') }}" class="list-group-item list-group-item-action">
-                            <i class="fas fa-cog me-2"></i> Ayarlar
-                        </a>
-                        <a href="{{ url_for('index') }}" class="list-group-item list-group-item-action">
-                            <i class="fas fa-arrow-left me-2"></i> Siteye Dön
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Main Content -->
-        <div class="col-md-9 col-lg-10">
-            <h1 class="admin-header mb-4">
-                <i class="fas fa-plus-circle me-2"></i> Yeni Hikaye Ekle
-            </h1>
+        <div class="col-md-12">
+            <h1>Yeni Yazı Ekle</h1>
             
             <div class="card">
                 <div class="card-body">
-                    <form method="POST" enctype="multipart/form-data" id="post-form">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <form method="post" enctype="multipart/form-data">
+                        {{ form.csrf_token }}
                         
-                        <div class="row">
-                            <div class="col-md-8">
-                                <div class="mb-3">
-                                    <label for="title" class="form-label">Başlık <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="title" name="title" value="{{ form_data.title if form_data else '' }}" required placeholder="Hikaye başlığını girin">
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label for="content" class="form-label">İçerik <span class="text-danger">*</span></label>
-                                    <textarea id="content" name="content" class="form-control">{{ form_data.content if form_data else '' }}</textarea>
-                                    {{ ckeditor.load(custom_url=url_for('static', filename='ckeditor/ckeditor.js')) }}
-                                    {{ ckeditor.config(name='content') }}
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-4">
-                                <div class="card mb-3">
-                                    <div class="card-header">
-                                        <h5 class="mb-0"><i class="fas fa-cog me-2"></i> Hikaye Ayarları</h5>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="mb-3">
-                                            <label for="author" class="form-label">Yazar</label>
-                                            <input type="text" class="form-control" id="author" name="author" value="{{ form_data.author if form_data else '' }}" placeholder="Yazar adını girin">
-                                        </div>
-                                        
-                                        <div class="mb-3">
-                                            <label for="category" class="form-label">Kategori</label>
-                                            <select class="form-select" id="category" name="category">
-                                                {% for value, label in categories %}
-                                                <option value="{{ value }}" {% if form_data and form_data.category == value %}selected{% endif %}>{{ label }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                        
-                                        <div class="mb-3">
-                                            <label class="form-label">Kapak Resmi</label>
-                                            <div class="file-upload-container w-100">
-                                                <div class="file-upload-btn w-100">
-                                                    <i class="fas fa-upload me-2"></i> Resim Seç
-                                                </div>
-                                                <input type="file" class="form-control" id="image" name="image" accept="image/*">
-                                            </div>
-                                            
-                                            <div class="image-preview" id="imagePreview">
-                                                <img id="previewImg" src="#" alt="Resim Önizleme">
-                                            </div>
-                                            
-                                            <div class="image-preview" id="imagePlaceholder">
-                                                <div class="image-preview-placeholder">
-                                                    <i class="fas fa-image"></i>
-                                                    <p>Resim seçilmedi</p>
-                                                </div>
-                                            </div>
-                                            
-                                            <div id="imageSuccessMessage" class="mt-2 alert alert-success" style="display: none;">
-                                                <i class="fas fa-check-circle"></i> Resim başarıyla seçildi! Kaydetmek için formu gönderiniz.
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="d-grid gap-2">
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-2"></i> Hikayeyi Kaydet
-                                    </button>
-                                    <a href="{{ url_for('admin_index') }}" class="btn btn-outline-secondary">
-                                        <i class="fas fa-times me-2"></i> İptal
-                                    </a>
-                                </div>
-                            </div>
+                        <div class="mb-3">
+                            {{ form.title.label(class="form-label") }}
+                            {{ form.title(class="form-control") }}
+                            {% for error in form.title.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.category.label(class="form-label") }}
+                            {{ form.category(class="form-select") }}
+                            {% for error in form.category.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.author.label(class="form-label") }}
+                            {{ form.author(class="form-control") }}
+                            {% for error in form.author.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.image.label(class="form-label") }}
+                            {{ form.image(class="form-control") }}
+                            {% for error in form.image.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                            <small class="form-text text-muted">Maksimum dosya boyutu: 16MB. İzin verilen formatlar: PNG, JPG, JPEG, GIF</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.content.label(class="form-label") }}
+                            {{ form.content() }}
+                            {% for error in form.content.errors %}
+                                <div class="text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('admin_index') }}" class="btn btn-secondary">İptal</a>
+                            {{ form.submit(class="btn btn-primary") }}
                         </div>
                     </form>
                 </div>

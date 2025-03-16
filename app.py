@@ -375,6 +375,21 @@ class LoginForm(FlaskForm):
     password = PasswordField('Şifre', validators=[DataRequired()])
     submit = SubmitField('Giriş Yap')
 
+# Post Form
+class PostForm(FlaskForm):
+    title = StringField('Başlık', validators=[DataRequired()])
+    content = CKEditorField('İçerik', validators=[DataRequired()])
+    category = SelectField('Kategori', choices=CATEGORIES, validators=[DataRequired()])
+    author = StringField('Yazar')
+    image = FileField('Kapak Resmi')
+    submit = SubmitField('Kaydet')
+
+# Video Form
+class VideoForm(FlaskForm):
+    title = StringField('Başlık', validators=[DataRequired()])
+    youtube_embed = StringField('YouTube Embed ID', validators=[DataRequired()])
+    submit = SubmitField('Kaydet')
+
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 def allowed_file(filename):
@@ -1285,3 +1300,188 @@ def rate_post(post_id, action):
         db.session.rollback()
         app.logger.error(f"Error rating post {post_id}: {str(e)}")
         return jsonify({'success': False, 'message': 'Bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.'}), 500
+
+@app.route('/admin/post/create', methods=['GET', 'POST'])
+@login_required
+def create_post():
+    """Create a new post"""
+    form = PostForm()
+    
+    if form.validate_on_submit():
+        try:
+            # Handle image upload
+            image_filename = None
+            if form.image.data:
+                f = form.image.data
+                if allowed_file(f.filename):
+                    # Process the file
+                    try:
+                        f.stream.seek(0)
+                        validate_image(f.stream)
+                        f.stream.seek(0)
+                        
+                        # Save image with timestamp to prevent duplicates
+                        filename = secure_filename(f.filename)
+                        timestamp = int(time.time())
+                        image_filename = f"{timestamp}_{filename}"
+                        
+                        # Ensure uploads directory exists
+                        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                        
+                        # Save the file
+                        file_path = os.path.join(app.config['UPLOAD_FOLDER'], image_filename)
+                        f.save(file_path)
+                        
+                        # Resize image for performance
+                        resize_image(file_path)
+                        
+                    except ValidationError as e:
+                        flash(f'Görsel yüklenirken hata oluştu: {str(e)}', 'danger')
+                        app.logger.error(f"Image validation error: {str(e)}")
+                        return render_template('admin/create_post.html', form=form)
+                else:
+                    flash('Desteklenmeyen dosya formatı. Lütfen PNG, JPG, JPEG veya GIF dosyası yükleyin.', 'danger')
+                    return render_template('admin/create_post.html', form=form)
+            
+            # Create new post
+            post = Post(
+                title=form.title.data,
+                content=form.content.data,
+                category=form.category.data,
+                author=form.author.data,
+                image_url=image_filename
+            )
+            
+            db.session.add(post)
+            db.session.commit()
+            
+            flash('Yazı başarıyla oluşturuldu!', 'success')
+            return redirect(url_for('admin_index'))
+            
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error creating post: {str(e)}")
+            flash(f'Yazı oluşturulurken bir hata oluştu: {str(e)}', 'danger')
+    
+    return render_template('admin/create_post.html', form=form)
+
+@app.route('/admin/post/<int:post_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_post(post_id):
+    """Edit an existing post"""
+    post = Post.query.get_or_404(post_id)
+    form = PostForm(obj=post)
+    
+    if form.validate_on_submit():
+        try:
+            # Handle image upload
+            if form.image.data:
+                f = form.image.data
+                if allowed_file(f.filename):
+                    # Process the file
+                    try:
+                        f.stream.seek(0)
+                        validate_image(f.stream)
+                        f.stream.seek(0)
+                        
+                        # Save image with timestamp to prevent duplicates
+                        filename = secure_filename(f.filename)
+                        timestamp = int(time.time())
+                        image_filename = f"{timestamp}_{filename}"
+                        
+                        # Ensure uploads directory exists
+                        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                        
+                        # Save the file
+                        file_path = os.path.join(app.config['UPLOAD_FOLDER'], image_filename)
+                        f.save(file_path)
+                        
+                        # Resize image for performance
+                        resize_image(file_path)
+                        
+                        # Update post image URL
+                        post.image_url = image_filename
+                        
+                    except ValidationError as e:
+                        flash(f'Görsel yüklenirken hata oluştu: {str(e)}', 'danger')
+                        app.logger.error(f"Image validation error: {str(e)}")
+                        return render_template('admin/edit_post.html', form=form, post=post)
+                else:
+                    flash('Desteklenmeyen dosya formatı. Lütfen PNG, JPG, JPEG veya GIF dosyası yükleyin.', 'danger')
+                    return render_template('admin/edit_post.html', form=form, post=post)
+            
+            # Update post
+            post.title = form.title.data
+            post.content = form.content.data
+            post.category = form.category.data
+            post.author = form.author.data
+            
+            db.session.commit()
+            
+            flash('Yazı başarıyla güncellendi!', 'success')
+            return redirect(url_for('admin_index'))
+            
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error updating post: {str(e)}")
+            flash(f'Yazı güncellenirken bir hata oluştu: {str(e)}', 'danger')
+    
+    return render_template('admin/edit_post.html', form=form, post=post)
+
+@app.route('/admin/post/<int:post_id>/delete', methods=['POST'])
+@login_required
+def delete_post(post_id):
+    """Delete a post"""
+    try:
+        post = Post.query.get_or_404(post_id)
+        db.session.delete(post)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Yazı başarıyla silindi'})
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error deleting post {post_id}: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/admin/video/<int:video_id>/delete', methods=['POST'])
+@login_required
+def delete_video(video_id):
+    """Delete a video"""
+    try:
+        video = Video.query.get_or_404(video_id)
+        db.session.delete(video)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Video başarıyla silindi'})
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error deleting video {video_id}: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/admin/sync-youtube', methods=['GET', 'POST'])
+@login_required
+def sync_youtube():
+    """Synchronize videos from YouTube"""
+    if request.method == 'POST':
+        channel_id = request.form.get('channel_id')
+        max_results = int(request.form.get('max_results', 10))
+        
+        if not channel_id:
+            flash('Lütfen bir YouTube kanal kimliği girin', 'danger')
+            return redirect(url_for('sync_youtube'))
+        
+        try:
+            videos_added = sync_youtube_videos(channel_id, max_results)
+            flash(f'{videos_added} video başarıyla eklendi!', 'success')
+            return redirect(url_for('admin_index'))
+        except Exception as e:
+            app.logger.error(f"Error syncing YouTube videos: {str(e)}")
+            flash(f'Videolar senkronize edilirken bir hata oluştu: {str(e)}', 'danger')
+    
+    # Get YouTube settings from database
+    youtube_channel_id = Setting.get_value('youtube_channel_id', '')
+    youtube_api_key = Setting.get_value('youtube_api_key', YOUTUBE_API_KEY)
+    
+    return render_template(
+        'admin/sync_youtube.html',
+        youtube_channel_id=youtube_channel_id,
+        youtube_api_key=youtube_api_key
+    )
