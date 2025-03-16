@@ -287,8 +287,14 @@ class Post(db.Model):
     def get_image_url(self):
         """Get the full URL for the post image"""
         if not self.image_url:
-            return None
-        return url_for('serve_upload', filename=self.image_url)
+            return url_for('static', filename='uploads/default_post_image.png')
+        
+        # Check if the image_url already has the correct format
+        if self.image_url.startswith('uploads/'):
+            return url_for('static', filename=self.image_url)
+        else:
+            # Otherwise, prepend the uploads/ directory
+            return url_for('static', filename=f'uploads/{self.image_url}')
 
     def update_rating_counts(self):
         """Update the likes and dislikes count for this post"""
@@ -534,123 +540,23 @@ def sync_youtube_videos(channel_identifier, max_results=10):
 
 @app.route('/uploads/<path:filename>')
 def serve_upload(filename):
-    """Serve uploaded files consistently across environments"""
+    """Serve uploaded files from the static/uploads directory"""
     try:
-        # Log the request for debugging
-        app.logger.info(f"Image request received for: {filename}")
-        
-        # Normalize filename - remove any leading slashes
-        filename = filename.lstrip('/')
-        
-        # Determine file path based on environment
-        if app.config['IS_PRODUCTION']:
-            # In production environment
-            app.logger.info(f"Serving file in PRODUCTION mode from {app.config['UPLOAD_FOLDER']}")
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        else:
-            # In development environment
-            upload_dir = os.path.join(app.static_folder, 'uploads')
-            app.logger.info(f"Serving file in DEVELOPMENT mode from {upload_dir}")
-            file_path = os.path.join(upload_dir, filename)
-        
-        # Check if the file exists
-        if os.path.exists(file_path):
-            app.logger.info(f"File exists at {file_path}")
-        else:
-            app.logger.warning(f"File NOT found at {file_path}, serving default image instead")
-            return send_from_directory(app.static_folder, 'img/default-story.jpg')
-            
-        # Get the correct directory to serve from
-        serve_dir = os.path.dirname(file_path)
-        serve_filename = os.path.basename(file_path)
-        
-        return send_from_directory(serve_dir, serve_filename)
+        # In production, serve from static/uploads
+        return redirect(url_for('static', filename=f'uploads/{filename}'))
     except Exception as e:
         app.logger.error(f"Error serving file {filename}: {str(e)}")
-        # Return a placeholder image instead of 404 for better user experience
-        return send_from_directory(app.static_folder, 'img/default-story.jpg')
-
-def get_db_connection():
-    """Get database connection with retry logic and enhanced error handling"""
-    max_retries = 3
-    retry_delay = 1  # seconds
-    
-    for attempt in range(max_retries):
-        try:
-            # Test the connection
-            connection = db.engine.connect()
-            app.logger.info("Successfully connected to the database")
-            
-            # Test a simple query using SQLAlchemy 2.0 syntax
-            result = connection.execute(text("SELECT 1"))
-            result.close()
-            connection.close()
-            
-            return True
-            
-        except OperationalError as e:
-            error_msg = str(e)
-            app.logger.error(f"Database connection attempt {attempt + 1} failed:")
-            app.logger.error(f"Error type: {type(e).__name__}")
-            app.logger.error(f"Error message: {error_msg}")
-            
-            if "could not translate host name" in error_msg:
-                app.logger.error("Hostname resolution failed. Please verify the database host is correct and accessible.")
-            elif "connection refused" in error_msg:
-                app.logger.error("Connection refused. Please verify the database is running and accepting connections.")
-            elif "password authentication failed" in error_msg:
-                app.logger.error("Authentication failed. Please verify your database credentials.")
-            
-            if attempt == max_retries - 1:
-                app.logger.error(f"Failed to connect to database after {max_retries} attempts")
-                raise
-                
-            app.logger.warning(f"Retrying in {retry_delay} seconds...")
-            time.sleep(retry_delay)
-            retry_delay *= 2  # Exponential backoff
-            
-        except SQLAlchemyError as e:
-            app.logger.error(f"SQLAlchemy error: {str(e)}")
-            raise
-            
-        except Exception as e:
-            app.logger.error(f"Unexpected error: {str(e)}")
-            raise
-            
-    return False
-
-@app.before_request
-def check_db_connection():
-    """Check database connection before each request with enhanced error handling"""
-    if request.endpoint and 'static' in request.endpoint:
-        return  # Skip check for static files
-        
+        # Return a default image if the file doesn't exist
+        return redirect(url_for('static', filename='uploads/default_post_image.png'))
+def serve_upload(filename):
+    """Serve uploaded files from the static/uploads directory"""
     try:
-        get_db_connection()
-    except OperationalError as e:
-        app.logger.error(f"Database connection error: {str(e)}")
-        if not request.is_xhr:  # Regular request
-            flash('Veritabanı bağlantısı kurulamadı. Lütfen daha sonra tekrar deneyin.', 'error')
-            return render_template('errors/db_error.html'), 503
-        else:  # AJAX request
-            return jsonify({'error': 'Database connection error'}), 503
+        # In production, serve from static/uploads
+        return redirect(url_for('static', filename=f'uploads/{filename}'))
     except Exception as e:
-        app.logger.error(f"Unexpected error checking database connection: {str(e)}")
-        return "An unexpected error occurred", 500
-
-def handle_db_error(func):
-    """Decorator to handle database errors"""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except SQLAlchemyError as e:
-            app.logger.error(f"Database error in {func.__name__}: {str(e)}")
-            db.session.rollback()
-            flash('Veritabanı hatası oluştu. Lütfen daha sonra tekrar deneyin.', 'error')
-            return redirect(url_for('index'))
-    return wrapper
-
+        app.logger.error(f"Error serving file {filename}: {str(e)}")
+        # Return a default image if the file doesn't exist
+        return redirect(url_for('static', filename='uploads/default_post_image.png'))
 @app.route('/admin')
 @login_required
 @handle_db_error
@@ -824,6 +730,44 @@ def inject_upload_url():
         return {'upload_url': '/static/uploads'}
 
 @app.context_processor
+def inject_categories():
+    """Make categories available to all templates"""
+    try:
+        app.logger.info("Injecting categories for template")
+        
+        # Get all defined categories from the global CATEGORIES list
+        all_categories = []
+        category_dict = dict(CATEGORIES)
+        
+        # Always include all defined categories, even if they have no posts
+        for cat_key, cat_name in CATEGORIES:
+            count = 0
+            try:
+                # Check if there are posts in this category
+                count = Post.query.filter_by(category=cat_key).count()
+            except Exception as e:
+                # If there's a database error, just use 0
+                app.logger.error(f"Error counting posts for category {cat_key}: {str(e)}")
+                pass
+                
+            all_categories.append({
+                'slug': cat_key,
+                'name': cat_name,
+                'count': count
+            })
+                
+        app.logger.info(f"Returning {len(all_categories)} categories to template")
+        return {'categories': all_categories}
+        
+    except Exception as e:
+        # Log any other errors but don't crash - return empty categories
+        app.logger.error(f"Unexpected error injecting categories: {str(e)}")
+        app.logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        # Always return a valid list, even if empty
+        return {'categories': []}
 def inject_categories():
     """Make categories available to all templates"""
     try:
