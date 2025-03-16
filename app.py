@@ -792,10 +792,20 @@ def index():
     recent_posts = Post.query.order_by(Post.created_at.desc()).limit(12).all()
     
     # Get categories with post counts
-    categories = db.session.query(
+    category_counts = db.session.query(
         Post.category, 
         func.count(Post.id).label('count')
     ).group_by(Post.category).all()
+    
+    # Format categories for the template
+    categories = []
+    category_dict = dict(CATEGORIES)
+    for cat_key, count in category_counts:
+        categories.append({
+            'slug': cat_key,
+            'name': category_dict.get(cat_key, cat_key.capitalize()),
+            'count': count
+        })
     
     # Get video content if any
     videos = Video.query.order_by(Video.created_at.desc()).limit(4).all()
@@ -806,4 +816,119 @@ def index():
         recent_posts=recent_posts,
         categories=categories,
         videos=videos
+    )
+
+@app.route('/category/<category>')
+def category(category):
+    """Display posts for a specific category"""
+    # Get posts for the category
+    posts = Post.query.filter_by(category=category).order_by(Post.created_at.desc()).all()
+    
+    # Get categories with post counts for sidebar
+    category_counts = db.session.query(
+        Post.category, 
+        func.count(Post.id).label('count')
+    ).group_by(Post.category).all()
+    
+    # Format categories for the template
+    categories = []
+    category_dict = dict(CATEGORIES)
+    for cat_key, count in category_counts:
+        categories.append({
+            'slug': cat_key,
+            'name': category_dict.get(cat_key, cat_key.capitalize()),
+            'count': count
+        })
+    
+    # Get the display name for the category
+    category_display = category_dict.get(category, category.capitalize())
+    
+    return render_template(
+        'category.html',
+        posts=posts,
+        category=category,
+        category_display=category_display,
+        categories=categories
+    )
+
+@app.route('/post/<int:post_id>')
+def post(post_id):
+    """Display a single post"""
+    post = Post.query.get_or_404(post_id)
+    
+    # Get categories with post counts for sidebar
+    category_counts = db.session.query(
+        Post.category, 
+        func.count(Post.id).label('count')
+    ).group_by(Post.category).all()
+    
+    # Format categories for the template
+    categories = []
+    category_dict = dict(CATEGORIES)
+    for cat_key, count in category_counts:
+        categories.append({
+            'slug': cat_key,
+            'name': category_dict.get(cat_key, cat_key.capitalize()),
+            'count': count
+        })
+    
+    return render_template(
+        'post_detail.html',
+        post=post,
+        categories=categories
+    )
+
+@app.route('/author/<author>')
+def author_posts(author):
+    """Display posts by a specific author"""
+    posts = Post.query.filter_by(author=author).order_by(Post.created_at.desc()).all()
+    
+    # Get categories with post counts for sidebar
+    category_counts = db.session.query(
+        Post.category, 
+        func.count(Post.id).label('count')
+    ).group_by(Post.category).all()
+    
+    # Format categories for the template
+    categories = []
+    category_dict = dict(CATEGORIES)
+    for cat_key, count in category_counts:
+        categories.append({
+            'slug': cat_key,
+            'name': category_dict.get(cat_key, cat_key.capitalize()),
+            'count': count
+        })
+    
+    return render_template(
+        'author.html',
+        author=author,
+        posts=posts,
+        categories=categories
+    )
+
+@app.route('/videos')
+def videos():
+    """Display video content"""
+    all_videos = Video.query.order_by(Video.created_at.desc()).all()
+    
+    # Get categories with post counts for sidebar
+    category_counts = db.session.query(
+        Post.category, 
+        func.count(Post.id).label('count')
+    ).group_by(Post.category).all()
+    
+    # Format categories for the template
+    categories = []
+    category_dict = dict(CATEGORIES)
+    for cat_key, count in category_counts:
+        categories.append({
+            'slug': cat_key,
+            'name': category_dict.get(cat_key, cat_key.capitalize()),
+            'count': count
+        })
+    
+    return render_template(
+        'videos.html',
+        videos=all_videos,
+        categories=categories
     )
