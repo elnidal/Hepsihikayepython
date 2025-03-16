@@ -552,11 +552,19 @@ def serve_upload(filename):
 
 @app.route('/admin')
 @login_required
-@handle_db_error
 def admin_index():
-    posts = Post.query.order_by(Post.created_at.desc()).all()
-    videos = Video.query.order_by(Video.created_at.desc()).all()
-    return render_template('admin/index.html', posts=posts, videos=videos)
+    try:
+        posts = Post.query.order_by(Post.created_at.desc()).all()
+        videos = Video.query.order_by(Video.created_at.desc()).all()
+        return render_template('admin/index.html', posts=posts, videos=videos)
+    except SQLAlchemyError as e:
+        app.logger.error(f"Database error in admin_index: {str(e)}")
+        flash('Veritabanı hatası oluştu. Lütfen daha sonra tekrar deneyiniz.', 'danger')
+        return render_template('errors/500.html'), 500
+    except Exception as e:
+        app.logger.error(f"Error in admin_index: {str(e)}")
+        flash('Bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.', 'danger')
+        return render_template('errors/500.html'), 500
 
 @app.route('/admin/')
 @login_required
@@ -1200,3 +1208,62 @@ def admin_comments(status='pending'):
         approved_count=approved_count,
         total_count=total_count
     )
+
+@app.route('/post/<int:post_id>/rate/<action>', methods=['POST'])
+def rate_post(post_id, action):
+    """Handle post rating (like/dislike)"""
+    try:
+        # Get the post or return 404
+        post = Post.query.get_or_404(post_id)
+        
+        # Validate action
+        if action not in ['like', 'dislike']:
+            return jsonify({'success': False, 'message': 'Invalid action'}), 400
+        
+        # Get IP address for tracking votes
+        ip_address = request.remote_addr
+        
+        # Check if the user has already rated this post
+        existing_rating = Rating.query.filter_by(
+            post_id=post_id,
+            ip_address=ip_address
+        ).first()
+        
+        is_like = action == 'like'
+        
+        if existing_rating:
+            # If rating exists and is the same as the current action, remove it (toggle)
+            if existing_rating.is_like == is_like:
+                db.session.delete(existing_rating)
+                message = 'Oyunuz kaldırıldı.'
+            else:
+                # Update existing rating
+                existing_rating.is_like = is_like
+                message = 'Oyunuz güncellendi.'
+        else:
+            # Create new rating
+            rating = Rating(
+                post_id=post_id,
+                ip_address=ip_address,
+                is_like=is_like
+            )
+            db.session.add(rating)
+            message = 'Oyunuz kaydedildi.'
+        
+        # Commit changes
+        db.session.commit()
+        
+        # Update post rating counts
+        post.update_rating_counts()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': message,
+            'likes': post.likes,
+            'dislikes': post.dislikes
+        })
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error rating post {post_id}: {str(e)}")
+        return jsonify({'success': False, 'message': 'Bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.'}), 500
