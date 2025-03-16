@@ -1212,3 +1212,80 @@ def media_library():
         app.logger.error(f"Media library error: {str(e)}")
         flash('Medya kütüphanesini görüntülerken bir hata oluştu.', 'danger')
         return redirect(url_for('admin_index'))
+
+@app.route('/post/<int:post_id>/comment', methods=['POST'])
+def add_comment(post_id):
+    """Add a comment to a post"""
+    try:
+        # Get the post or return 404
+        post = Post.query.get_or_404(post_id)
+        
+        # Get form data
+        name = request.form.get('name')
+        email = request.form.get('email')
+        content = request.form.get('content')
+        
+        # Validate inputs
+        if not name or not email or not content:
+            flash('Lütfen tüm alanları doldurun.', 'danger')
+            return redirect(url_for('post', post_id=post_id))
+        
+        # Create and save the comment
+        comment = Comment(
+            post_id=post_id,
+            name=name,
+            email=email,
+            content=content,
+            ip_address=request.remote_addr,
+            is_approved=False  # Comments require approval by default
+        )
+        
+        db.session.add(comment)
+        db.session.commit()
+        
+        # Show success message
+        flash('Yorumunuz başarıyla gönderildi. Onaylandıktan sonra görüntülenecektir.', 'success')
+        
+        return redirect(url_for('post', post_id=post_id))
+    except Exception as e:
+        # Log the detailed error
+        app.logger.error(f"Error adding comment to post {post_id}: {str(e)}")
+        app.logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        db.session.rollback()
+        flash('Bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.', 'danger')
+        return redirect(url_for('post', post_id=post_id))
+
+@app.route('/admin/comment/<int:comment_id>/approve', methods=['POST'])
+@login_required
+def approve_comment(comment_id):
+    """Approve a comment"""
+    try:
+        comment = Comment.query.get_or_404(comment_id)
+        comment.is_approved = True
+        db.session.commit()
+        flash('Yorum başarıyla onaylandı.', 'success')
+    except Exception as e:
+        app.logger.error(f"Error approving comment {comment_id}: {str(e)}")
+        db.session.rollback()
+        flash('Yorum onaylanırken bir hata oluştu.', 'danger')
+    
+    return redirect(url_for('admin_comments'))
+
+@app.route('/admin/comment/<int:comment_id>/delete', methods=['POST'])
+@login_required
+def delete_comment(comment_id):
+    """Delete a comment"""
+    try:
+        comment = Comment.query.get_or_404(comment_id)
+        db.session.delete(comment)
+        db.session.commit()
+        flash('Yorum başarıyla silindi.', 'success')
+    except Exception as e:
+        app.logger.error(f"Error deleting comment {comment_id}: {str(e)}")
+        db.session.rollback()
+        flash('Yorum silinirken bir hata oluştu.', 'danger')
+    
+    return redirect(url_for('admin_comments'))
