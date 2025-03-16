@@ -188,6 +188,11 @@ login_manager.login_view = 'login'
 login_manager.login_message = 'Lütfen giriş yapın!'
 login_manager.login_message_category = 'warning'
 
+@login_manager.user_loader
+def load_user(user_id):
+    """Load a user from the database based on their ID"""
+    return User.query.get(int(user_id))
+
 # YouTube API configuration
 YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY', '')
 YOUTUBE_API_SERVICE_NAME = "youtube"
