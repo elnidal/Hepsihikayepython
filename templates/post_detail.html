@@ -2,7 +2,9 @@
 
 {% block head %}
 {{ super() }}
+{% if request %}
 <meta name="csrf-token" content="{{ csrf_token() }}">
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -47,7 +49,11 @@
                 <!-- Comment Form -->
                 <div class="comment-form mb-4">
                     <form action="{{ url_for('add_comment', post_id=post.id) }}" method="post">
+                        {% if request %}
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        {% else %}
+                        <input type="hidden" name="csrf_token" value="">
+                        {% endif %}
                         <div class="form-group">
                             <label for="name">İsim</label>
                             <input type="text" class="form-control" id="name" name="name" required>

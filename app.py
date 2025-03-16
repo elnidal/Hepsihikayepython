@@ -953,12 +953,19 @@ def post(post_id):
         # Get the post or return 404
         post = Post.query.get_or_404(post_id)
         
+        # Find related posts
+        related_posts = Post.query.filter(
+            Post.category == post.category,
+            Post.id != post.id
+        ).order_by(Post.created_at.desc()).limit(4).all()
+        
         # Track page view for analytics (optional)
         app.logger.info(f"Post {post_id} viewed: {post.title}")
         
         return render_template(
             'post_detail.html',
-            post=post
+            post=post,
+            related_posts=related_posts
         )
     except Exception as e:
         # Log the detailed error
