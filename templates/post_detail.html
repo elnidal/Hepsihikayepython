@@ -14,7 +14,7 @@
                 
                 {% if post.image_url %}
                 <div class="post-image mb-4">
-                    <img src="{{ url_for('serve_upload', filename=post.image_url) }}" class="img-fluid rounded" alt="{{ post.title }}">
+                    <img src="{{ post.get_image_url() }}" class="img-fluid rounded" alt="{{ post.title }}">
                 </div>
                 {% endif %}
                 

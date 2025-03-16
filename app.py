@@ -17,6 +17,22 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import googleapiclient.discovery
 import googleapiclient.errors
+from sqlalchemy import create_engine
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from functools import wraps
+import subprocess
+from urllib.parse import urlparse
+
+# Load environment variables from .env file in development mode
+if os.path.exists('.env') and not os.environ.get('FLASK_ENV') == 'production':
+    print("Loading environment variables from .env file")
+    with open('.env') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            key, value = line.split('=', 1)
+            os.environ[key] = value
 
 # Custom exception for validation errors
 class ValidationError(Exception):
@@ -24,8 +40,24 @@ class ValidationError(Exception):
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key')
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.abspath("blog.db")}'
+
+# Get database URL from environment variables with fallback to the new database
+database_url = os.environ.get('DATABASE_URL', "postgresql://hepsihikaye_wyg3_user:JWWumjYdrR15YATOT4KJvsRz4XxkRxzX@dpg-cvanpdlumphs73ag0b80-a.oregon-postgres.render.com/hepsihikaye_wyg3")
+
+# If the URL starts with 'postgres://', convert it to 'postgresql://' (needed for SQLAlchemy)
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+# Configure SQLAlchemy
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Add SSL configuration
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'connect_args': {
+        'sslmode': 'require'
+    }
+}
 
 # Configure upload folder based on environment
 is_production = os.environ.get('FLASK_ENV') == 'production'
@@ -107,25 +139,20 @@ app.config['CKEDITOR_CONFIG'] = {
 }
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
-if os.environ.get('FLASK_ENV') == 'production':
-    # In production, log to stdout for Render.com
-    handler = logging.StreamHandler()
-else:
-    # In development, log to a file
-    if not os.path.exists('logs'):
-        os.makedirs('logs')
-    handler = RotatingFileHandler('logs/hepsihikaye.log', maxBytes=10240, backupCount=10)
+if not app.debug:
+    # Prevent duplicate logging by removing existing handlers
+    app.logger.handlers = []
+    
+    # Set up file handler
+    file_handler = RotatingFileHandler('app.log', maxBytes=10240, backupCount=10)
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    ))
+    file_handler.setLevel(logging.INFO)
+    app.logger.addHandler(file_handler)
+    app.logger.setLevel(logging.INFO)
+    app.logger.info('HepsiHikaye startup')
 
-handler.setFormatter(logging.Formatter(
-    '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-))
-handler.setLevel(logging.INFO)
-app.logger.addHandler(handler)
-app.logger.setLevel(logging.INFO)
-app.logger.info('HepsiHikaye startup')
-
-# Log important configuration
 app.logger.info(f'Upload directory: {app.config["UPLOAD_FOLDER"]}')
 app.logger.info(f'Environment: {os.environ.get("FLASK_ENV", "Development")}')
 app.logger.info(f'Static folder: {app.static_folder}')
@@ -135,8 +162,9 @@ def after_request(response):
     if not os.environ.get('FLASK_ENV') == 'production':
         return response
         
-    # Log non-successful responses in production
-    if response.status_code != 200:
+    # Log only error responses (4xx and 5xx) in production
+    # Exclude normal status codes like 206 (Partial Content) and 304 (Not Modified)
+    if response.status_code >= 400:
         app.logger.warning(f'Request to {request.path} returned status code {response.status_code}')
     return response
 
@@ -220,6 +248,12 @@ class Post(db.Model):
         """Get the display name for the category"""
         category_dict = dict(CATEGORIES)
         return category_dict.get(self.category, self.category.capitalize())
+
+    def get_image_url(self):
+        """Get the full URL for the post image"""
+        if not self.image_url:
+            return None
+        return url_for('serve_upload', filename=self.image_url)
 
     def update_rating_counts(self):
         """Update the likes and dislikes count for this post"""
@@ -495,8 +529,90 @@ def serve_upload(filename):
         # Return a placeholder image instead of 404 for better user experience
         return send_from_directory(app.static_folder, 'img/default-story.jpg')
 
+def get_db_connection():
+    """Get database connection with retry logic and enhanced error handling"""
+    max_retries = 3
+    retry_delay = 1  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            # Test the connection
+            connection = db.engine.connect()
+            app.logger.info("Successfully connected to the database")
+            
+            # Test a simple query
+            result = connection.execute("SELECT 1")
+            result.close()
+            connection.close()
+            
+            return True
+            
+        except OperationalError as e:
+            error_msg = str(e)
+            app.logger.error(f"Database connection attempt {attempt + 1} failed:")
+            app.logger.error(f"Error type: {type(e).__name__}")
+            app.logger.error(f"Error message: {error_msg}")
+            
+            if "could not translate host name" in error_msg:
+                app.logger.error("Hostname resolution failed. Please verify the database host is correct and accessible.")
+            elif "connection refused" in error_msg:
+                app.logger.error("Connection refused. Please verify the database is running and accepting connections.")
+            elif "password authentication failed" in error_msg:
+                app.logger.error("Authentication failed. Please verify your database credentials.")
+            
+            if attempt == max_retries - 1:
+                app.logger.error(f"Failed to connect to database after {max_retries} attempts")
+                raise
+                
+            app.logger.warning(f"Retrying in {retry_delay} seconds...")
+            time.sleep(retry_delay)
+            retry_delay *= 2  # Exponential backoff
+            
+        except SQLAlchemyError as e:
+            app.logger.error(f"SQLAlchemy error: {str(e)}")
+            raise
+            
+        except Exception as e:
+            app.logger.error(f"Unexpected error: {str(e)}")
+            raise
+            
+    return False
+
+@app.before_request
+def check_db_connection():
+    """Check database connection before each request with enhanced error handling"""
+    if request.endpoint and 'static' in request.endpoint:
+        return  # Skip check for static files
+        
+    try:
+        get_db_connection()
+    except OperationalError as e:
+        app.logger.error(f"Database connection error: {str(e)}")
+        if not request.is_xhr:  # Regular request
+            flash('Veritabanı bağlantısı kurulamadı. Lütfen daha sonra tekrar deneyin.', 'error')
+            return render_template('errors/db_error.html'), 503
+        else:  # AJAX request
+            return jsonify({'error': 'Database connection error'}), 503
+    except Exception as e:
+        app.logger.error(f"Unexpected error checking database connection: {str(e)}")
+        return "An unexpected error occurred", 500
+
+def handle_db_error(func):
+    """Decorator to handle database errors"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except SQLAlchemyError as e:
+            app.logger.error(f"Database error in {func.__name__}: {str(e)}")
+            db.session.rollback()
+            flash('Veritabanı hatası oluştu. Lütfen daha sonra tekrar deneyin.', 'error')
+            return redirect(url_for('index'))
+    return wrapper
+
 @app.route('/admin')
 @login_required
+@handle_db_error
 def admin_index():
     posts = Post.query.order_by(Post.created_at.desc()).all()
     videos = Video.query.order_by(Video.created_at.desc()).all()
@@ -507,926 +623,137 @@ def admin_index():
 def admin_index_slash():
     return redirect(url_for('admin_index'))
 
-@app.route('/admin/create', methods=['GET', 'POST'])
-@login_required
-def create_post():
-    if request.method == 'POST':
-        title = request.form.get('title')
-        content = request.form.get('content')
-        category = request.form.get('category')
-        author = request.form.get('author')
-        
-        # Debug logging
-        app.logger.info(f"Form data - Title: {title}, Category: {category}, Author: {author}")
-        app.logger.info(f"Content: {content}")
-        
-        # Check if content is empty or just contains HTML tags with no actual content
-        content_without_tags = re.sub(r'<[^>]*>', '', content or '')
-        content_without_tags = content_without_tags.strip()
-        app.logger.info(f"Content without tags: '{content_without_tags}'")
-        
-        if not title:
-            flash('Lütfen başlık alanını doldurun!', 'danger')
-            return render_template('admin/create_post.html', categories=CATEGORIES, 
-                                 form_data={'title': title, 'content': content, 'category': category, 'author': author})
-        
-        # Special check for CKEditor empty content patterns
-        is_empty_content = (not content or 
-                           content == '<p>&nbsp;</p>' or 
-                           content == '<p>None</p>' or
-                           content == 'None' or
-                           not content_without_tags)
-        
-        if is_empty_content:
-            app.logger.info(f"Content validation failed: '{content}'")
-            flash('Lütfen içerik alanını doldurun!', 'danger')
-            return render_template('admin/create_post.html', categories=CATEGORIES, 
-                                 form_data={'title': title, 'content': '', 'category': category, 'author': author})
-        
-        app.logger.info(f"Content validation passed, creating post")
-        
-        new_post = Post(
-            title=title,
-            content=content,
-            category=category,
-            author=author
-        )
-        
-        # Handle image upload
-        image_uploaded = False
-        if 'image' in request.files and request.files['image'].filename:
-            file = request.files['image']
-            app.logger.info(f"Image upload detected: {file.filename}")
-            
-            if file and allowed_file(file.filename):
-                try:
-                    # Sanitize and create a unique filename
-                    filename = secure_filename(file.filename)
-                    timestamp = int(time.time())
-                    name, ext = os.path.splitext(filename)
-                    unique_filename = f"{name}_{timestamp}{ext}"
-                    
-                    # Use the configured upload folder directly
-                    upload_dir = app.config['UPLOAD_FOLDER']
-                    
-                    # Ensure directory exists
-                    os.makedirs(upload_dir, exist_ok=True)
-                    
-                    # Full path to save the file
-                    filepath = os.path.join(upload_dir, unique_filename)
-                    app.logger.info(f"Saving uploaded image to: {filepath}")
-                    
-                    # Save the file
-                    file.save(filepath)
-                    app.logger.info(f"File saved successfully")
-                    
-                    # Resize image
-                    try:
-                        resize_image(filepath)
-                        app.logger.info(f"Image resized successfully")
-                    except Exception as e:
-                        app.logger.warning(f"Image resize failed: {str(e)}")
-                    
-                    # Set image URL to just the filename, not the full path
-                    new_post.image_url = unique_filename
-                    app.logger.info(f"Post image_url set to: {unique_filename}")
-                    image_uploaded = True
-                except Exception as e:
-                    app.logger.error(f"Image upload error: {str(e)}")
-                    if 'filepath' in locals() and os.path.exists(filepath):
-                        os.remove(filepath)
-                    flash(f'Resim yüklenirken hata oluştu: {str(e)}', 'danger')
-                    return redirect(url_for('create_post'))
-            else:
-                app.logger.warning(f"Invalid file type for upload: {file.filename}")
-                flash('Geçersiz dosya türü. Lütfen bir resim dosyası seçin.', 'danger')
-                return redirect(url_for('create_post'))
-        
-        try:
-            db.session.add(new_post)
-            db.session.commit()
-            app.logger.info(f"Post created successfully with ID: {new_post.id}")
-            
-            success_message = 'Hikaye başarıyla oluşturuldu!'
-            if image_uploaded:
-                success_message += ' Resim başarıyla yüklendi.'
-            
-            flash(success_message, 'success')
-            return redirect(url_for('admin_index'))
-        except Exception as e:
-            db.session.rollback()
-            app.logger.error(f"Database error creating post: {str(e)}")
-            flash(f'Hikaye kaydedilirken bir hata oluştu: {str(e)}', 'danger')
-            return render_template('admin/create_post.html', categories=CATEGORIES, 
-                               form_data={'title': title, 'content': content, 'category': category, 'author': author})
-    
-    categories = CATEGORIES
-    return render_template('admin/create_post.html', categories=categories)
-
-@app.route('/admin/edit/<int:post_id>', methods=['GET', 'POST'])
-@login_required
-def edit_post(post_id):
-    post = Post.query.get_or_404(post_id)
-    
-    if request.method == 'POST':
-        title = request.form.get('title')
-        content = request.form.get('content')
-        category = request.form.get('category')
-        author = request.form.get('author')
-        
-        # Check if title is empty
-        if not title:
-            flash('Lütfen başlık alanını doldurun!', 'danger')
-            return redirect(url_for('edit_post', post_id=post_id))
-        
-        # Check if content is empty or just contains HTML tags with no actual content
-        content_without_tags = re.sub(r'<[^>]*>', '', content or '')
-        content_without_tags = content_without_tags.strip()
-        
-        is_empty_content = (not content or 
-                           content == '<p>&nbsp;</p>' or 
-                           content == '<p>None</p>' or
-                           content == 'None' or
-                           not content_without_tags)
-        
-        if is_empty_content:
-            flash('Lütfen içerik alanını doldurun!', 'danger')
-            return redirect(url_for('edit_post', post_id=post_id))
-        
-        # Update post
-        post.title = title
-        post.content = content
-        post.category = category
-        post.author = author
-        
-        # Handle image upload
-        image_uploaded = False
-        if 'image' in request.files and request.files['image'].filename:
-            file = request.files['image']
-            app.logger.info(f"Image upload detected for post {post_id}: {file.filename}")
-            
-            if file and allowed_file(file.filename):
-                try:
-                    # Delete old image if exists
-                    if post.image_url:
-                        app.logger.info(f"Existing image for post {post_id}: {post.image_url}")
-                        
-                        # Use the configured upload folder directly
-                        old_image_path = os.path.join(app.config['UPLOAD_FOLDER'], post.image_url)
-                            
-                        app.logger.info(f"Checking for old image at: {old_image_path}")
-                        
-                        # Delete if exists
-                        if os.path.exists(old_image_path):
-                            app.logger.info(f"Deleting old image at: {old_image_path}")
-                            os.remove(old_image_path)
-                            app.logger.info(f"Old image deleted successfully")
-                        else:
-                            app.logger.warning(f"Old image not found at: {old_image_path}")
-                    
-                    # Sanitize and create a unique filename
-                    filename = secure_filename(file.filename)
-                    timestamp = int(time.time())
-                    name, ext = os.path.splitext(filename)
-                    unique_filename = f"{name}_{timestamp}{ext}"
-                    
-                    # Use the configured upload folder directly
-                    upload_dir = app.config['UPLOAD_FOLDER']
-                    
-                    # Ensure directory exists
-                    os.makedirs(upload_dir, exist_ok=True)
-                    
-                    # Full path to save the file
-                    filepath = os.path.join(upload_dir, unique_filename)
-                    app.logger.info(f"Saving new image to: {filepath}")
-                    
-                    # Save the file
-                    file.save(filepath)
-                    app.logger.info(f"New image saved successfully")
-                    
-                    # Resize image
-                    try:
-                        resize_image(filepath)
-                        app.logger.info(f"New image resized successfully")
-                    except Exception as e:
-                        app.logger.warning(f"Image resize failed: {str(e)}")
-                    
-                    # Update image URL
-                    post.image_url = unique_filename
-                    app.logger.info(f"Post image_url updated to: {unique_filename}")
-                    image_uploaded = True
-                except Exception as e:
-                    app.logger.error(f"Image upload error: {str(e)}")
-                    if 'filepath' in locals() and os.path.exists(filepath):
-                        os.remove(filepath)
-                    flash(f'Resim yüklenirken hata oluştu: {str(e)}', 'danger')
-                    return redirect(url_for('edit_post', post_id=post_id))
-            else:
-                app.logger.warning(f"Invalid file type for upload: {file.filename}")
-                flash('Geçersiz dosya türü. Lütfen bir resim dosyası seçin.', 'danger')
-                return redirect(url_for('edit_post', post_id=post_id))
-        
-        try:
-            db.session.commit()
-            app.logger.info(f"Post {post_id} updated successfully")
-            
-            success_message = 'Hikaye başarıyla güncellendi!'
-            if image_uploaded:
-                success_message += ' Resim başarıyla yüklendi.'
-            
-            flash(success_message, 'success')
-            return redirect(url_for('admin_index'))
-        except Exception as e:
-            db.session.rollback()
-            app.logger.error(f"Database error updating post {post_id}: {str(e)}")
-            flash(f'Hikaye güncellenirken bir hata oluştu: {str(e)}', 'danger')
-            return redirect(url_for('edit_post', post_id=post_id))
-    
-    categories = CATEGORIES
-    return render_template('admin/edit_post.html', post=post, categories=categories)
-
-@app.route('/admin/delete/<int:post_id>', methods=['POST'])
-@login_required
-def delete_post(post_id):
+def backup_database():
+    """Create a backup of the PostgreSQL database"""
     try:
-        post = Post.query.get_or_404(post_id)
-        app.logger.info(f"Attempting to delete post {post_id}: {post.title}")
+        database_url = os.environ.get('DATABASE_URL')
+        if not database_url:
+            app.logger.error("DATABASE_URL not found in environment variables")
+            return False
+            
+        # Parse database URL
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
-        # Delete image if exists
-        if post.image_url:
-            try:
-                # Get the appropriate path based on environment
-                image_path = os.path.join(app.config['UPLOAD_FOLDER'], post.image_url)
-                app.logger.info(f"Checking for image at {image_path}")
-                
-                if os.path.exists(image_path):
-                    os.remove(image_path)
-                    app.logger.info(f"Deleted image at {image_path}")
-                else:
-                    app.logger.warning(f"Image not found at {image_path} during post deletion")
-            except Exception as e:
-                app.logger.error(f"Error deleting image: {str(e)}")
-                # Continue with post deletion even if image deletion fails
+        # Create backup directory if it doesn't exist
+        backup_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'backups')
+        os.makedirs(backup_dir, exist_ok=True)
         
-        # Delete associated comments
-        comments = Comment.query.filter_by(post_id=post_id).all()
-        for comment in comments:
-            db.session.delete(comment)
-            app.logger.info(f"Deleted comment {comment.id} associated with post {post_id}")
+        # Generate backup filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_file = os.path.join(backup_dir, f'hepsihikaye_backup_{timestamp}.sql')
         
-        # Delete associated ratings
-        ratings = Rating.query.filter_by(post_id=post_id).all()
-        for rating in ratings:
-            db.session.delete(rating)
-            app.logger.info(f"Deleted rating {rating.id} associated with post {post_id}")
+        # Extract connection details from DATABASE_URL
+        url = urlparse(database_url)
         
-        # Delete the post
-        db.session.delete(post)
-        db.session.commit()
+        # Set PostgreSQL environment variables
+        env = os.environ.copy()
+        env['PGHOST'] = url.hostname
+        env['PGPORT'] = str(url.port or 5432)
+        env['PGUSER'] = url.username
+        env['PGPASSWORD'] = url.password
+        env['PGDATABASE'] = url.path[1:]
         
-        app.logger.info(f"Post {post_id} successfully deleted")
-        flash('Hikaye başarıyla silindi!', 'success')
-        return redirect(url_for('admin_index'))
-    
+        # Run pg_dump
+        cmd = ['pg_dump', '--clean', '--if-exists', '--format=p', '--file=' + backup_file]
+        
+        subprocess.run(cmd, env=env, check=True)
+        
+        app.logger.info(f"Database backup created successfully: {backup_file}")
+        
+        # Clean up old backups (keep last 5)
+        backup_files = sorted([f for f in os.listdir(backup_dir) if f.startswith('hepsihikaye_backup_')])
+        if len(backup_files) > 5:
+            for old_file in backup_files[:-5]:
+                os.remove(os.path.join(backup_dir, old_file))
+                app.logger.info(f"Removed old backup: {old_file}")
+        
+        return True
+        
     except Exception as e:
-        db.session.rollback()
-        app.logger.error(f"Error deleting post {post_id}: {str(e)}", exc_info=True)
-        flash(f'Hikaye silinirken bir hata oluştu: {str(e)}', 'danger')
-        return redirect(url_for('admin_index'))
-
-@app.route('/admin/sync-youtube', methods=['GET', 'POST'])
-@login_required
-def sync_youtube():
-    """Admin page to sync YouTube videos"""
-    # Check if API key is set
-    api_key = Setting.get_value('youtube_api_key', YOUTUBE_API_KEY)
-    has_api_key = bool(api_key)
-    
-    if request.method == 'POST':
-        channel_id = request.form.get('channel_id')
-        max_results = int(request.form.get('max_results', 10))
-        
-        if not channel_id:
-            flash('Kanal ID veya kullanıcı adı gereklidir.', 'danger')
-            return redirect(url_for('sync_youtube'))
-        
-        if not has_api_key:
-            flash('YouTube API anahtarı ayarlanmamış. Lütfen önce ayarlar sayfasından API anahtarınızı ekleyin.', 'danger')
-            return redirect(url_for('admin_settings'))
-        
-        try:
-            videos_count = sync_youtube_videos(channel_id, max_results)
-            flash(f'{videos_count} video başarıyla senkronize edildi.', 'success')
-        except Exception as e:
-            app.logger.error(f"Error syncing videos: {e}")
-            flash(f'Video senkronizasyonu sırasında bir hata oluştu: {str(e)}', 'danger')
-        
-        return redirect(url_for('videos'))
-    
-    return render_template('admin/sync_youtube.html', has_api_key=has_api_key)
-
-@app.route('/admin/video/add', methods=['GET', 'POST'])
-@login_required
-def add_video():
-    """Add a video manually"""
-    form = VideoForm()
-    
-    if form.validate_on_submit():
-        # Extract video ID if full URL is provided
-        youtube_embed = form.youtube_embed.data
-        
-        # Check if it's a full YouTube URL and extract the video ID
-        if 'youtube.com/watch?v=' in youtube_embed:
-            youtube_embed = youtube_embed.split('v=')[1].split('&')[0]
-        elif 'youtu.be/' in youtube_embed:
-            youtube_embed = youtube_embed.split('/')[-1].split('?')[0]
-            
-        # Create new video
-        new_video = Video(
-            title=form.title.data,
-            youtube_embed=youtube_embed,
-            created_at=datetime.now(UTC)
-        )
-        
-        db.session.add(new_video)
-        db.session.commit()
-        
-        flash('Video başarıyla eklendi.', 'success')
-        return redirect(url_for('videos'))
-    
-    return render_template('admin/video_form.html', form=form, title='Video Ekle')
-
-@app.route('/admin/video/edit/<int:video_id>', methods=['GET', 'POST'])
-@login_required
-def edit_video(video_id):
-    """Edit a video"""
-    video = Video.query.get_or_404(video_id)
-    form = VideoForm(obj=video)
-    
-    if form.validate_on_submit():
-        # Extract video ID if full URL is provided
-        youtube_embed = form.youtube_embed.data
-        
-        # Check if it's a full YouTube URL and extract the video ID
-        if 'youtube.com/watch?v=' in youtube_embed:
-            youtube_embed = youtube_embed.split('v=')[1].split('&')[0]
-        elif 'youtu.be/' in youtube_embed:
-            youtube_embed = youtube_embed.split('/')[-1].split('?')[0]
-            
-        video.title = form.title.data
-        video.youtube_embed = youtube_embed
-        
-        db.session.commit()
-        
-        flash('Video başarıyla güncellendi.', 'success')
-        return redirect(url_for('videos'))
-    
-    return render_template('admin/video_form.html', form=form, title='Video Düzenle')
-
-@app.route('/admin/video/delete/<int:video_id>', methods=['POST'])
-@login_required
-def delete_video(video_id):
-    """Delete a video"""
-    video = Video.query.get_or_404(video_id)
-    
-    db.session.delete(video)
-    db.session.commit()
-    
-    flash('Video başarıyla silindi.', 'success')
-    return redirect(url_for('videos'))
-
-@login_manager.user_loader
-def load_user(user_id):
-    """Load user by ID for Flask-Login"""
-    return db.session.get(User, int(user_id))
-
-class LoginForm(FlaskForm):
-    username = StringField('Kullanıcı Adı', validators=[DataRequired()])
-    password = PasswordField('Şifre', validators=[DataRequired()])
-    submit = SubmitField('Giriş Yap')
-
-class VideoForm(FlaskForm):
-    title = StringField('Video Başlığı', validators=[DataRequired()])
-    youtube_embed = StringField('YouTube Video ID', validators=[DataRequired()])
-    submit = SubmitField('Kaydet')
-
-@app.route('/')
-def index():
-    """Home page"""
-    search_query = request.args.get('search', '')
-    
-    if search_query:
-        # Search in title and content
-        page = request.args.get('page', 1, type=int)
-        per_page = 10
-        
-        posts_query = Post.query.filter(
-            or_(
-                Post.title.ilike(f'%{search_query}%'),
-                Post.content.ilike(f'%{search_query}%')
-            )
-        ).order_by(Post.created_at.desc())
-        
-        posts_pagination = posts_query.paginate(page=page, per_page=per_page, error_out=False)
-        posts = posts_pagination.items
-        
-        return render_template('category.html', 
-                              posts=posts, 
-                              pagination=posts_pagination,
-                              category='search', 
-                              category_display=f'"{search_query}" için arama sonuçları')
-    else:
-        # Get trending posts based on likes
-        trending_posts = Post.query.order_by(Post.likes.desc()).limit(3).all()
-        
-        # Get recent posts
-        recent_posts = Post.query.order_by(Post.created_at.desc()).limit(4).all()
-        
-        # Get most liked posts
-        most_liked_posts = Post.query.order_by(Post.likes.desc()).limit(4).all()
-        
-        # Get category highlights
-        category_highlights = {}
-        for category, _ in CATEGORIES:
-            posts = Post.query.filter_by(category=category).order_by(Post.created_at.desc()).limit(3).all()
-            if posts:
-                category_highlights[category] = posts
-        
-        # Get videos
-        videos = Video.query.order_by(Video.created_at.desc()).limit(3).all()
-        
-        return render_template('index.html', 
-                              featured_posts=trending_posts, 
-                              recent_posts=recent_posts,
-                              most_liked_posts=most_liked_posts,
-                              category_highlights=category_highlights,
-                              videos=videos)
-
-@app.route('/category/<category>')
-def category(category):
-    """Category page"""
-    page = request.args.get('page', 1, type=int)
-    per_page = 10
-    
-    # Special handling for 'video' category
-    if category == 'video':
-        # Redirect to videos page
-        return redirect(url_for('videos'))
-    
-    posts_query = Post.query.filter_by(category=category).order_by(Post.created_at.desc())
-    posts_pagination = posts_query.paginate(page=page, per_page=per_page, error_out=False)
-    posts = posts_pagination.items
-    
-    # Get category display name
-    category_display = dict(CATEGORIES).get(category, category.capitalize())
-    
-    return render_template('category.html', 
-                          posts=posts, 
-                          pagination=posts_pagination,
-                          category=category, 
-                          category_display=category_display)
-
-@app.route('/post/<int:post_id>')
-def post(post_id):
-    post = Post.query.get_or_404(post_id)
-    trending_posts = Post.get_trending_posts(5)
-    approved_comments = Comment.query.filter_by(post_id=post_id, is_approved=True).order_by(Comment.created_at.desc()).all()
-    
-    # Debug logging
-    app.logger.info(f"Post ID: {post.id}, Title: {post.title}")
-    app.logger.info(f"Image URL: {post.image_url}")
-    app.logger.info(f"Image URL type: {type(post.image_url)}")
-    
-    return render_template('post.html', post=post, trending_posts=trending_posts, comments=approved_comments)
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if current_user.is_authenticated:
-        return redirect(url_for('admin_index'))
-
-    form = LoginForm()
-    if form.validate_on_submit():
-        username = form.username.data
-        password = form.password.data
-        print(f"Login attempt for user: {username}")
-        
-        user = User.query.filter_by(username=username).first()
-        if user:
-            print(f"User found in database")
-            if user.check_password(password):
-                print("Password verification successful")
-                login_user(user)
-                flash('Başarıyla giriş yaptınız!', 'success')
-                next_page = request.args.get('next')
-                if next_page and next_page.startswith('/'):
-                    return redirect(next_page)
-                return redirect(url_for('admin_index'))
-            else:
-                print("Password verification failed")
-                flash('Geçersiz şifre!', 'error')
-        else:
-            print(f"User {username} not found in database")
-            flash('Kullanıcı bulunamadı!', 'error')
-    
-    return render_template('login.html', form=form)
-
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    flash('Başarıyla çıkış yaptınız.', 'success')
-    return redirect(url_for('index'))
-
-@app.route('/videos')
-def videos():
-    """Display all videos from the database"""
-    all_videos = Video.query.order_by(Video.created_at.desc()).all()
-    
-    # Add debug logging to check authentication status
-    app.logger.info(f"Videos route: current_user.is_authenticated = {current_user.is_authenticated if hasattr(current_user, 'is_authenticated') else 'Not available'}")
-    
-    return render_template('videos.html', videos=all_videos)
-
-@app.route('/post/<int:post_id>/rate/<action>', methods=['POST'])
-@csrf.exempt  # Since we're handling CSRF in JavaScript
-def rate_post(post_id, action):
-    """Handle post rating (like/dislike)"""
-    try:
-        # Log the request for debugging
-        app.logger.info(f"Rating request received: post_id={post_id}, action={action}, IP={request.remote_addr}")
-        
-        # Validate action
-        if action not in ['like', 'dislike']:
-            return jsonify({'success': False, 'message': 'Geçersiz işlem'}), 400
-
-        # Get post
-        post = Post.query.get_or_404(post_id)
-        
-        # Simplified rating approach - just increment/decrement
-        if action == 'like':
-            post.likes += 1
-        else:
-            post.dislikes += 1
-        
-        db.session.commit()
-        
-        # Log the response for debugging
-        app.logger.info(f"Rating successful: post_id={post_id}, new likes={post.likes}, new dislikes={post.dislikes}")
-        
-        return jsonify({
-            'success': True,
-            'likes': post.likes,
-            'dislikes': post.dislikes,
-            'message': 'Oyunuz kaydedildi'
-        })
-
-    except Exception as e:
-        app.logger.error(f"Error rating post {post_id}: {str(e)}")
-        db.session.rollback()
-        return jsonify({
-            'success': False,
-            'message': f'Bir hata oluştu. Lütfen daha sonra tekrar deneyin.'
-        }), 500
-
-@app.route('/upload', methods=['POST'])
-@login_required
-def upload():
-    """Handle file uploads from CKEditor and other forms"""
-    try:
-        if 'upload' not in request.files:
-            app.logger.warning("No file part in request")
-            return jsonify({'error': 'No file part'})
-        
-        f = request.files['upload']
-        if f.filename == '':
-            app.logger.warning("No selected file")
-            return jsonify({'error': 'No selected file'})
-        
-        if f and allowed_file(f.filename):
-            filename = secure_filename(f.filename)
-            # Add timestamp to filename to make it unique
-            name, ext = os.path.splitext(filename)
-            filename = f"{name}_{int(time.time())}{ext}"
-            
-            # Use the configured upload folder directly
-            upload_dir = app.config['UPLOAD_FOLDER']
-            
-            # Ensure upload directory exists
-            os.makedirs(upload_dir, exist_ok=True)
-            
-            # Save the file
-            file_path = os.path.join(upload_dir, filename)
-            f.save(file_path)
-            
-            app.logger.info(f"File saved to {file_path}")
-            
-            # Generate URL for the file - ensure consistent URL path
-            url = url_for('serve_upload', filename=filename)
-            
-            app.logger.info(f"Generated URL: {url}")
-            
-            # Return in the format CKEditor expects
-            return jsonify({
-                'url': url,
-                "uploaded": 1,
-                "fileName": filename
-            })
-        else:
-            app.logger.warning(f"File type not allowed: {f.filename}")
-            return jsonify({'error': 'File type not allowed'})
-    except Exception as e:
-        app.logger.error(f"Error uploading file: {str(e)}")
-        return jsonify({'error': f'Upload error: {str(e)}'}), 500
+        app.logger.error(f"Backup failed: {str(e)}")
+        return False
 
 def init_db():
-    """Initialize the database with required tables and default admin user."""
+    """Initialize the database tables"""
     db.create_all()
     
     # Check if admin user exists
     admin_user = User.query.filter_by(username='admin').first()
     if not admin_user:
+        # Create admin user with default password - change this in production!
+        from werkzeug.security import generate_password_hash
         admin_user = User(username='admin', password=generate_password_hash('admin'))
         db.session.add(admin_user)
         db.session.commit()
         app.logger.info("Admin user created successfully")
+    else:
+        app.logger.info("Admin user already exists")
+
+def init_app():
+    """Initialize the application (call this after app creation)"""
+    with app.app_context():
+        try:
+            # Initialize database
+            init_db()
+            app.logger.info("Database initialized successfully")
+            
+            # Set up backup if in production
+            if app.config['IS_PRODUCTION']:
+                try:
+                    backup_database()
+                    app.logger.info("Initial backup completed successfully")
+                except Exception as e:
+                    app.logger.error(f"Initial backup failed: {str(e)}")
+        except Exception as e:
+            app.logger.error(f"Error initializing application: {str(e)}")
+            # Don't raise the error - log it and continue
+            # This prevents the application from failing to start
+
+# Call the initialization function immediately if this is the main module
+if __name__ == '__main__':
+    # Initialize the app
+    init_app()
     
-    # Check if settings table exists and YouTube API key is set
-    youtube_api_key = Setting.get_value('youtube_api_key')
-    if youtube_api_key is None:
-        # Try to get from environment variable
-        env_api_key = os.environ.get('YOUTUBE_API_KEY')
-        if env_api_key:
-            Setting.set_value('youtube_api_key', env_api_key)
-            app.logger.info("YouTube API key initialized from environment variable")
-        else:
-            app.logger.info("YouTube API key not found in environment variables")
-
-    # Update old makale posts to inceleme category
-    update_makale_posts()
-    
-    app.logger.info("Database initialized successfully")
-
-def update_makale_posts():
-    """Update posts with 'makale' category to 'inceleme'"""
-    try:
-        makale_posts = Post.query.filter_by(category='makale').all()
-        if makale_posts:
-            count = len(makale_posts)
-            for post in makale_posts:
-                post.category = 'inceleme'
-            db.session.commit()
-            app.logger.info(f"Updated {count} posts from 'makale' to 'inceleme' category")
-    except Exception as e:
-        app.logger.error(f"Error updating makale posts: {str(e)}")
-        db.session.rollback()
-
-@app.before_first_request
-def initialize_app():
-    """Initialize the app before first request"""
-    try:
-        init_db()
-        app.logger.info("Database initialized successfully")
-    except Exception as e:
-        app.logger.error(f"Error initializing database: {str(e)}")
-        raise
-
-@app.context_processor
-def inject_now():
-    """Inject current datetime into templates"""
-    return {'now': datetime.now(UTC)}
-
-@app.context_processor
-def inject_categories():
-    """Inject categories into all templates"""
-    # Create a list of category objects with name and slug properties
-    categories_list = []
-    for slug, name in CATEGORIES:
-        categories_list.append({'slug': slug, 'name': name})
-    return {'categories': categories_list}
-
-@app.route('/author/<author>')
-def author_posts(author):
-    """Author posts page"""
-    page = request.args.get('page', 1, type=int)
-    per_page = 10
-    
-    posts_query = Post.query.filter_by(author=author).order_by(Post.created_at.desc())
-    posts_pagination = posts_query.paginate(page=page, per_page=per_page, error_out=False)
-    posts = posts_pagination.items
-    
-    return render_template('category.html', 
-                          posts=posts, 
-                          pagination=posts_pagination,
-                          category='author', 
-                          category_display=f'{author} tarafından yazılan içerikler')
-
-@app.route('/category/makale')
-def makale_redirect():
-    """Redirect old makale category to new inceleme category"""
-    return redirect(url_for('category', category='inceleme'))
-
-@app.route('/admin/settings', methods=['GET', 'POST'])
-@login_required
-def admin_settings():
-    """Admin settings page"""
-    if request.method == 'POST':
-        youtube_api_key = request.form.get('youtube_api_key', '').strip()
-        
-        # Save the API key to the database
-        Setting.set_value('youtube_api_key', youtube_api_key)
-        
-        flash('Ayarlar başarıyla kaydedildi!', 'success')
-        return redirect(url_for('admin_settings'))
-    
-    # Get current settings
-    youtube_api_key = Setting.get_value('youtube_api_key', '')
-    
-    return render_template('admin/settings.html', youtube_api_key=youtube_api_key)
-
-@app.route('/post/<int:post_id>/comment', methods=['POST'])
-def add_comment(post_id):
-    """Handle comment submission for a post"""
-    try:
-        app.logger.info(f"Comment submission received for post {post_id}")
-        app.logger.info(f"Form data: {request.form}")
-        
-        post = Post.query.get_or_404(post_id)
-        
-        name = request.form.get('name')
-        email = request.form.get('email')
-        content = request.form.get('content')
-        
-        app.logger.info(f"Extracted data - Name: {name}, Email: {email}, Content length: {len(content) if content else 0}")
-        
-        if not name or not email or not content:
-            app.logger.warning(f"Missing required fields - Name: {bool(name)}, Email: {bool(email)}, Content: {bool(content)}")
-            flash('Lütfen tüm alanları doldurun.', 'danger')
-            return redirect(url_for('post', post_id=post_id))
-        
-        # Simple email validation
-        if '@' not in email or '.' not in email:
-            app.logger.warning(f"Invalid email format: {email}")
-            flash('Geçerli bir e-posta adresi girin.', 'danger')
-            return redirect(url_for('post', post_id=post_id))
-        
-        # Create new comment
-        comment = Comment(
-            post_id=post_id,
-            name=name,
-            email=email,
-            content=content,
-            ip_address=request.remote_addr
-        )
-        
-        db.session.add(comment)
-        db.session.commit()
-        
-        app.logger.info(f"Comment created successfully with ID: {comment.id}")
-        flash('Yorumunuz gönderildi ve onay bekliyor.', 'success')
-        return redirect(url_for('post', post_id=post_id))
-    except Exception as e:
-        db.session.rollback()
-        error_msg = str(e)
-        app.logger.error(f"Error adding comment to post {post_id}: {error_msg}")
-        flash(f'Yorum gönderilirken bir hata oluştu: {error_msg}', 'danger')
-        return redirect(url_for('post', post_id=post_id))
-
-@app.route('/admin/comments')
-@login_required
-def admin_comments():
-    page = request.args.get('page', 1, type=int)
-    status = request.args.get('status', 'pending')
-    
-    # Get counts for the badge indicators
-    pending_count = Comment.query.filter_by(is_approved=False).count()
-    approved_count = Comment.query.filter_by(is_approved=True).count()
-    total_count = Comment.query.count()
-    
-    if status == 'approved':
-        comments = Comment.query.filter_by(is_approved=True)
-    elif status == 'all':
-        comments = Comment.query
-    else:  # pending
-        comments = Comment.query.filter_by(is_approved=False)
-    
-    # Order by created_at descending and paginate
-    paginated_comments = comments.order_by(Comment.created_at.desc()).paginate(page=page, per_page=20)
-    
-    return render_template('admin/comments.html', 
-                          comments=paginated_comments, 
-                          status=status,
-                          pending_count=pending_count,
-                          approved_count=approved_count,
-                          total_count=total_count,
-                          pagination=paginated_comments)
-
-@app.route('/admin/comments/approve/<int:comment_id>', methods=['POST'])
-@login_required
-def approve_comment(comment_id):
-    try:
-        comment = Comment.query.get_or_404(comment_id)
-        comment.is_approved = True
-        db.session.commit()
-        
-        flash('Yorum başarıyla onaylandı.', 'success')
-        return redirect(url_for('admin_comments'))
-    except Exception as e:
-        db.session.rollback()
-        app.logger.error(f"Error approving comment {comment_id}: {str(e)}")
-        flash(f'Yorum onaylanırken bir hata oluştu: {str(e)}', 'error')
-        return redirect(url_for('admin_comments'))
-
-@app.route('/admin/comments/delete/<int:comment_id>', methods=['POST'])
-@login_required
-def delete_comment(comment_id):
-    """Delete a comment"""
-    try:
-        app.logger.info(f"Attempting to delete comment {comment_id}")
-        comment = Comment.query.get_or_404(comment_id)
-        
-        # Store the comment details for logging
-        comment_details = {
-            'id': comment.id,
-            'post_id': comment.post_id,
-            'author': comment.name,
-            'content': comment.content[:50]
-        }
-        
-        # Delete the comment
-        db.session.delete(comment)
-        db.session.commit()
-        
-        app.logger.info(f"Successfully deleted comment: {comment_details}")
-        
-        # Check if it's an AJAX request
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({
-                'success': True,
-                'message': 'Yorum başarıyla silindi.',
-                'comment_id': comment_id
-            })
-        
-        flash('Yorum başarıyla silindi.', 'success')
-        return redirect(url_for('admin_comments'))
-    except Exception as e:
-        db.session.rollback()
-        error_msg = str(e)
-        app.logger.error(f"Error deleting comment {comment_id}: {error_msg}")
-        
-        # Check if it's an AJAX request
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({
-                'success': False,
-                'message': f'Yorum silinirken bir hata oluştu: {error_msg}',
-                'comment_id': comment_id
-            }), 500
-        
-        flash(f'Yorum silinirken bir hata oluştu: {error_msg}', 'danger')
-        return redirect(url_for('admin_comments'))
+    # Then start the server
+    port = int(os.environ.get('PORT', 10001))
+    app.debug = True
+    app.run(host='0.0.0.0', port=port)
 
 @app.route('/test-image')
-def test_image():
-    """Test route for image display"""
+def test_image_page():
+    """Show a test page for debugging image display issues"""
     return render_template('test_image.html')
 
 @app.route('/image-diagnostics')
 @login_required
 def image_diagnostics():
-    """Diagnostic tool for image uploads and serving"""
-    # Get info about the upload directories
-    if os.environ.get('FLASK_ENV') == 'production':
-        upload_dir = app.config['UPLOAD_FOLDER']
-    else:
-        upload_dir = os.path.join(app.static_folder, 'uploads')
+    """Admin page for diagnosing image issues"""
+    # Get posts with images
+    posts_with_images = Post.query.filter(Post.image_url.isnot(None)).order_by(Post.created_at.desc()).limit(10).all()
     
-    # Check if directory exists
-    dir_exists = os.path.exists(upload_dir)
+    # Get the upload folder configuration
+    upload_info = {
+        'upload_folder': app.config['UPLOAD_FOLDER'],
+        'upload_url': app.config['UPLOAD_URL'],
+        'is_production': app.config['IS_PRODUCTION'],
+        'static_folder': app.static_folder
+    }
     
-    # List files in the directory
-    if dir_exists:
-        files = os.listdir(upload_dir)
-        files = [f for f in files if os.path.isfile(os.path.join(upload_dir, f)) and not f.startswith('.')]
-    else:
-        files = []
-    
-    # Get image_url from some recent posts
-    posts_with_images = Post.query.filter(Post.image_url.isnot(None)).order_by(Post.created_at.desc()).limit(5).all()
+    # Get a list of files in the upload folder
+    upload_files = []
+    try:
+        if os.path.exists(app.config['UPLOAD_FOLDER']):
+            upload_files = os.listdir(app.config['UPLOAD_FOLDER'])
+    except Exception as e:
+        app.logger.error(f"Error listing files in upload directory: {str(e)}")
     
     return render_template('admin/image_diagnostics.html', 
-                          upload_dir=upload_dir,
-                          dir_exists=dir_exists,
-                          file_count=len(files),
-                          files=files[:10],  # Show only first 10 files
-                          posts=posts_with_images,
-                          env=os.environ.get('FLASK_ENV', 'development'))
+                          posts=posts_with_images, 
+                          upload_info=upload_info,
+                          upload_files=upload_files)
 
-@app.errorhandler(404)
-def page_not_found(e):
-    """Handle 404 errors with a custom template"""
-    app.logger.warning(f"404 error: {request.path}")
-    return render_template('errors/404.html'), 404
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10001))
-    app.debug = True
-    app.run(host='0.0.0.0', port=port)
+@app.context_processor
+def inject_upload_url():
+    """Make upload URL available to all templates"""
+    return {'upload_url': app.config['UPLOAD_URL']}

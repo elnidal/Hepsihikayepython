@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Test</title>
+    <style>
+        .image-container {
+            margin-bottom: 30px;
+            border: 1px solid #ccc;
+            padding: 15px;
+        }
+        img {
+            max-width: 300px;
+            max-height: 300px;
+        }
+        h2 {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>Image Display Test</h1>
+
+    <div class="image-container">
+        <h2>Method 1: Direct URL to image</h2>
+        <p>URL: /uploads/sample.jpg</p>
+        <img src="/uploads/sample.jpg" alt="Test Image">
+    </div>
+
+    <div class="image-container">
+        <h2>Method 2: Using static folder</h2>
+        <p>URL: /static/uploads/sample.jpg</p>
+        <img src="/static/uploads/sample.jpg" alt="Test Image">
+    </div>
+
+    <div class="image-container">
+        <h2>Method 3: Direct path from server root</h2>
+        <p>URL: uploads/sample.jpg</p>
+        <img src="uploads/sample.jpg" alt="Test Image">
+    </div>
+
+    <div class="image-container">
+        <h2>Method 4: External image as control</h2>
+        <p>URL: https://via.placeholder.com/300</p>
+        <img src="https://via.placeholder.com/300" alt="Test Image">
+    </div>
+</body>
+</html>

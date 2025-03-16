@@ -9,7 +9,7 @@
         <div class="col-md-4 mb-4">
             <div class="story-card">
                 {% if post.image_url %}
-                <img src="{{ url_for('serve_upload', filename=post.image_url) }}" alt="{{ post.title }}" class="story-image">
+                <img src="{{ post.get_image_url() }}" alt="{{ post.title }}" class="story-image">
                 {% else %}
                 <img src="{{ url_for('static', filename='img/default-story.jpg') }}" alt="{{ post.title }}" class="story-image">
                 {% endif %}
