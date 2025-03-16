@@ -982,3 +982,57 @@ def logout():
     logout_user()
     flash('Başarıyla çıkış yapıldı.', 'success')
     return redirect(url_for('index'))
+
+@app.errorhandler(500)
+def internal_error(error):
+    """Handle internal server errors with detailed logging"""
+    app.logger.error(f"500 error: {request.path}")
+    
+    # Log the exception if it exists
+    if hasattr(error, 'original_exception'):
+        original = error.original_exception
+        app.logger.error(f"Original exception: {str(original)}")
+        app.logger.error(f"Type: {type(original).__name__}")
+        
+        import traceback
+        tb = traceback.format_exception(type(original), original, original.__traceback__)
+        app.logger.error(f"Traceback: {''.join(tb)}")
+    
+    return render_template('errors/500.html'), 500
+
+@app.errorhandler(Exception)
+def handle_unhandled_exception(error):
+    """Global exception handler for unhandled exceptions"""
+    app.logger.error(f"Unhandled exception: {str(error)}")
+    app.logger.error(f"Type: {type(error).__name__}")
+    
+    import traceback
+    tb = traceback.format_exception(type(error), error, error.__traceback__)
+    app.logger.error(f"Traceback: {''.join(tb)}")
+    
+    return render_template('errors/500.html'), 500
+
+@app.route('/check-health')
+def health_check():
+    """Simple health check endpoint for monitoring"""
+    try:
+        # Test database connection
+        if get_db_connection():
+            return jsonify({
+                'status': 'ok',
+                'db_connection': 'ok',
+                'timestamp': datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                'status': 'warning',
+                'db_connection': 'failed',
+                'timestamp': datetime.now().isoformat()
+            }), 500
+    except Exception as e:
+        app.logger.error(f"Health check failed: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500

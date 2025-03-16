@@ -1,22 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}Sayfa Bulunamadı{% endblock %}
+{% block title %}Sunucu Hatası{% endblock %}
 
 {% block content %}
 <div class="container mt-5 mb-5">
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card shadow-sm">
-                <div class="card-header bg-primary text-white">
-                    <h3 class="mb-0">Sayfa Bulunamadı</h3>
+                <div class="card-header bg-danger text-white">
+                    <h3 class="mb-0">Sunucu Hatası</h3>
                 </div>
                 <div class="card-body text-center py-5">
                     <div class="error-icon mb-4">
-                        <i class="fas fa-search fa-5x text-primary"></i>
+                        <i class="fas fa-exclamation-triangle fa-5x text-danger"></i>
                     </div>
-                    <h2 class="mb-4">404 - Aradığınız sayfa bulunamadı</h2>
-                    <p class="lead mb-4">Aramaya çalıştığınız sayfa taşınmış, kaldırılmış veya hiç var olmamış olabilir.</p>
-                    <p class="mb-5">Lütfen URL'nin doğru olduğunu kontrol edin veya ana sayfadan başlayın.</p>
+                    <h2 class="mb-4">Üzgünüz, bir sorun oluştu</h2>
+                    <p class="lead mb-4">Sunucu beklenmedik bir hata ile karşılaştı ve isteğinizi şu anda işleyemiyor.</p>
+                    <p class="mb-5">Bu sorunun çözümü için çalışıyoruz. Lütfen daha sonra tekrar deneyin.</p>
                     <div class="d-grid gap-2 col-md-8 mx-auto">
                         <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">
                             <i class="fas fa-home me-2"></i> Ana Sayfaya Dön

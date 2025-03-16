@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Veritabanı Hatası{% endblock %}
+
+{% block content %}
+<div class="container mt-5 mb-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h3 class="mb-0">Veritabanı Bağlantı Hatası</h3>
+                </div>
+                <div class="card-body text-center py-5">
+                    <div class="error-icon mb-4">
+                        <i class="fas fa-database fa-5x text-warning"></i>
+                    </div>
+                    <h2 class="mb-4">Veritabanına bağlanılamıyor</h2>
+                    <p class="lead mb-4">Şu anda veritabanı sunucusuna bağlantı kurulamıyor. Bu geçici bir durum olabilir.</p>
+                    <p class="mb-5">Sistem yöneticileri bu sorunu çözmek için çalışıyor. Lütfen daha sonra tekrar deneyin.</p>
+                    <div class="d-grid gap-2 col-md-8 mx-auto">
+                        <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-sync-alt me-2"></i> Tekrar Dene
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
