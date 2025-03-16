@@ -19,3 +19,4 @@ gunicorn==21.2.0
 bleach==6.1.0
 packaging==24.2  # Added for gunicorn dependency
 google-api-python-client==2.118.0
+psycopg2-binary==2.9.9  # Added for PostgreSQL database connections

@@ -11,6 +11,7 @@ git add templates/index.html
 git add templates/category.html
 git add templates/post.html
 git add templates/post_detail.html
+git add requirements.txt
 
 # Add new diagnostic files
 echo "Adding new diagnostic files..."
