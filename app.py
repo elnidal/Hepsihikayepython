@@ -1289,3 +1289,38 @@ def delete_comment(comment_id):
         flash('Yorum silinirken bir hata oluştu.', 'danger')
     
     return redirect(url_for('admin_comments'))
+
+@app.route('/admin/comments')
+@app.route('/admin/comments/<status>')
+@login_required
+@handle_db_error
+def admin_comments(status='pending'):
+    """Admin comments management page"""
+    page = request.args.get('page', 1, type=int)
+    per_page = 15
+    
+    # Get comments based on status
+    if status == 'approved':
+        comments = Comment.query.filter_by(is_approved=True)
+    elif status == 'pending':
+        comments = Comment.query.filter_by(is_approved=False)
+    else:  # status == 'all'
+        comments = Comment.query.order_by(Comment.created_at.desc())
+    
+    # Count for tabs
+    pending_count = Comment.query.filter_by(is_approved=False).count()
+    approved_count = Comment.query.filter_by(is_approved=True).count()
+    total_count = Comment.query.count()
+    
+    # Paginate comments
+    pagination = comments.order_by(Comment.created_at.desc()).paginate(page=page, per_page=per_page)
+    
+    return render_template(
+        'admin/comments.html',
+        comments=pagination.items,
+        pagination=pagination,
+        status=status,
+        pending_count=pending_count,
+        approved_count=approved_count,
+        total_count=total_count
+    )
