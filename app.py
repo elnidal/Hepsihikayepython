@@ -22,6 +22,7 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from functools import wraps
 import subprocess
 from urllib.parse import urlparse
+import sys
 
 # Load environment variables from .env file in development mode
 if os.path.exists('.env') and not os.environ.get('FLASK_ENV') == 'production':
@@ -150,7 +151,16 @@ if not app.debug:
     ))
     file_handler.setLevel(logging.INFO)
     app.logger.addHandler(file_handler)
-    app.logger.setLevel(logging.INFO)
+    
+    # Add a stream handler to output to stdout (for Render logs)
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    ))
+    stream_handler.setLevel(logging.DEBUG)  # Lower level for more details
+    app.logger.addHandler(stream_handler)
+    
+    app.logger.setLevel(logging.DEBUG)  # Set to DEBUG to get more information
     app.logger.info('HepsiHikaye startup')
 
 app.logger.info(f'Upload directory: {app.config["UPLOAD_FOLDER"]}')
@@ -695,18 +705,26 @@ def init_app():
     with app.app_context():
         try:
             # Initialize database
+            app.logger.info("Starting database initialization...")
             init_db()
             app.logger.info("Database initialized successfully")
             
             # Set up backup if in production
             if app.config['IS_PRODUCTION']:
                 try:
+                    app.logger.info("Attempting to create initial database backup...")
                     backup_database()
                     app.logger.info("Initial backup completed successfully")
                 except Exception as e:
                     app.logger.error(f"Initial backup failed: {str(e)}")
+                    app.logger.error(f"Error type: {type(e).__name__}")
+                    import traceback
+                    app.logger.error(f"Traceback: {traceback.format_exc()}")
         except Exception as e:
             app.logger.error(f"Error initializing application: {str(e)}")
+            app.logger.error(f"Error type: {type(e).__name__}")
+            import traceback
+            app.logger.error(f"Traceback: {traceback.format_exc()}")
             # Don't raise the error - log it and continue
             # This prevents the application from failing to start
 

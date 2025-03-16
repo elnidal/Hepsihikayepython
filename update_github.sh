@@ -20,10 +20,11 @@ git add add_sample_posts.py
 git add db_persistent_check.py
 git add test_image.html
 git add update_github.sh
+git add prod_debug.py
 
 # Commit the changes
 echo "Committing changes..."
-git commit -m "Fix posts disappearing issue and image display problems"
+git commit -m "Add production debugging tools and improved error logging"
 
 # Push to main branch
 echo "Pushing to GitHub..."
