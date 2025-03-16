@@ -1036,3 +1036,98 @@ def health_check():
             'message': str(e),
             'timestamp': datetime.now().isoformat()
         }), 500
+
+@app.route('/upload', methods=['POST'])
+@login_required
+def upload():
+    """Handle file uploads from CKEditor"""
+    f = request.files.get('upload')
+    if f and allowed_file(f.filename):
+        try:
+            # Validate the file
+            f.stream.seek(0)
+            validate_image(f.stream)
+            f.stream.seek(0)
+            
+            # Save the file
+            filename = secure_filename(f.filename)
+            timestamp = int(time.time())
+            filename = f"{timestamp}_{filename}"
+            
+            # Ensure upload directory exists
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            f.save(file_path)
+            
+            # Resize the image if needed
+            resize_image(file_path)
+            
+            # Get the URL path
+            if app.config['IS_PRODUCTION']:
+                url = f"{app.config['UPLOAD_URL']}/{filename}"
+            else:
+                url = url_for('static', filename=f"uploads/{filename}")
+            
+            return jsonify({
+                'uploaded': 1,
+                'fileName': filename,
+                'url': url
+            })
+        except ValidationError as e:
+            app.logger.error(f"Upload validation error: {str(e)}")
+            return jsonify({
+                'uploaded': 0,
+                'error': {
+                    'message': str(e)
+                }
+            })
+        except Exception as e:
+            app.logger.error(f"Upload error: {str(e)}")
+            return jsonify({
+                'uploaded': 0,
+                'error': {
+                    'message': 'An error occurred during upload.'
+                }
+            })
+    
+    return jsonify({
+        'uploaded': 0,
+        'error': {
+            'message': 'Invalid file type or file not provided.'
+        }
+    })
+
+@app.route('/media-library')
+@login_required
+def media_library():
+    """Browse media files for CKEditor"""
+    try:
+        # List files in upload directory
+        files = []
+        for filename in os.listdir(app.config['UPLOAD_FOLDER']):
+            if allowed_file(filename):
+                # Get file path and URL
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                if app.config['IS_PRODUCTION']:
+                    url = f"{app.config['UPLOAD_URL']}/{filename}"
+                else:
+                    url = url_for('static', filename=f"uploads/{filename}")
+                
+                # Get file info
+                stats = os.stat(file_path)
+                size_kb = stats.st_size / 1024
+                modified = datetime.fromtimestamp(stats.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+                
+                files.append({
+                    'name': filename,
+                    'url': url,
+                    'size': f"{size_kb:.1f} KB",
+                    'modified': modified
+                })
+        
+        return render_template('admin/media_library.html', files=files)
+    except Exception as e:
+        app.logger.error(f"Media library error: {str(e)}")
+        flash('Medya kütüphanesini görüntülerken bir hata oluştu.', 'danger')
+        return redirect(url_for('admin_index'))
