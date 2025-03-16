@@ -553,16 +553,34 @@ def serve_upload(filename):
 @app.route('/admin')
 @login_required
 def admin_index():
+    """Admin dashboard page"""
     try:
-        posts = Post.query.order_by(Post.created_at.desc()).all()
-        videos = Video.query.order_by(Video.created_at.desc()).all()
+        # Use a simpler query with error handling
+        posts = []
+        videos = []
+        
+        try:
+            # Get posts with basic error handling
+            posts = Post.query.order_by(Post.created_at.desc()).all()
+            app.logger.info(f"Retrieved {len(posts)} posts for admin panel")
+        except Exception as e:
+            app.logger.error(f"Error retrieving posts: {str(e)}")
+            flash('Yazılar yüklenirken bir hata oluştu.', 'warning')
+        
+        try:
+            # Get videos with basic error handling
+            videos = Video.query.order_by(Video.created_at.desc()).all()
+            app.logger.info(f"Retrieved {len(videos)} videos for admin panel")
+        except Exception as e:
+            app.logger.error(f"Error retrieving videos: {str(e)}")
+            flash('Videolar yüklenirken bir hata oluştu.', 'warning')
+        
+        # Render the template with whatever data we have
         return render_template('admin/index.html', posts=posts, videos=videos)
-    except SQLAlchemyError as e:
-        app.logger.error(f"Database error in admin_index: {str(e)}")
-        flash('Veritabanı hatası oluştu. Lütfen daha sonra tekrar deneyiniz.', 'danger')
-        return render_template('errors/500.html'), 500
     except Exception as e:
-        app.logger.error(f"Error in admin_index: {str(e)}")
+        app.logger.error(f"Unhandled error in admin_index: {str(e)}")
+        import traceback
+        app.logger.error(traceback.format_exc())
         flash('Bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.', 'danger')
         return render_template('errors/500.html'), 500
 
