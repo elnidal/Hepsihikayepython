@@ -220,6 +220,12 @@
 </div>
 
 <script>
+    // Init script with safety checks
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize any UI components safely
+        console.log('Dashboard loaded');
+    });
+
     // Delete post confirmation
     function deletePost(postId) {
         if (confirm('Bu yazıyı silmek istediğinize emin misiniz?')) {

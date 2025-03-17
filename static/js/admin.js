@@ -1,12 +1,13 @@
 // Admin Panel JavaScript
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Set up delete buttons
-    setupDeleteButtons();
+    // Set up delete buttons if they exist
+    if (document.querySelectorAll('.comment-delete-form').length > 0) {
+        setupDeleteButtons();
+    }
     
     // Log for debugging
     console.log('Admin JS loaded');
-    console.log('Delete forms found:', document.querySelectorAll('.comment-delete-form').length);
 });
 
 function setupDeleteButtons() {
@@ -141,9 +142,11 @@ function showMessage(message, type) {
     
     // Auto-dismiss after 3 seconds
     setTimeout(() => {
-        messageElement.classList.remove('show');
-        setTimeout(() => {
-            messageElement.remove();
-        }, 300);
+        if (messageElement) {
+            messageElement.classList.remove('show');
+            setTimeout(() => {
+                messageElement.remove();
+            }, 300);
+        }
     }, 3000);
 } 
