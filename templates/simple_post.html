@@ -1,0 +1,14 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>{{ post.title }}</title>
+    </head>
+    <body>
+        <h1>{{ post.title }}</h1>
+        <p>Category: {{ post.get_category_display() }}</p>
+        <p>Author: {{ post.author }}</p>
+        <div>{{ post.content|safe }}</div>
+    </body>
+    </html>
+    

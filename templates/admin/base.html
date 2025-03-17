@@ -1,127 +1,189 @@
-{% extends "base.html" %}
-
-{% block title %}HepsiHikaye Admin{% endblock %}
-
-{% block styles %}
-{{ super() }}
-<style>
-    /* Admin Sidebar Styles */
-    .admin-container {
-        display: flex;
-        min-height: calc(100vh - 56px);
-    }
-    
-    .admin-sidebar {
-        width: 250px;
-        background-color: #343a40;
-        color: #fff;
-        padding: 20px 0;
-    }
-    
-    .admin-content {
-        flex: 1;
-        padding: 20px;
-        background-color: #f8f9fa;
-    }
-    
-    .admin-sidebar h5 {
-        padding: 0 20px;
-        margin-bottom: 20px;
-        font-weight: bold;
-    }
-    
-    .admin-sidebar .nav-link {
-        color: rgba(255, 255, 255, 0.8);
-        padding: 10px 20px;
-        border-left: 3px solid transparent;
-    }
-    
-    .admin-sidebar .nav-link:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-        color: #fff;
-    }
-    
-    .admin-sidebar .nav-link.active {
-        color: #fff;
-        background-color: rgba(255, 255, 255, 0.1);
-        border-left: 3px solid #0d6efd;
-    }
-    
-    .admin-sidebar .nav-link i {
-        margin-right: 10px;
-        width: 20px;
-        text-align: center;
-    }
-    
-    /* Small screens */
-    @media (max-width: 768px) {
-        .admin-container {
-            flex-direction: column;
-        }
-        
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>{% block title %}Admin Panel{% endblock %} - HepsiHikaye</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
         .admin-sidebar {
-            width: 100%;
+            min-height: 100vh;
+            background-color: #1a2a42;
+            color: #fff;
+            padding-top: 20px;
         }
-    }
-</style>
-{% endblock %}
-
-{% block content %}
-<div class="admin-container">
-    <!-- Sidebar Navigation -->
-    <div class="admin-sidebar">
-        <h5>Admin Panel</h5>
-        <ul class="nav flex-column">
-            <li class="nav-item">
-                <a class="nav-link {{ 'active' if active_page == 'dashboard' }}" href="{{ url_for('admin_index_slash') }}">
-                    <i class="fas fa-tachometer-alt"></i> Dashboard
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {{ 'active' if active_page == 'new_post' }}" href="{{ url_for('admin_new_post') }}">
-                    <i class="fas fa-pen"></i> Yeni Hikaye
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {{ 'active' if active_page == 'new_video' }}" href="{{ url_for('admin_new_video') }}">
-                    <i class="fas fa-video"></i> Video Ekle
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {{ 'active' if active_page == 'youtube_sync' }}" href="{{ url_for('admin_youtube_sync') }}">
-                    <i class="fab fa-youtube"></i> YouTube Senkronizasyon
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {{ 'active' if active_page == 'comments' }}" href="{{ url_for('admin_comments') }}">
-                    <i class="fas fa-comments"></i> Yorumlar
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {{ 'active' if active_page == 'settings' }}" href="{{ url_for('admin_settings') }}">
-                    <i class="fas fa-cog"></i> Ayarlar
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('index') }}">
-                    <i class="fas fa-arrow-left"></i> Siteye Dön
-                </a>
-            </li>
-        </ul>
-    </div>
-    
-    <!-- Main Content Area -->
-    <div class="admin-content">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
         
-        {% block admin_content %}
-        {% endblock %}
+        .admin-sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 12px 20px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            transition: all 0.3s;
+        }
+        
+        .admin-sidebar .nav-link:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+        
+        .admin-sidebar .nav-link.active {
+            background-color: #0d6efd;
+            color: #fff;
+        }
+        
+        .admin-sidebar .nav-link i {
+            width: 24px;
+            text-align: center;
+            margin-right: 10px;
+        }
+        
+        .admin-content {
+            padding: 20px;
+            background-color: #f8f9fa;
+            min-height: 100vh;
+        }
+        
+        .stats-card {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+            margin-bottom: 20px;
+        }
+        
+        .stats-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .stats-icon {
+            font-size: 2rem;
+            margin-bottom: 15px;
+            color: #0d6efd;
+        }
+        
+        .content-table {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+        
+        .action-buttons .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+        }
+        
+        .navbar-brand {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #fff !important;
+        }
+        
+        .top-navbar {
+            background-color: #1a2a42;
+            padding: 1rem;
+        }
+        
+        .user-dropdown .dropdown-toggle::after {
+            display: none;
+        }
+        
+        .user-dropdown .dropdown-toggle {
+            color: #fff;
+        }
+        
+        .user-dropdown .dropdown-menu {
+            margin-top: 10px;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg top-navbar">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('admin_dashboard') }}">
+                <i class="fas fa-shield-alt me-2"></i>HepsiHikaye Admin
+            </a>
+            <div class="ms-auto">
+                <div class="dropdown user-dropdown">
+                    <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-user-circle me-2"></i>{{ current_user.username }}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="{{ url_for('index') }}"><i class="fas fa-home me-2"></i>Siteye Git</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-2"></i>Çıkış Yap</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-2 px-0 admin-sidebar">
+                <div class="px-3">
+                    <nav class="nav flex-column">
+                        <a class="nav-link {% if active_page == 'dashboard' %}active{% endif %}" href="{{ url_for('admin_dashboard') }}">
+                            <i class="fas fa-tachometer-alt"></i>Dashboard
+                        </a>
+                        <a class="nav-link {% if active_page == 'new_post' %}active{% endif %}" href="{{ url_for('admin_new_post') }}">
+                            <i class="fas fa-plus-circle"></i>Yeni Hikaye
+                        </a>
+                        <a class="nav-link {% if active_page == 'new_video' %}active{% endif %}" href="{{ url_for('admin_new_video') }}">
+                            <i class="fas fa-video"></i>Video Ekle
+                        </a>
+                        <a class="nav-link {% if active_page == 'youtube_sync' %}active{% endif %}" href="{{ url_for('sync_youtube') }}">
+                            <i class="fab fa-youtube"></i>YouTube Senkronizasyon
+                        </a>
+                        <a class="nav-link {% if active_page == 'comments' %}active{% endif %}" href="{{ url_for('admin_comments') }}">
+                            <i class="fas fa-comments"></i>Yorumlar
+                        </a>
+                        <a class="nav-link {% if active_page == 'media' %}active{% endif %}" href="{{ url_for('media_library') }}">
+                            <i class="fas fa-images"></i>Medya
+                        </a>
+                        <a class="nav-link {% if active_page == 'settings' %}active{% endif %}" href="{{ url_for('admin_settings') }}">
+                            <i class="fas fa-cog"></i>Ayarlar
+                        </a>
+                    </nav>
+                </div>
+            </div>
+            
+            <div class="col-md-10 admin-content">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                {% block content %}{% endblock %}
+            </div>
+        </div>
     </div>
-</div>
-{% endblock %} 
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize tooltips
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl)
+            });
+            
+            // Add any additional initialization code here
+            console.log('Admin panel initialized');
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html> 

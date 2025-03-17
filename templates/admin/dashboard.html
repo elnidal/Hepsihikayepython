@@ -1,279 +1,197 @@
 {% extends "admin/base.html" %}
 
-{% block head %}
-{{ super() }}
-<style>
-    .admin-sidebar {
-        background-color: #1d2939;
-        min-height: calc(100vh - 56px);
-        color: #fff;
-        padding-top: 20px;
-    }
-    
-    .admin-sidebar .nav-link {
-        color: rgba(255, 255, 255, 0.75);
-        padding: 12px 20px;
-        border-radius: 0;
-        transition: all 0.3s;
-    }
-    
-    .admin-sidebar .nav-link:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-        color: #fff;
-    }
-    
-    .admin-sidebar .nav-link.active {
-        background-color: #0d6efd;
-        color: #fff;
-    }
-    
-    .admin-sidebar .nav-link i {
-        width: 24px;
-        text-align: center;
-        margin-right: 10px;
-    }
-    
-    .stats-card {
-        background-color: #fff;
-        border-radius: 8px;
-        padding: 20px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        transition: transform 0.2s;
-        margin-bottom: 20px;
-    }
-    
-    .stats-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-    }
-    
-    .stats-icon {
-        font-size: 2rem;
-        margin-bottom: 15px;
-        color: #0d6efd;
-    }
-    
-    .stats-count {
-        font-size: 2rem;
-        font-weight: bold;
-    }
-    
-    .section-title {
-        margin-bottom: 20px;
-        padding-bottom: 10px;
-        border-bottom: 1px solid #dee2e6;
-    }
-    
-    .content-table {
-        background-color: #fff;
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        overflow: hidden;
-    }
-    
-    .action-buttons .btn {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.875rem;
-    }
-</style>
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-icon">
+                    <i class="fas fa-book"></i>
+                </div>
+                <h3>{{ post_count }}</h3>
+                <p class="text-muted mb-0">Toplam Hikaye</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-icon">
+                    <i class="fas fa-video"></i>
+                </div>
+                <h3>{{ video_count }}</h3>
+                <p class="text-muted mb-0">Toplam Video</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-icon">
+                    <i class="fas fa-comments"></i>
+                </div>
+                <h3>{{ comment_count }}</h3>
+                <p class="text-muted mb-0">Toplam Yorum</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-icon">
+                    <i class="fas fa-eye"></i>
+                </div>
+                <h3>{{ total_views }}</h3>
+                <p class="text-muted mb-0">Toplam Görüntülenme</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Stories -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="content-table">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Son Eklenen Hikayeler</h5>
+                        <a href="{{ url_for('admin_new_post') }}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus"></i> Yeni Hikaye
+                        </a>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Başlık</th>
+                                        <th>Kategori</th>
+                                        <th>Tarih</th>
+                                        <th>Görüntülenme</th>
+                                        <th>İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for post in posts %}
+                                    <tr>
+                                        <td>{{ post.title }}</td>
+                                        <td>{{ post.category }}</td>
+                                        <td>{{ post.created_at.strftime('%d.%m.%Y') }}</td>
+                                        <td>{{ post.views }}</td>
+                                        <td class="action-buttons">
+                                            <a href="{{ url_for('edit_post', post_id=post.id) }}" class="btn btn-sm btn-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <button class="btn btn-sm btn-danger" onclick="deletePost('{{ post.id }}')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Videos -->
+    <div class="row">
+        <div class="col-12">
+            <div class="content-table">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Son Eklenen Videolar</h5>
+                        <a href="{{ url_for('admin_new_video') }}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus"></i> Yeni Video
+                        </a>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Başlık</th>
+                                        <th>Platform</th>
+                                        <th>Tarih</th>
+                                        <th>Görüntülenme</th>
+                                        <th>İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for video in videos %}
+                                    <tr>
+                                        <td>{{ video.title }}</td>
+                                        <td>{{ video.platform }}</td>
+                                        <td>{{ video.created_at.strftime('%d.%m.%Y') }}</td>
+                                        <td>{{ video.views }}</td>
+                                        <td class="action-buttons">
+                                            <a href="{{ url_for('edit_video', video_id=video.id) }}" class="btn btn-sm btn-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <button class="btn btn-sm btn-danger" onclick="deleteVideo('{{ video.id }}')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
-{% block admin_content %}
-<h1 class="mb-4">Dashboard</h1>
-
-<!-- Statistics Cards -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="stats-card text-center">
-            <div class="stats-icon">
-                <i class="fas fa-pen"></i>
-            </div>
-            <div class="stats-count">{{ posts|length }}</div>
-            <div class="stats-label">Hikayeler</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stats-card text-center">
-            <div class="stats-icon">
-                <i class="fas fa-video"></i>
-            </div>
-            <div class="stats-count">{{ videos|length }}</div>
-            <div class="stats-label">Videolar</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stats-card text-center">
-            <div class="stats-icon">
-                <i class="fas fa-comments"></i>
-            </div>
-            <div class="stats-count">0</div>
-            <div class="stats-label">Yorumlar</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stats-card text-center">
-            <div class="stats-icon">
-                <i class="fas fa-eye"></i>
-            </div>
-            <div class="stats-count">0</div>
-            <div class="stats-label">Görüntülenme</div>
-        </div>
-    </div>
-</div>
-
-<!-- Stories Section -->
-<div class="mb-5">
-    <div class="d-flex justify-content-between align-items-center section-title">
-        <h2>Hikayeler</h2>
-        <a href="{{ url_for('admin_new_post') }}" class="btn btn-primary">
-            <i class="fas fa-plus-circle"></i> Yeni Hikaye Ekle
-        </a>
-    </div>
-    
-    {% if posts and posts|length > 0 %}
-    <div class="content-table table-responsive">
-        <table class="table table-hover mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>Başlık</th>
-                    <th>Kategori</th>
-                    <th>Tarih</th>
-                    <th>İşlemler</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for post in posts %}
-                <tr>
-                    <td>{{ post.title }}</td>
-                    <td><span class="badge bg-secondary">{{ post.category }}</span></td>
-                    <td>{{ post.created_at.strftime('%d.%m.%Y') }}</td>
-                    <td class="action-buttons">
-                        <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-sm btn-info" target="_blank">
-                            <i class="fas fa-eye"></i>
-                        </a>
-                        <a href="{{ url_for('admin_edit_post', post_id=post.id) }}" class="btn btn-sm btn-warning">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                        <button class="btn btn-sm btn-danger" onclick="deletePost({{ post.id }})">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <div class="alert alert-info">
-        <i class="fas fa-info-circle"></i> Henüz hikaye eklenmemiş. İlk hikayeyi eklemek için "Yeni Hikaye Ekle" butonuna tıklayın.
-    </div>
-    {% endif %}
-</div>
-
-<!-- Videos Section -->
-<div class="mb-5">
-    <div class="d-flex justify-content-between align-items-center section-title">
-        <h2>Videolar</h2>
-        <a href="{{ url_for('admin_new_video') }}" class="btn btn-primary">
-            <i class="fas fa-plus-circle"></i> Yeni Video Ekle
-        </a>
-    </div>
-    
-    {% if videos and videos|length > 0 %}
-    <div class="content-table table-responsive">
-        <table class="table table-hover mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>Başlık</th>
-                    <th>YouTube ID</th>
-                    <th>Tarih</th>
-                    <th>İşlemler</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for video in videos %}
-                <tr>
-                    <td>{{ video.title }}</td>
-                    <td>{{ video.youtube_id }}</td>
-                    <td>{{ video.created_at.strftime('%d.%m.%Y') }}</td>
-                    <td class="action-buttons">
-                        <a href="{{ url_for('video_detail', video_id=video.id) }}" class="btn btn-sm btn-info" target="_blank">
-                            <i class="fas fa-eye"></i>
-                        </a>
-                        <a href="{{ url_for('admin_edit_video', video_id=video.id) }}" class="btn btn-sm btn-warning">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                        <button class="btn btn-sm btn-danger" onclick="deleteVideo({{ video.id }})">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <div class="alert alert-info">
-        <i class="fas fa-info-circle"></i> Henüz video eklenmemiş. İlk videoyu eklemek için "Yeni Video Ekle" butonuna tıklayın.
-    </div>
-    {% endif %}
-</div>
-
+{% block scripts %}
 <script>
-    // Init script with safety checks
-    document.addEventListener('DOMContentLoaded', function() {
-        // Initialize any UI components safely
-        console.log('Dashboard loaded');
-    });
+function deletePost(postId) {
+    if (confirm('Bu hikayeyi silmek istediğinizden emin misiniz?')) {
+        fetch(`/admin/post/${postId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Hikaye silinirken bir hata oluştu: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Bir hata oluştu. Lütfen tekrar deneyin.');
+        });
+    }
+}
 
-    // Delete post confirmation
-    function deletePost(postId) {
-        if (confirm('Bu yazıyı silmek istediğinize emin misiniz?')) {
-            fetch(`/admin/post/${postId}/delete`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token() }}'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Yazı başarıyla silindi.');
-                    location.reload();
-                } else {
-                    alert('Yazı silinirken bir hata oluştu: ' + data.message);
-                }
-            })
-            .catch(error => {
-                alert('Bir hata oluştu: ' + error);
-            });
-        }
+function deleteVideo(videoId) {
+    if (confirm('Bu videoyu silmek istediğinizden emin misiniz?')) {
+        fetch(`/admin/video/${videoId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Video silinirken bir hata oluştu: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Bir hata oluştu. Lütfen tekrar deneyin.');
+        });
     }
-    
-    // Delete video confirmation
-    function deleteVideo(videoId) {
-        if (confirm('Bu videoyu silmek istediğinize emin misiniz?')) {
-            fetch(`/admin/video/${videoId}/delete`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token() }}'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Video başarıyla silindi.');
-                    location.reload();
-                } else {
-                    alert('Video silinirken bir hata oluştu: ' + data.message);
-                }
-            })
-            .catch(error => {
-                alert('Bir hata oluştu: ' + error);
-            });
-        }
-    }
+}
 </script>
 {% endblock %} 

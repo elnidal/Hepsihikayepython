@@ -42,17 +42,6 @@ if os.path.exists('.env') and not os.environ.get('FLASK_ENV') == 'production':
 class ValidationError(Exception):
     pass
 
-
-# Login required decorator
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated:
-            app.logger.warning(f"Unauthenticated user attempted to access {request.path}")
-            flash('Lütfen giriş yapın.', 'warning')
-            return redirect(url_for('login', next=request.url))
-        return f(*args, **kwargs)
-    return decorated_function
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key')
 
@@ -570,55 +559,51 @@ def sync_youtube_videos(channel_identifier, max_results=10):
 def serve_upload(filename):
     """Serve uploaded files from the static/uploads directory"""
     try:
-        # Check if file exists in static/uploads
-        upload_path = os.path.join(app.static_folder, 'uploads', filename)
-        if os.path.isfile(upload_path):
-            return redirect(url_for('static', filename=f'uploads/{filename}'))
-        else:
-            app.logger.warning(f"File not found: {upload_path}")
-            # Return default image
-            return redirect(url_for('static', filename='uploads/default_post_image.png'))
+        # In production, serve from static/uploads
+        return redirect(url_for('static', filename=f'uploads/{filename}'))
     except Exception as e:
         app.logger.error(f"Error serving file {filename}: {str(e)}")
-        # Return a default image if there's any error
+        # Return a default image if the file doesn't exist
         return redirect(url_for('static', filename='uploads/default_post_image.png'))
 
 @app.route('/admin')
 @login_required
 def admin_index():
-    return redirect(url_for('admin_dashboard'))
+    """Admin dashboard page"""
+    try:
+        # Use a simpler query with error handling
+        posts = []
+        videos = []
+        
+        try:
+            # Get posts with basic error handling
+            posts = Post.query.order_by(Post.created_at.desc()).all()
+            app.logger.info(f"Retrieved {len(posts)} posts for admin panel")
+        except Exception as e:
+            app.logger.error(f"Error retrieving posts: {str(e)}")
+            flash('Yazılar yüklenirken bir hata oluştu.', 'warning')
+        
+        try:
+            # Get videos with basic error handling
+            videos = Video.query.order_by(Video.created_at.desc()).all()
+            app.logger.info(f"Retrieved {len(videos)} videos for admin panel")
+        except Exception as e:
+            app.logger.error(f"Error retrieving videos: {str(e)}")
+            flash('Videolar yüklenirken bir hata oluştu.', 'warning')
+        
+        # Render the new dashboard template with active page set
+        return render_template('admin/dashboard.html', posts=posts, videos=videos, active_page='dashboard')
+    except Exception as e:
+        app.logger.error(f"Unhandled error in admin_index: {str(e)}")
+        import traceback
+        app.logger.error(traceback.format_exc())
+        flash('Bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.', 'danger')
+        return render_template('errors/500.html'), 500
 
 @app.route('/admin/')
 @login_required
-def admin_dashboard():
-    try:
-        # Get posts with error handling
-        posts = Post.query.order_by(Post.created_at.desc()).limit(10).all()
-        post_count = Post.query.count()
-        
-        # Get videos with error handling
-        videos = Video.query.order_by(Video.created_at.desc()).limit(10).all()
-        video_count = Video.query.count()
-        
-        # Get comment count
-        comment_count = Comment.query.count()
-        
-        # Calculate total views
-        total_views = db.session.query(func.sum(Post.views).label('post_views')).first()[0] or 0
-        total_views += db.session.query(func.sum(Video.views).label('video_views')).first()[0] or 0
-        
-        return render_template('admin/dashboard.html',
-                             posts=posts,
-                             videos=videos,
-                             post_count=post_count,
-                             video_count=video_count,
-                             comment_count=comment_count,
-                             total_views=total_views,
-                             active_page='dashboard')
-    except Exception as e:
-        app.logger.error(f"Error in admin dashboard: {str(e)}")
-        flash('Veriler yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.', 'danger')
-        return render_template('admin/dashboard.html', active_page='dashboard')
+def admin_index_slash():
+    return redirect(url_for('admin_index'))
 
 def backup_database():
     """Create a backup of the PostgreSQL database"""
@@ -955,28 +940,47 @@ def videos():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    """Login page"""
     if current_user.is_authenticated:
-        return redirect(url_for('admin_dashboard'))
+        return redirect(url_for('admin_index'))
         
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data).first()
+        user = User.get_by_username(form.username.data)
         if user and user.check_password(form.password.data):
             login_user(user)
             next_page = request.args.get('next')
             if next_page and next_page.startswith('/'):
                 return redirect(next_page)
-            return redirect(url_for('admin_dashboard'))
-        flash('Hatalı kullanıcı adı veya şifre!', 'danger')
+            return redirect(url_for('admin_index'))
+        else:
+            flash('Hatalı kullanıcı adı veya şifre!', 'danger')
     
-    return render_template('login.html', form=form)
+    # Get categories with post counts for sidebar
+    category_counts = db.session.query(
+        Post.category, 
+        func.count(Post.id).label('count')
+    ).group_by(Post.category).all()
+    
+    # Format categories for the template
+    categories = []
+    category_dict = dict(CATEGORIES)
+    for cat_key, count in category_counts:
+        categories.append({
+            'slug': cat_key,
+            'name': category_dict.get(cat_key, cat_key.capitalize()),
+            'count': count
+        })
+    
+    return render_template('login.html', form=form, categories=categories)
 
 @app.route('/logout')
 @login_required
 def logout():
+    """Logout route"""
     logout_user()
     flash('Başarıyla çıkış yapıldı.', 'success')
-    return redirect(url_for('login'))
+    return redirect(url_for('index'))
 
 @app.errorhandler(500)
 def internal_error(error):
@@ -1125,7 +1129,7 @@ def media_library():
     except Exception as e:
         app.logger.error(f"Media library error: {str(e)}")
         flash('Medya kütüphanesini görüntülerken bir hata oluştu.', 'danger')
-        return redirect(url_for('admin_dashboard'))
+        return redirect(url_for('admin_index'))
 
 @app.route('/post/<int:post_id>/comment', methods=['POST'])
 def add_comment(post_id):
@@ -1175,20 +1179,39 @@ def add_comment(post_id):
 @app.route('/admin/comments')
 @login_required
 def admin_comments():
-    """Manage comments"""
+    """Admin comments management page"""
     try:
-        # Get comments with basic error handling
-        comments = []
+        # Get filter parameters
+        status = request.args.get('status', 'all')
+        post_id = request.args.get('post_id')
+        search = request.args.get('search', '')
         
-        try:
-            # Get all comments
-            comments = Comment.query.order_by(Comment.created_at.desc()).all()
-            app.logger.info(f"Retrieved {len(comments)} comments for admin panel")
-        except Exception as e:
-            app.logger.error(f"Error retrieving comments: {str(e)}")
-            flash('Yorumlar yüklenirken bir hata oluştu.', 'warning')
+        # Build query
+        query = Comment.query
         
-        return render_template('admin/comments.html', comments=comments, active_page='comments')
+        # Apply filters
+        if status != 'all':
+            query = query.filter(Comment.status == status)
+        
+        if post_id and post_id.isdigit():
+            query = query.filter(Comment.post_id == int(post_id))
+        
+        if search:
+            query = query.filter(Comment.content.ilike(f'%{search}%'))
+        
+        # Order by newest first
+        query = query.order_by(Comment.created_at.desc())
+        
+        # Get comments with post relationship eagerly loaded
+        comments = query.options(joinedload(Comment.post)).all()
+        
+        # Get all posts for filter dropdown
+        posts = Post.query.order_by(Post.title).all()
+        
+        return render_template('admin/comments.html', 
+                               comments=comments, 
+                               posts=posts,
+                               active_page='comments')
     except Exception as e:
         app.logger.error(f"Unhandled error in admin_comments: {str(e)}")
         import traceback
@@ -1202,15 +1225,19 @@ def admin_approve_comment(comment_id):
     """Approve a comment"""
     try:
         comment = Comment.query.get_or_404(comment_id)
-        comment.is_approved = True
-        db.session.commit()
-        app.logger.info(f"Approved comment ID {comment_id}")
-        flash('Yorum onaylandı.', 'success')
-        return redirect(url_for('admin_comments'))
+        comment.status = 'approved'
+        
+        try:
+            db.session.commit()
+            app.logger.info(f"Comment {comment_id} approved by admin")
+            return jsonify({'success': True})
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error approving comment {comment_id}: {str(e)}")
+            return jsonify({'success': False, 'message': str(e)})
     except Exception as e:
-        app.logger.error(f"Error approving comment: {str(e)}")
-        flash('Yorum onaylanırken bir hata oluştu.', 'danger')
-        return redirect(url_for('admin_dashboard'))
+        app.logger.error(f"Unhandled error in admin_approve_comment: {str(e)}")
+        return jsonify({'success': False, 'message': 'Bir hata oluştu.'}), 500
 
 @app.route('/admin/comment/<int:comment_id>/spam', methods=['POST'])
 @login_required
@@ -1315,140 +1342,150 @@ def rate_post(post_id, action):
 @login_required
 def admin_new_post():
     """Create a new post"""
-    app.logger.info("Entering admin_new_post route")
-    form = PostForm()
-    
-    if form.validate_on_submit():
-        try:
+    try:
+        form = PostForm()
+        if form.validate_on_submit():
+            # Get form data
             title = form.title.data
             content = form.content.data
             category = form.category.data
-            author = form.author.data or current_user.username
             
-            # Handle image upload
+            # Process image if present
             image_url = None
             if form.image.data:
                 try:
-                    image = form.image.data
-                    if image and allowed_file(image.filename):
-                        # Secure the filename
-                        filename = secure_filename(image.filename)
-                        
-                        # Add a timestamp to avoid filename collisions
-                        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-                        filename = f"{timestamp}_{filename}"
-                        
-                        # Save the file
-                        image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                        image.save(image_path)
-                        
-                        # Resize the image
-                        resize_image(image_path)
-                        
-                        # Set the URL for the database
-                        image_url = os.path.join(app.config['UPLOAD_URL'], filename)
-                        app.logger.info(f"Image saved to {image_path}, URL: {image_url}")
+                    # Save the image and get back the URL
+                    image_url = save_image(form.image.data)
                 except Exception as e:
-                    app.logger.error(f"Error uploading image: {str(e)}")
-                    flash('Resim yüklenirken bir hata oluştu.', 'danger')
+                    app.logger.error(f"Error saving image: {str(e)}")
+                    flash('Resim yüklenirken bir hata oluştu. Yazı resim olmadan kaydedildi.', 'warning')
             
-            # Create post
-            post = Post(title=title, content=content, category=category, author=author, image_url=image_url)
-            db.session.add(post)
-            db.session.commit()
+            # Create new post
+            new_post = Post(
+                title=title,
+                content=content,
+                category=category,
+                image_url=image_url
+            )
             
-            app.logger.info(f"New post created: {title}")
-            flash('Yazı başarıyla oluşturuldu.', 'success')
-            return redirect(url_for('admin_dashboard'))
-            
+            # Add and commit to DB
+            try:
+                db.session.add(new_post)
+                db.session.commit()
+                app.logger.info(f"Created new post: {title} in category: {category}")
+                flash('Yazı başarıyla oluşturuldu.', 'success')
+                return redirect(url_for('admin_index'))
+            except Exception as e:
+                db.session.rollback()
+                app.logger.error(f"Database error creating post: {str(e)}")
+                flash('Yazı kaydedilirken bir hata oluştu.', 'danger')
+        
+        # Get all existing categories to populate dropdown
+        try:
+            categories = get_all_categories()
         except Exception as e:
-            db.session.rollback()
-            app.logger.error(f"Error creating post: {str(e)}")
-            import traceback
-            app.logger.error(traceback.format_exc())
-            flash('Yazı oluşturulurken bir hata oluştu.', 'danger')
-    
-    return render_template('admin/new_post.html', form=form, active_page='new_post')
+            app.logger.error(f"Error retrieving categories: {str(e)}")
+            categories = []
+            flash('Kategoriler yüklenirken bir hata oluştu.', 'warning')
+        
+        return render_template('admin/new_post.html', form=form, categories=categories, active_page='new_post')
+    except Exception as e:
+        app.logger.error(f"Unhandled error in admin_new_post: {str(e)}")
+        import traceback
+        app.logger.error(traceback.format_exc())
+        flash('Bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.', 'danger')
+        return render_template('errors/500.html'), 500
 
 @app.route('/admin/post/<int:post_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_post(post_id):
     """Edit an existing post"""
-    app.logger.info(f"Entering edit_post route for post_id: {post_id}")
     post = Post.query.get_or_404(post_id)
     form = PostForm(obj=post)
     
     if form.validate_on_submit():
         try:
-            # Update post from form data
+            # Handle image upload
+            if form.image.data:
+                f = form.image.data
+                if allowed_file(f.filename):
+                    # Process the file
+                    try:
+                        f.stream.seek(0)
+                        validate_image(f.stream)
+                        f.stream.seek(0)
+                        
+                        # Save image with timestamp to prevent duplicates
+                        filename = secure_filename(f.filename)
+                        timestamp = int(time.time())
+                        image_filename = f"{timestamp}_{filename}"
+                        
+                        # Ensure uploads directory exists
+                        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                        
+                        # Save the file
+                        file_path = os.path.join(app.config['UPLOAD_FOLDER'], image_filename)
+                        f.save(file_path)
+                        
+                        # Resize image for performance
+                        resize_image(file_path)
+                        
+                        # Update post image URL
+                        post.image_url = image_filename
+                        
+                    except ValidationError as e:
+                        flash(f'Görsel yüklenirken hata oluştu: {str(e)}', 'danger')
+                        app.logger.error(f"Image validation error: {str(e)}")
+                        return render_template('admin/edit_post.html', form=form, post=post)
+                else:
+                    flash('Desteklenmeyen dosya formatı. Lütfen PNG, JPG, JPEG veya GIF dosyası yükleyin.', 'danger')
+                    return render_template('admin/edit_post.html', form=form, post=post)
+            
+            # Update post
             post.title = form.title.data
             post.content = form.content.data
             post.category = form.category.data
-            post.author = form.author.data or post.author
+            post.author = form.author.data
             
-            # Handle image upload if new image is provided
-            if form.image.data:
-                try:
-                    image = form.image.data
-                    if image and allowed_file(image.filename):
-                        # Secure the filename
-                        filename = secure_filename(image.filename)
-                        
-                        # Add a timestamp to avoid filename collisions
-                        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-                        filename = f"{timestamp}_{filename}"
-                        
-                        # Save the file
-                        image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                        image.save(image_path)
-                        
-                        # Resize the image
-                        resize_image(image_path)
-                        
-                        # Set the URL for the database
-                        post.image_url = os.path.join(app.config['UPLOAD_URL'], filename)
-                        app.logger.info(f"Image saved to {image_path}, URL: {post.image_url}")
-                except Exception as e:
-                    app.logger.error(f"Error uploading image: {str(e)}")
-                    flash('Resim yüklenirken bir hata oluştu.', 'danger')
-            
-            # Save the changes
             db.session.commit()
-            app.logger.info(f"Post {post_id} updated successfully")
-            flash('Yazı başarıyla güncellendi.', 'success')
-            return redirect(url_for('admin_dashboard'))
+            
+            flash('Yazı başarıyla güncellendi!', 'success')
+            return redirect(url_for('admin_index'))
+            
         except Exception as e:
             db.session.rollback()
             app.logger.error(f"Error updating post: {str(e)}")
-            flash('Yazı güncellenirken bir hata oluştu.', 'danger')
+            flash(f'Yazı güncellenirken bir hata oluştu: {str(e)}', 'danger')
     
-    return render_template('admin/edit_post.html', form=form, post=post, active_page='edit_post')
+    return render_template('admin/edit_post.html', form=form, post=post)
 
 @app.route('/admin/post/<int:post_id>/delete', methods=['POST'])
 @login_required
 def delete_post(post_id):
+    """Delete a post"""
     try:
         post = Post.query.get_or_404(post_id)
         db.session.delete(post)
         db.session.commit()
-        return jsonify({'success': True})
+        return jsonify({'success': True, 'message': 'Yazı başarıyla silindi'})
     except Exception as e:
-        app.logger.error(f"Error deleting post {post_id}: {str(e)}")
         db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+        app.logger.error(f"Error deleting post {post_id}: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/admin/video/<int:video_id>/delete', methods=['POST'])
 @login_required
 def delete_video(video_id):
+    """Delete a video"""
     try:
         video = Video.query.get_or_404(video_id)
         db.session.delete(video)
         db.session.commit()
-        return jsonify({'success': True})
+        return jsonify({'success': True, 'message': 'Video başarıyla silindi'})
     except Exception as e:
-        app.logger.error(f"Error deleting video {video_id}: {str(e)}")
         db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+        app.logger.error(f"Error deleting video {video_id}: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/admin/sync-youtube', methods=['GET', 'POST'])
 @login_required
@@ -1465,7 +1502,7 @@ def sync_youtube():
         try:
             videos_added = sync_youtube_videos(channel_id, max_results)
             flash(f'{videos_added} video başarıyla eklendi!', 'success')
-            return redirect(url_for('admin_dashboard'))
+            return redirect(url_for('admin_index'))
         except Exception as e:
             app.logger.error(f"Error syncing YouTube videos: {str(e)}")
             flash(f'Videolar senkronize edilirken bir hata oluştu: {str(e)}', 'danger')
@@ -1483,39 +1520,41 @@ def sync_youtube():
 @app.route('/admin/new_video', methods=['GET', 'POST'])
 @login_required
 def admin_new_video():
-    """Add a new video manually"""
-    app.logger.info("Entering admin_new_video route")
-    form = VideoForm()
-    
-    if form.validate_on_submit():
-        try:
-            # Create new video
+    """Add a new video"""
+    try:
+        form = VideoForm()
+        if form.validate_on_submit():
+            # Get form data
             title = form.title.data
-            youtube_embed = form.youtube_embed.data
+            youtube_id = form.youtube_id.data
+            description = form.description.data
             
-            # Extract just the video ID if full URLs are provided
-            if '/' in youtube_embed:
-                # Handle various YouTube URL formats
-                if 'youtu.be/' in youtube_embed:
-                    youtube_embed = youtube_embed.split('youtu.be/')[1].split('?')[0]
-                elif 'youtube.com/watch' in youtube_embed:
-                    youtube_embed = youtube_embed.split('v=')[1].split('&')[0]
-                elif 'youtube.com/embed/' in youtube_embed:
-                    youtube_embed = youtube_embed.split('embed/')[1].split('?')[0]
+            # Create new video
+            new_video = Video(
+                title=title,
+                youtube_embed=youtube_id,
+                created_at=datetime.now(UTC)
+            )
             
-            video = Video(title=title, youtube_embed=youtube_embed)
-            db.session.add(video)
-            db.session.commit()
-            
-            app.logger.info(f"Created new video: {title} with YouTube ID: {youtube_embed}")
-            flash('Video başarıyla eklendi.', 'success')
-            return redirect(url_for('admin_dashboard'))
-        except Exception as e:
-            db.session.rollback()
-            app.logger.error(f"Error adding video: {str(e)}")
-            flash('Video eklenirken bir hata oluştu.', 'danger')
-    
-    return render_template('admin/new_video.html', form=form, active_page='new_video')
+            # Add and commit to DB
+            try:
+                db.session.add(new_video)
+                db.session.commit()
+                app.logger.info(f"Added new video: {title} with YouTube ID: {youtube_id}")
+                flash('Video başarıyla eklendi.', 'success')
+                return redirect(url_for('admin_index'))
+            except Exception as e:
+                db.session.rollback()
+                app.logger.error(f"Database error adding video: {str(e)}")
+                flash('Video eklenirken bir hata oluştu.', 'danger')
+        
+        return render_template('admin/new_video.html', form=form, active_page='new_video')
+    except Exception as e:
+        app.logger.error(f"Unhandled error in admin_new_video: {str(e)}")
+        import traceback
+        app.logger.error(traceback.format_exc())
+        flash('Bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.', 'danger')
+        return render_template('errors/500.html'), 500
 
 @app.route('/admin/youtube_sync', methods=['GET', 'POST'])
 @login_required

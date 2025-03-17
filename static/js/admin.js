@@ -1,6 +1,68 @@
 // Admin Panel JavaScript
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+    
+    // Initialize popovers
+    var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'))
+    var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+        return new bootstrap.Popover(popoverTriggerEl)
+    });
+    
+    // Initialize any datepickers
+    const datepickers = document.querySelectorAll('.datepicker');
+    if (datepickers.length > 0) {
+        datepickers.forEach(dp => {
+            new Datepicker(dp, {
+                format: 'dd.mm.yyyy',
+                language: 'tr',
+                autohide: true
+            });
+        });
+    }
+    
+    // Initialize select2 if available
+    if (typeof $.fn.select2 !== 'undefined') {
+        $('.select2').select2({
+            theme: 'bootstrap-5'
+        });
+    }
+    
+    // Add form validation
+    const forms = document.querySelectorAll('.needs-validation');
+    Array.from(forms).forEach(form => {
+        form.addEventListener('submit', event => {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            form.classList.add('was-validated');
+        }, false);
+    });
+    
+    // Handle sidebar toggle for mobile
+    const sidebarToggle = document.querySelector('.sidebar-toggle');
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', () => {
+            document.querySelector('.admin-sidebar').classList.toggle('show');
+        });
+    }
+    
+    // Handle alert dismissal
+    const alerts = document.querySelectorAll('.alert');
+    alerts.forEach(alert => {
+        const closeBtn = alert.querySelector('.btn-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                alert.remove();
+            });
+        }
+    });
+    
     // Set up delete buttons if they exist
     if (document.querySelectorAll('.comment-delete-form').length > 0) {
         setupDeleteButtons();
@@ -149,4 +211,87 @@ function showMessage(message, type) {
             }, 300);
         }
     }, 3000);
-} 
+}
+
+// Utility functions for admin panel
+const AdminUtils = {
+    // Show loading spinner
+    showLoading: function(element) {
+        if (element) {
+            element.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Yükleniyor...';
+            element.disabled = true;
+        }
+    },
+    
+    // Hide loading spinner
+    hideLoading: function(element, originalText) {
+        if (element) {
+            element.innerHTML = originalText;
+            element.disabled = false;
+        }
+    },
+    
+    // Show toast notification
+    showToast: function(message, type = 'success') {
+        const toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) {
+            const container = document.createElement('div');
+            container.id = 'toast-container';
+            container.className = 'position-fixed bottom-0 end-0 p-3';
+            document.body.appendChild(container);
+        }
+        
+        const toast = document.createElement('div');
+        toast.className = `toast align-items-center text-white bg-${type} border-0`;
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+        toast.setAttribute('aria-atomic', 'true');
+        
+        toast.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        `;
+        
+        document.getElementById('toast-container').appendChild(toast);
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+        
+        toast.addEventListener('hidden.bs.toast', () => {
+            toast.remove();
+        });
+    },
+    
+    // Format date for display
+    formatDate: function(date) {
+        return new Date(date).toLocaleDateString('tr-TR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+    },
+    
+    // Format number for display
+    formatNumber: function(number) {
+        return new Intl.NumberFormat('tr-TR').format(number);
+    },
+    
+    // Confirm action
+    confirm: function(message, callback) {
+        if (confirm(message)) {
+            callback();
+        }
+    },
+    
+    // Handle AJAX errors
+    handleAjaxError: function(error) {
+        console.error('AJAX Error:', error);
+        this.showToast('Bir hata oluştu. Lütfen tekrar deneyin.', 'danger');
+    }
+};
+
+// Export AdminUtils for use in other files
+window.AdminUtils = AdminUtils; 
