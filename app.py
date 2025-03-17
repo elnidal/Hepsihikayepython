@@ -959,26 +959,35 @@ def videos():
 @app.route('/admin/login', methods=['GET', 'POST'])
 def login():
     """Admin giriş sayfası"""
-    if current_user.is_authenticated:
-        return redirect(url_for('admin_dashboard'))
-        
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        remember = request.form.get('remember', False)
-        
-        user = User.query.filter_by(username=username).first()
-        
-        if user and user.check_password(password):
-            login_user(user, remember=remember)
-            next_page = request.args.get('next')
-            if not next_page or url_parse(next_page).netloc != '':
-                next_page = url_for('admin_dashboard')
-            return redirect(next_page)
-        else:
-            flash('Geçersiz kullanıcı adı veya şifre.', 'error')
+    try:
+        if current_user.is_authenticated:
+            return redirect(url_for('admin_dashboard'))
             
-    return render_template('admin/login.html')
+        if request.method == 'POST':
+            username = request.form.get('username')
+            password = request.form.get('password')
+            remember = request.form.get('remember', False)
+            
+            if not username or not password:
+                flash('Lütfen kullanıcı adı ve şifrenizi girin.', 'error')
+                return render_template('admin/login.html')
+            
+            user = User.query.filter_by(username=username).first()
+            
+            if user and user.check_password(password):
+                login_user(user, remember=remember)
+                next_page = request.args.get('next')
+                if not next_page or url_parse(next_page).netloc != '':
+                    next_page = url_for('admin_dashboard')
+                return redirect(next_page)
+            else:
+                flash('Geçersiz kullanıcı adı veya şifre.', 'error')
+                
+        return render_template('admin/login.html')
+    except Exception as e:
+        app.logger.error(f"Login error: {str(e)}")
+        flash('Giriş yapılırken bir hata oluştu. Lütfen daha sonra tekrar deneyin.', 'error')
+        return render_template('admin/login.html')
 
 @app.route('/logout')
 @login_required
