@@ -346,7 +346,7 @@
     <!-- Add subtle admin login button to bottom left -->
     <div class="admin-corner-login">
         {% if current_user.is_authenticated %}
-        <a href="{{ url_for('admin_index_slash') }}" class="admin-corner-btn">
+        <a href="{{ url_for('admin_index') }}" class="admin-corner-btn">
             <i class="fas fa-user-shield"></i>
         </a>
         <a href="{{ url_for('logout') }}" class="admin-corner-btn ms-2">
