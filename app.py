@@ -559,14 +559,18 @@ def sync_youtube_videos(channel_identifier, max_results=10):
 def serve_upload(filename):
     """Serve uploaded files from the static/uploads directory"""
     try:
-        # In production, serve from static/uploads
-        return redirect(url_for('static', filename=f'uploads/{filename}'))
+        # Check if file exists in static/uploads
+        upload_path = os.path.join(app.static_folder, 'uploads', filename)
+        if os.path.isfile(upload_path):
+            return redirect(url_for('static', filename=f'uploads/{filename}'))
+        else:
+            app.logger.warning(f"File not found: {upload_path}")
+            # Return default image
+            return redirect(url_for('static', filename='uploads/default_post_image.png'))
     except Exception as e:
         app.logger.error(f"Error serving file {filename}: {str(e)}")
-        # Return a default image if the file doesn't exist
-        return redirect(url_for('static', filename='uploads/default_post_image.png'))
-
-@app.route('/admin')
+        # Return a default image if there's any error
+        return redirect(url_for('static', filename='uploads/default_post_image.png'))@app.route('/admin')
 @login_required
 def admin_index():
     """Admin dashboard page"""
