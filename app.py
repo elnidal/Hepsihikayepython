@@ -586,7 +586,13 @@ def serve_upload(filename):
 @app.route('/admin')
 @login_required
 def admin_index():
-    """Admin dashboard page"""
+    """Redirect to admin dashboard with trailing slash"""
+    return redirect(url_for('admin_index_slash'))
+
+@app.route('/admin/')
+@login_required
+def admin_index_slash():
+    """Admin dashboard page with trailing slash"""
     try:
         # Use a simpler query with error handling
         posts = []
@@ -608,19 +614,14 @@ def admin_index():
             app.logger.error(f"Error retrieving videos: {str(e)}")
             flash('Videolar yüklenirken bir hata oluştu.', 'warning')
         
-        # Render the new dashboard template with active page set
+        # Render the dashboard template with active page set
         return render_template('admin/dashboard.html', posts=posts, videos=videos, active_page='dashboard')
     except Exception as e:
-        app.logger.error(f"Unhandled error in admin_index: {str(e)}")
+        app.logger.error(f"Unhandled error in admin_index_slash: {str(e)}")
         import traceback
         app.logger.error(traceback.format_exc())
         flash('Bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.', 'danger')
         return render_template('errors/500.html'), 500
-
-@app.route('/admin/')
-@login_required
-def admin_index_slash():
-    return redirect(url_for('admin_index_slash'))
 
 def backup_database():
     """Create a backup of the PostgreSQL database"""
