@@ -42,6 +42,17 @@ if os.path.exists('.env') and not os.environ.get('FLASK_ENV') == 'production':
 class ValidationError(Exception):
     pass
 
+
+# Login required decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            app.logger.warning(f"Unauthenticated user attempted to access {request.path}")
+            flash('Please log in to access this page.', 'warning')
+            return redirect(url_for('login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key')
 
