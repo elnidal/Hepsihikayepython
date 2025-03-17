@@ -621,7 +621,7 @@ def admin_dashboard():
     except Exception as e:
         app.logger.error(f"Admin dashboard error: {str(e)}")
         flash('Dashboard yüklenirken bir hata oluştu.', 'error')
-        return redirect(url_for('admin_index'))
+        return redirect(url_for('index'))
 
 def backup_database():
     """Create a backup of the PostgreSQL database"""
@@ -956,23 +956,29 @@ def videos():
         # Re-raise to be caught by the error handler
         raise
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/admin/login', methods=['GET', 'POST'])
 def login():
+    """Admin giriş sayfası"""
     if current_user.is_authenticated:
         return redirect(url_for('admin_dashboard'))
         
-    form = LoginForm()
-    if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data).first()
-        if user and user.check_password(form.password.data):
-            login_user(user)
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        remember = request.form.get('remember', False)
+        
+        user = User.query.filter_by(username=username).first()
+        
+        if user and user.check_password(password):
+            login_user(user, remember=remember)
             next_page = request.args.get('next')
-            if next_page and next_page.startswith('/'):
-                return redirect(next_page)
-            return redirect(url_for('admin_dashboard'))
-        flash('Hatalı kullanıcı adı veya şifre!', 'danger')
-    
-    return render_template('login.html', form=form)
+            if not next_page or url_parse(next_page).netloc != '':
+                next_page = url_for('admin_dashboard')
+            return redirect(next_page)
+        else:
+            flash('Geçersiz kullanıcı adı veya şifre.', 'error')
+            
+    return render_template('admin/login.html')
 
 @app.route('/logout')
 @login_required
