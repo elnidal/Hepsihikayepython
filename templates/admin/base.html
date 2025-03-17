@@ -174,14 +174,140 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialize tooltips
-            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+            // Initialize tooltips and popovers
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
             var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-                return new bootstrap.Tooltip(tooltipTriggerEl)
+                return new bootstrap.Tooltip(tooltipTriggerEl);
             });
-            
-            // Add any additional initialization code here
-            console.log('Admin panel initialized');
+
+            var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+            var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+                return new bootstrap.Popover(popoverTriggerEl);
+            });
+
+            // Initialize datepickers
+            if (typeof $.fn.datepicker !== 'undefined') {
+                $('.datepicker').datepicker({
+                    format: 'yyyy-mm-dd',
+                    language: 'tr',
+                    autoclose: true
+                });
+            }
+
+            // Form validation
+            var forms = document.querySelectorAll('.needs-validation');
+            Array.prototype.slice.call(forms).forEach(function (form) {
+                form.addEventListener('submit', function (event) {
+                    if (!form.checkValidity()) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+                    form.classList.add('was-validated');
+                }, false);
+            });
+
+            // Sidebar toggle for mobile
+            var sidebarToggle = document.getElementById('sidebarToggle');
+            if (sidebarToggle) {
+                sidebarToggle.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    document.body.classList.toggle('sb-sidenav-toggled');
+                    var sidebar = document.querySelector('.sb-sidenav');
+                    if (sidebar) {
+                        sidebar.classList.toggle('show');
+                    }
+                });
+            }
+
+            // Handle alert dismissal
+            var alerts = document.querySelectorAll('.alert-dismissible');
+            alerts.forEach(function(alert) {
+                var closeButton = alert.querySelector('.btn-close');
+                if (closeButton) {
+                    closeButton.addEventListener('click', function() {
+                        alert.classList.remove('show');
+                        setTimeout(function() {
+                            alert.remove();
+                        }, 150);
+                    });
+                }
+            });
+
+            // Initialize toast notifications
+            var toastElList = [].slice.call(document.querySelectorAll('.toast'));
+            var toastList = toastElList.map(function (toastEl) {
+                return new bootstrap.Toast(toastEl, {
+                    autohide: true,
+                    delay: 3000
+                });
+            });
+
+            // Show toast notifications
+            window.showToast = function(message, type = 'success') {
+                var toastContainer = document.getElementById('toastContainer');
+                if (!toastContainer) {
+                    toastContainer = document.createElement('div');
+                    toastContainer.id = 'toastContainer';
+                    toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+                    document.body.appendChild(toastContainer);
+                }
+
+                var toast = document.createElement('div');
+                toast.className = `toast align-items-center text-white bg-${type} border-0`;
+                toast.setAttribute('role', 'alert');
+                toast.setAttribute('aria-live', 'assertive');
+                toast.setAttribute('aria-atomic', 'true');
+
+                toast.innerHTML = `
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                `;
+
+                toastContainer.appendChild(toast);
+                var bsToast = new bootstrap.Toast(toast);
+                bsToast.show();
+
+                toast.addEventListener('hidden.bs.toast', function () {
+                    toast.remove();
+                });
+            };
+
+            // Utility functions
+            window.AdminUtils = {
+                showLoading: function(element) {
+                    if (element) {
+                        element.disabled = true;
+                        element.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Yükleniyor...';
+                    }
+                },
+                hideLoading: function(element, originalText) {
+                    if (element) {
+                        element.disabled = false;
+                        element.innerHTML = originalText;
+                    }
+                },
+                formatDate: function(date) {
+                    return new Date(date).toLocaleDateString('tr-TR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+                },
+                formatNumber: function(number) {
+                    return new Intl.NumberFormat('tr-TR').format(number);
+                },
+                confirmAction: function(message) {
+                    return confirm(message || 'Bu işlemi gerçekleştirmek istediğinizden emin misiniz?');
+                },
+                handleError: function(error) {
+                    console.error('Error:', error);
+                    showToast(error.message || 'Bir hata oluştu. Lütfen daha sonra tekrar deneyin.', 'danger');
+                }
+            };
         });
     </script>
     {% block scripts %}{% endblock %}

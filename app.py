@@ -586,39 +586,42 @@ def serve_upload(filename):
 @app.route('/admin')
 @login_required
 def admin_index():
-    return redirect(url_for('admin_dashboard'))
+    """Admin panel ana sayfası"""
+    try:
+        return redirect(url_for('admin_dashboard'))
+    except Exception as e:
+        app.logger.error(f"Admin index error: {str(e)}")
+        flash('Admin paneline erişimde bir hata oluştu.', 'error')
+        return redirect(url_for('index'))
 
-@app.route('/admin/')
+@app.route('/admin/dashboard')
 @login_required
 def admin_dashboard():
+    """Admin panel dashboard sayfası"""
     try:
-        # Get posts with error handling
+        # Son eklenen içerikleri getir
         posts = Post.query.order_by(Post.created_at.desc()).limit(10).all()
-        post_count = Post.query.count()
-        
-        # Get videos with error handling
         videos = Video.query.order_by(Video.created_at.desc()).limit(10).all()
-        video_count = Video.query.count()
+        comments = Comment.query.order_by(Comment.created_at.desc()).limit(10).all()
         
-        # Get comment count
-        comment_count = Comment.query.count()
-        
-        # Calculate total views
-        total_views = db.session.query(func.sum(Post.views).label('post_views')).first()[0] or 0
-        total_views += db.session.query(func.sum(Video.views).label('video_views')).first()[0] or 0
+        # İstatistikleri hesapla
+        total_posts = Post.query.count()
+        total_videos = Video.query.count()
+        total_comments = Comment.query.count()
+        total_views = sum(post.views for post in Post.query.all())
         
         return render_template('admin/dashboard.html',
                              posts=posts,
                              videos=videos,
-                             post_count=post_count,
-                             video_count=video_count,
-                             comment_count=comment_count,
-                             total_views=total_views,
-                             active_page='dashboard')
+                             comments=comments,
+                             total_posts=total_posts,
+                             total_videos=total_videos,
+                             total_comments=total_comments,
+                             total_views=total_views)
     except Exception as e:
-        app.logger.error(f"Error in admin dashboard: {str(e)}")
-        flash('Veriler yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.', 'danger')
-        return render_template('admin/dashboard.html', active_page='dashboard')
+        app.logger.error(f"Admin dashboard error: {str(e)}")
+        flash('Dashboard yüklenirken bir hata oluştu.', 'error')
+        return redirect(url_for('admin_index'))
 
 def backup_database():
     """Create a backup of the PostgreSQL database"""
@@ -721,7 +724,7 @@ if __name__ == '__main__':
     init_app()
     
     # Then start the server
-    port = int(os.environ.get('PORT', 10001))
+    port = int(os.environ.get('PORT', 5001))
     app.debug = True
     app.run(host='0.0.0.0', port=port)
 
