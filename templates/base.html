@@ -327,7 +327,7 @@
             <span>Videolar</span>
         </a>
         {% if current_user.is_authenticated %}
-        <a href="{{ url_for('admin_index_slash') }}" class="mobile-nav-item {% if '/admin' in request.path %}active{% endif %}">
+        <a href="{{ url_for('admin_index') }}" class="mobile-nav-item {% if '/admin' in request.path %}active{% endif %}">
             <i class="fas fa-user-shield"></i>
             <span>Admin</span>
         </a>
