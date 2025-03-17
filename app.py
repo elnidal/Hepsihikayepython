@@ -581,7 +581,9 @@ def serve_upload(filename):
     except Exception as e:
         app.logger.error(f"Error serving file {filename}: {str(e)}")
         # Return a default image if there's any error
-        return redirect(url_for('static', filename='uploads/default_post_image.png'))@app.route('/admin')
+        return redirect(url_for('static', filename='uploads/default_post_image.png'))
+
+@app.route('/admin')
 @login_required
 def admin_index():
     """Admin dashboard page"""
@@ -618,7 +620,7 @@ def admin_index():
 @app.route('/admin/')
 @login_required
 def admin_index_slash():
-    return redirect(url_for('admin_index'))
+    return redirect(url_for('admin_index_slash'))
 
 def backup_database():
     """Create a backup of the PostgreSQL database"""
@@ -957,7 +959,7 @@ def videos():
 def login():
     """Login page"""
     if current_user.is_authenticated:
-        return redirect(url_for('admin_index'))
+        return redirect(url_for('admin_index_slash'))
         
     form = LoginForm()
     if form.validate_on_submit():
@@ -967,7 +969,7 @@ def login():
             next_page = request.args.get('next')
             if next_page and next_page.startswith('/'):
                 return redirect(next_page)
-            return redirect(url_for('admin_index'))
+            return redirect(url_for('admin_index_slash'))
         else:
             flash('Hatalı kullanıcı adı veya şifre!', 'danger')
     
