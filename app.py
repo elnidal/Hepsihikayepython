@@ -586,7 +586,7 @@ def serve_upload(filename):
 @app.route('/admin')
 @login_required
 def admin_index():
-    """Admin panel ana sayfası"""
+    """Admin ana sayfası"""
     try:
         return redirect(url_for('admin_dashboard'))
     except Exception as e:
@@ -597,12 +597,12 @@ def admin_index():
 @app.route('/admin/dashboard')
 @login_required
 def admin_dashboard():
-    """Admin panel dashboard sayfası"""
+    """Admin paneli ana sayfası"""
     try:
         # Son eklenen içerikleri getir
-        posts = Post.query.order_by(Post.created_at.desc()).limit(10).all()
-        videos = Video.query.order_by(Video.created_at.desc()).limit(10).all()
-        comments = Comment.query.order_by(Comment.created_at.desc()).limit(10).all()
+        recent_posts = Post.query.order_by(Post.created_at.desc()).limit(10).all()
+        recent_videos = Video.query.order_by(Video.created_at.desc()).limit(10).all()
+        recent_comments = Comment.query.order_by(Comment.created_at.desc()).limit(10).all()
         
         # İstatistikleri hesapla
         total_posts = Post.query.count()
@@ -611,16 +611,16 @@ def admin_dashboard():
         total_views = sum(post.views for post in Post.query.all())
         
         return render_template('admin/dashboard.html',
-                             posts=posts,
-                             videos=videos,
-                             comments=comments,
+                             posts=recent_posts,
+                             videos=recent_videos,
+                             comments=recent_comments,
                              total_posts=total_posts,
                              total_videos=total_videos,
                              total_comments=total_comments,
                              total_views=total_views)
     except Exception as e:
         app.logger.error(f"Admin dashboard error: {str(e)}")
-        flash('Dashboard yüklenirken bir hata oluştu.', 'error')
+        flash('Admin paneli yüklenirken bir hata oluştu.', 'error')
         return redirect(url_for('index'))
 
 def backup_database():
@@ -992,9 +992,15 @@ def login():
 @app.route('/logout')
 @login_required
 def logout():
-    logout_user()
-    flash('Başarıyla çıkış yapıldı.', 'success')
-    return redirect(url_for('login'))
+    """Çıkış yap"""
+    try:
+        logout_user()
+        flash('Başarıyla çıkış yaptınız.', 'success')
+        return redirect(url_for('index'))
+    except Exception as e:
+        app.logger.error(f"Logout error: {str(e)}")
+        flash('Çıkış yapılırken bir hata oluştu.', 'error')
+        return redirect(url_for('index'))
 
 @app.errorhandler(500)
 def internal_error(error):
