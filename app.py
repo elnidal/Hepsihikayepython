@@ -180,8 +180,8 @@ if not app.debug:
     # Set up file handler
     file_handler = RotatingFileHandler('app.log', maxBytes=10240, backupCount=10)
     file_handler.setFormatter(logging.Formatter(
-        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-    ))
+    '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+))
     file_handler.setLevel(logging.INFO)
     app.logger.addHandler(file_handler)
     
@@ -194,7 +194,7 @@ if not app.debug:
     app.logger.addHandler(stream_handler)
     
     app.logger.setLevel(logging.DEBUG)  # Set to DEBUG to get more information
-    app.logger.info('HepsiHikaye startup')
+app.logger.info('HepsiHikaye startup')
 
 app.logger.info(f'Upload directory: {app.config["UPLOAD_FOLDER"]}')
 app.logger.info(f'Environment: {os.environ.get("FLASK_ENV", "Development")}')
@@ -710,13 +710,13 @@ def init_app():
                     app.logger.error(f"Error type: {type(e).__name__}")
                     import traceback
                     app.logger.error(f"Traceback: {traceback.format_exc()}")
-        except Exception as e:
-            app.logger.error(f"Error initializing application: {str(e)}")
-            app.logger.error(f"Error type: {type(e).__name__}")
-            import traceback
-            app.logger.error(f"Traceback: {traceback.format_exc()}")
-            # Don't raise the error - log it and continue
-            # This prevents the application from failing to start
+                except Exception as e:
+                    app.logger.error(f"Error initializing application: {str(e)}")
+                    app.logger.error(f"Error type: {type(e).__name__}")
+                    import traceback
+                    app.logger.error(f"Traceback: {traceback.format_exc()}")
+                    # Don't raise the error - log it and continue
+                    # This prevents the application from failing to start
 
 # Call the initialization function immediately if this is the main module
 if __name__ == '__main__':
@@ -868,8 +868,8 @@ def category(category):
         
         return render_template(
             'category.html',
-            posts=posts,
-            category=category,
+            posts=posts, 
+            category=category, 
             category_display=category_display
         )
     except Exception as e:
@@ -957,7 +957,7 @@ def videos():
         raise
 
 @app.route('/admin/login', methods=['GET', 'POST'])
-def login():
+def admin_login():
     """Admin giriş sayfası"""
     try:
         if current_user.is_authenticated:
@@ -977,7 +977,7 @@ def login():
             if user and user.check_password(password):
                 login_user(user, remember=remember)
                 next_page = request.args.get('next')
-                if not next_page or url_parse(next_page).netloc != '':
+                if not next_page or urlparse(next_page).netloc != '':
                     next_page = url_for('admin_dashboard')
                 return redirect(next_page)
             else:
@@ -996,7 +996,7 @@ def logout():
     try:
         logout_user()
         flash('Başarıyla çıkış yaptınız.', 'success')
-        return redirect(url_for('index'))
+        return redirect(url_for('admin_login'))
     except Exception as e:
         app.logger.error(f"Logout error: {str(e)}")
         flash('Çıkış yapılırken bir hata oluştu.', 'error')
@@ -1060,9 +1060,9 @@ def health_check():
 @login_required
 def upload():
     """Handle file uploads from CKEditor"""
-    f = request.files.get('upload')
-    if f and allowed_file(f.filename):
-        try:
+    try:
+        f = request.files.get('upload')
+        if f and allowed_file(f.filename):
             # Validate the file
             f.stream.seek(0)
             validate_image(f.stream)
@@ -1093,29 +1093,24 @@ def upload():
                 'fileName': filename,
                 'url': url
             })
-        except ValidationError as e:
-            app.logger.error(f"Upload validation error: {str(e)}")
-            return jsonify({
-                'uploaded': 0,
-                'error': {
-                    'message': str(e)
-                }
-            })
-        except Exception as e:
-            app.logger.error(f"Upload error: {str(e)}")
-            return jsonify({
-                'uploaded': 0,
-                'error': {
-                    'message': 'An error occurred during upload.'
-                }
-            })
-    
-    return jsonify({
-        'uploaded': 0,
-        'error': {
-            'message': 'Invalid file type or file not provided.'
-        }
-    })
+        else:
+            raise ValidationError('Invalid file type or no file provided')
+    except ValidationError as e:
+        app.logger.error(f"Upload validation error: {str(e)}")
+        return jsonify({
+            'uploaded': 0,
+            'error': {
+                'message': str(e)
+            }
+        })
+    except Exception as e:
+        app.logger.error(f"Upload error: {str(e)}")
+        return jsonify({
+            'uploaded': 0,
+            'error': {
+                'message': 'Dosya yüklenirken bir hata oluştu.'
+            }
+        })
 
 @app.route('/media-library')
 @login_required
