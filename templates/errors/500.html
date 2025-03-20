@@ -1,29 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}Sunucu Hatası{% endblock %}
+{% block title %}500 - Sunucu Hatası{% endblock %}
 
 {% block content %}
-<div class="container mt-5 mb-5">
+<div class="container mt-5">
     <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card shadow-sm">
-                <div class="card-header bg-danger text-white">
-                    <h3 class="mb-0">Sunucu Hatası</h3>
-                </div>
-                <div class="card-body text-center py-5">
-                    <div class="error-icon mb-4">
-                        <i class="fas fa-exclamation-triangle fa-5x text-danger"></i>
-                    </div>
-                    <h2 class="mb-4">Üzgünüz, bir sorun oluştu</h2>
-                    <p class="lead mb-4">Sunucu beklenmedik bir hata ile karşılaştı ve isteğinizi şu anda işleyemiyor.</p>
-                    <p class="mb-5">Bu sorunun çözümü için çalışıyoruz. Lütfen daha sonra tekrar deneyin.</p>
-                    <div class="d-grid gap-2 col-md-8 mx-auto">
-                        <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">
-                            <i class="fas fa-home me-2"></i> Ana Sayfaya Dön
-                        </a>
-                    </div>
-                </div>
-            </div>
+        <div class="col-md-8 text-center">
+            <h1 class="display-1">500</h1>
+            <h2 class="mb-4">Sunucu Hatası</h2>
+            <p class="lead">Üzgünüz, bir hata oluştu. Lütfen daha sonra tekrar deneyin.</p>
+            <a href="{{ url_for('index') }}" class="btn btn-primary mt-3">Ana Sayfaya Dön</a>
         </div>
     </div>
 </div>

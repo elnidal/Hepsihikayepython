@@ -27,7 +27,35 @@ from sqlalchemy import text
 from decorators import handle_db_error
 from sqlalchemy.orm import joinedload
 
+# Configure logging
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+
+logging.basicConfig(level=logging.INFO)
+file_handler = RotatingFileHandler('logs/app.log', maxBytes=10240, backupCount=10)
+file_handler.setFormatter(logging.Formatter(
+    '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+))
+file_handler.setLevel(logging.INFO)
+
+# Initialize Flask app
 app = Flask(__name__)
+app.logger.addHandler(file_handler)
+app.logger.setLevel(logging.INFO)
+app.logger.info('Application startup')
+
+# Error handlers
+@app.errorhandler(404)
+def not_found_error(error):
+    app.logger.error(f'Page not found: {request.url}')
+    return render_template('errors/404.html'), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    db.session.rollback()
+    app.logger.error(f'Server Error: {error}')
+    return render_template('errors/500.html'), 500
+
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key')
 
 # Get database URL from environment variables with fallback
@@ -57,6 +85,34 @@ class User(UserMixin, db.Model):
 
     def check_password(self, password):
         return check_password_hash(self.password, password)
+
+class Post(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    image = db.Column(db.String(200))
+    views = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    comments = db.relationship('Comment', backref='post', lazy=True)
+
+class Video(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    youtube_id = db.Column(db.String(20), nullable=False)
+    description = db.Column(db.Text)
+    thumbnail_url = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    comments = db.relationship('Comment', backref='video', lazy=True)
+
+class Comment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    content = db.Column(db.Text, nullable=False)
+    author_name = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    post_id = db.Column(db.Integer, db.ForeignKey('post.id'))
+    video_id = db.Column(db.Integer, db.ForeignKey('video.id'))
 
 def init_db():
     db.create_all()
