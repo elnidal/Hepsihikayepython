@@ -115,18 +115,35 @@ class Comment(db.Model):
     video_id = db.Column(db.Integer, db.ForeignKey('video.id'))
 
 def init_db():
-    db.create_all()
-    
-    # Check if admin user exists
-    admin_user = User.query.filter_by(username='admin').first()
-    if not admin_user:
-        # Create admin user
-        admin_user = User(
-            username='admin',
-            password=generate_password_hash('admin')
-        )
-        db.session.add(admin_user)
-        db.session.commit()
+    try:
+        with app.app_context():
+            # Create all tables
+            db.create_all()
+            app.logger.info("Database tables created successfully")
+
+            # Check if admin user exists
+            admin = User.query.filter_by(username='admin').first()
+            if not admin:
+                # Create default admin user
+                admin = User(
+                    username='admin',
+                    password=generate_password_hash('admin')
+                )
+                db.session.add(admin)
+                db.session.commit()
+                app.logger.info("Default admin user created")
+            else:
+                app.logger.info("Admin user already exists")
+
+            # Create uploads directory if it doesn't exist
+            uploads_dir = os.path.join(app.static_folder, 'uploads')
+            if not os.path.exists(uploads_dir):
+                os.makedirs(uploads_dir)
+                app.logger.info("Uploads directory created")
+
+    except Exception as e:
+        app.logger.error(f"Database initialization error: {str(e)}")
+        raise
 
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
@@ -139,20 +156,14 @@ def admin_login():
             password = request.form.get('password')
             remember = request.form.get('remember', False)
             
-            if not username or not password:
-                flash('Lütfen kullanıcı adı ve şifrenizi girin.', 'error')
-                return render_template('admin/login.html')
-            
             user = User.query.filter_by(username=username).first()
-            
             if user and user.check_password(password):
                 login_user(user, remember=remember)
-                next_page = request.args.get('next')
-                if not next_page or urlparse(next_page).netloc != '':
-                    next_page = url_for('admin_dashboard')
-                return redirect(next_page)
+                app.logger.info(f"User {username} logged in successfully")
+                return redirect(url_for('admin_dashboard'))
             else:
                 flash('Geçersiz kullanıcı adı veya şifre.', 'error')
+                app.logger.warning(f"Failed login attempt for user {username}")
         
         return render_template('admin/login.html')
     except Exception as e:
@@ -168,37 +179,37 @@ def admin_index():
     except Exception as e:
         app.logger.error(f"Admin index error: {str(e)}")
         flash('Admin paneline erişimde bir hata oluştu.', 'error')
-        return redirect(url_for('index'))
+        return redirect(url_for('admin_login'))
 
 @app.route('/admin/dashboard')
 @login_required
 def admin_dashboard():
     try:
+        # Get recent posts and videos
         recent_posts = Post.query.order_by(Post.created_at.desc()).limit(10).all()
         recent_videos = Video.query.order_by(Video.created_at.desc()).limit(10).all()
-        recent_comments = Comment.query.order_by(Comment.created_at.desc()).limit(10).all()
         
+        # Get statistics
         total_posts = Post.query.count()
         total_videos = Video.query.count()
         total_comments = Comment.query.count()
-        total_views = sum(post.views for post in Post.query.all())
+        total_views = db.session.query(db.func.sum(Post.views)).scalar() or 0
         
         return render_template('admin/dashboard.html',
                              posts=recent_posts,
                              videos=recent_videos,
-                             comments=recent_comments,
                              total_posts=total_posts,
                              total_videos=total_videos,
                              total_comments=total_comments,
                              total_views=total_views)
     except Exception as e:
         app.logger.error(f"Admin dashboard error: {str(e)}")
-        flash('Admin paneli yüklenirken bir hata oluştu.', 'error')
-        return redirect(url_for('index'))
+        flash('Dashboard yüklenirken bir hata oluştu.', 'error')
+        return redirect(url_for('admin_index'))
 
-@app.route('/logout')
+@app.route('/admin/logout')
 @login_required
-def logout():
+def admin_logout():
     try:
         logout_user()
         flash('Başarıyla çıkış yaptınız.', 'success')
@@ -206,7 +217,7 @@ def logout():
     except Exception as e:
         app.logger.error(f"Logout error: {str(e)}")
         flash('Çıkış yapılırken bir hata oluştu.', 'error')
-        return redirect(url_for('index'))
+        return redirect(url_for('admin_login'))
 
 @app.route('/')
 def index():
@@ -239,7 +250,6 @@ def video_detail(video_id):
         return render_template('errors/500.html')
 
 if __name__ == '__main__':
-    with app.app_context():
-        init_db()
+    init_db()
     port = int(os.environ.get('PORT', 5001))
     app.run(host='0.0.0.0', port=port) 
