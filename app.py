@@ -90,7 +90,7 @@ class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    image = db.Column(db.String(200))
+    image = db.Column(db.String(200), nullable=True)
     views = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -117,6 +117,10 @@ class Comment(db.Model):
 def init_db():
     try:
         with app.app_context():
+            # Drop all tables first
+            db.drop_all()
+            app.logger.info("Dropped all existing tables")
+
             # Create all tables
             db.create_all()
             app.logger.info("Database tables created successfully")
