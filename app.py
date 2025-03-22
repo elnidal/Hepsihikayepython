@@ -249,6 +249,18 @@ def video_detail(video_id):
         app.logger.error(f"Video detail error: {str(e)}")
         return render_template('errors/500.html')
 
+@app.route('/videos')
+def videos():
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = 12
+        videos = Video.query.order_by(Video.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False)
+        return render_template('videos.html', videos=videos)
+    except Exception as e:
+        app.logger.error(f"Videos page error: {str(e)}")
+        return render_template('errors/500.html')
+
 if __name__ == '__main__':
     init_db()
     port = int(os.environ.get('PORT', 5001))

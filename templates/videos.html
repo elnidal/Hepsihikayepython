@@ -1,94 +1,58 @@
 {% extends "base.html" %}
 
+{% block title %}Videolar - Hepsi Hikaye{% endblock %}
+
 {% block content %}
-<div class="container">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="section-title">Videolar</h1>
-        {% if current_user and current_user.is_authenticated and not current_user.is_anonymous %}
-        <div>
-            <a href="{{ url_for('add_video') }}" class="btn btn-success me-2">
-                <i class="fas fa-plus-circle"></i> Manuel Video Ekle
-            </a>
-            <a href="{{ url_for('sync_youtube') }}" class="btn btn-primary">
-                <i class="fab fa-youtube"></i> YouTube'dan Video Ekle
-            </a>
-        </div>
-        {% endif %}
-    </div>
+<div class="container mt-4">
+    <h1 class="mb-4">Videolar</h1>
     
-    {% if videos %}
-        <div class="row">
-            {% for video in videos %}
-            <div class="col-md-4 mb-4">
-                <div class="card video-card shadow-sm h-100">
-                    <div class="embed-responsive embed-responsive-16by9">
-                        <iframe class="embed-responsive-item rounded-top" style="width: 100%; height: 215px;"
-                            src="https://www.youtube.com/embed/{{ video.youtube_embed }}"
-                            frameborder="0"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowfullscreen>
-                        </iframe>
-                    </div>
-                    <div class="card-body">
-                        <h5 class="card-title">{{ video.title }}</h5>
-                        <p class="card-text text-muted">
-                            <small><i class="far fa-calendar-alt"></i> {{ video.created_at.strftime('%d.%m.%Y') }}</small>
-                        </p>
-                        {% if current_user and current_user.is_authenticated and not current_user.is_anonymous %}
-                        <div class="mt-2 d-flex justify-content-between">
-                            <a href="{{ url_for('edit_video', video_id=video.id) }}" class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-edit"></i> Düzenle
-                            </a>
-                            <button type="button" class="btn btn-sm btn-outline-danger" 
-                                    data-bs-toggle="modal" data-bs-target="#deleteVideoModal{{ video.id }}">
-                                <i class="fas fa-trash"></i> Sil
-                            </button>
-                            
-                            <!-- Delete Modal -->
-                            <div class="modal fade" id="deleteVideoModal{{ video.id }}" tabindex="-1" aria-labelledby="deleteVideoModalLabel{{ video.id }}" aria-hidden="true">
-                                <div class="modal-dialog">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title" id="deleteVideoModalLabel{{ video.id }}">Video Silme Onayı</h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                        </div>
-                                        <div class="modal-body">
-                                            <p>"{{ video.title }}" başlıklı videoyu silmek istediğinizden emin misiniz?</p>
-                                        </div>
-                                        <div class="modal-footer">
-                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
-                                            <form action="{{ url_for('delete_video', video_id=video.id) }}" method="POST">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <button type="submit" class="btn btn-danger">Videoyu Sil</button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        {% endif %}
-                    </div>
+    <div class="row">
+        {% for video in videos.items %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                {% if video.thumbnail_url %}
+                <img src="{{ video.thumbnail_url }}" class="card-img-top" alt="{{ video.title }}">
+                {% endif %}
+                <div class="card-body">
+                    <h5 class="card-title">{{ video.title }}</h5>
+                    <p class="card-text">{{ video.description|default('')|truncate(100) }}</p>
+                    <a href="{{ url_for('video_detail', video_id=video.id) }}" class="btn btn-primary">İzle</a>
+                </div>
+                <div class="card-footer text-muted">
+                    {{ video.created_at.strftime('%d.%m.%Y') }}
                 </div>
             </div>
-            {% endfor %}
         </div>
-    {% else %}
-        <div class="text-center empty-message p-5 bg-light rounded">
-            <h4>Henüz video bulunmamaktadır.</h4>
-            {% if current_user and current_user.is_authenticated and not current_user.is_anonymous %}
-            <div class="mt-3">
-                <p>Video eklemek için "Manuel Video Ekle" veya "YouTube'dan Video Ekle" butonlarını kullanabilirsiniz.</p>
-                <div class="mt-4">
-                    <a href="{{ url_for('add_video') }}" class="btn btn-success me-2">
-                        <i class="fas fa-plus-circle"></i> Manuel Video Ekle
-                    </a>
-                    <a href="{{ url_for('sync_youtube') }}" class="btn btn-primary">
-                        <i class="fab fa-youtube"></i> YouTube'dan Video Ekle
-                    </a>
-                </div>
-            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if videos.pages > 1 %}
+    <nav aria-label="Video sayfaları" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if videos.has_prev %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('videos', page=videos.prev_num) }}">Önceki</a>
+            </li>
             {% endif %}
-        </div>
+
+            {% for page in videos.iter_pages() %}
+                {% if page %}
+                    <li class="page-item {% if page == videos.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('videos', page=page) }}">{{ page }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+            {% endfor %}
+
+            {% if videos.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('videos', page=videos.next_num) }}">Sonraki</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
     {% endif %}
 </div>
 {% endblock %}
