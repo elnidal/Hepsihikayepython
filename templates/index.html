@@ -1,142 +1,57 @@
 {% extends "base.html" %}
 
-{% block content %}
-<div class="container">
-    <!-- Featured Stories Section -->
-    <section class="featured-section mb-5">
-        <h2 class="section-title">Trend Hikayeler</h2>
-        
-        <div class="row">
-            {% for post in featured_posts %}
-            <div class="col-6 col-md-4 mb-4">
-                <div class="story-card featured-card animate-card {% if loop.index0 < 8 %}delay-{{ loop.index0 + 1 }}{% endif %}">
-                    {% if post.image_url %}
-                    <img src="{{ post.get_image_url() }}" alt="{{ post.title }}" class="story-image">
-                    {% else %}
-                    <img src="{{ url_for('static', filename='img/default-story.jpg') }}" alt="{{ post.title }}" class="story-image">
-                    {% endif %}
-                    
-                    <div class="story-content">
-                        <span class="story-category">{{ post.get_category_display() }}</span>
-                        <h3 class="story-title">{{ post.title }}</h3>
-                        <div class="story-excerpt d-none d-md-block">
-                            {{ post.content|striptags|truncate(100) }}
-                        </div>
-                        <div class="story-meta">
-                            <span><i class="far fa-calendar"></i> {{ post.created_at.strftime('%d.%m.%Y') }}</span>
-                            <span class="d-none d-md-inline"><i class="far fa-thumbs-up"></i> {{ post.likes }}</span>
-                            <span class="d-none d-md-inline"><i class="far fa-thumbs-down"></i> {{ post.dislikes }}</span>
-                            {% if post.author %}
-                            <div class="mt-1 d-none d-md-block"><i class="fas fa-user"></i> <a href="{{ url_for('author_posts', author=post.author) }}">{{ post.author }}</a></div>
-                            {% endif %}
-                        </div>
-                        <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-sm btn-primary mt-2">Oku</a>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </section>
-    
-    <!-- Recent Stories Section -->
-    <section class="recent-section mb-5">
-        <h2 class="section-title">Son Eklenenler</h2>
-        
-        <div class="row">
-            {% for post in recent_posts %}
-            <div class="col-6 col-md-3 mb-4">
-                <div class="story-card animate-card {% if loop.index0 < 8 %}delay-{{ loop.index0 + 1 }}{% endif %}">
-                    {% if post.image_url %}
-                    <img src="{{ post.get_image_url() }}" alt="{{ post.title }}" class="story-image">
-                    {% else %}
-                    <img src="{{ url_for('static', filename='img/default-story.jpg') }}" alt="{{ post.title }}" class="story-image">
-                    {% endif %}
-                    
-                    <div class="story-content">
-                        <span class="story-category">{{ post.get_category_display() }}</span>
-                        <h3 class="story-title">{{ post.title }}</h3>
-                        <div class="story-excerpt d-none d-md-block">
-                            {{ post.content|striptags|truncate(80) }}
-                        </div>
-                        <div class="story-meta">
-                            <span><i class="far fa-calendar"></i> {{ post.created_at.strftime('%d.%m.%Y') }}</span>
-                            <span class="d-none d-md-inline"><i class="far fa-thumbs-up"></i> {{ post.likes }}</span>
-                        </div>
-                        <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-sm btn-primary mt-2">Oku</a>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </section>
-    
-    <!-- Popular Stories Section -->
-    <section class="popular-section mb-5">
-        <h2 class="section-title">En Çok Beğenilenler</h2>
-        
-        <div class="row">
-            {% for post in most_liked_posts %}
-            <div class="col-6 col-md-3 mb-4">
-                <div class="story-card animate-card {% if loop.index0 < 8 %}delay-{{ loop.index0 + 1 }}{% endif %}">
-                    {% if post.image_url %}
-                    <img src="{{ post.get_image_url() }}" alt="{{ post.title }}" class="story-image">
-                    {% else %}
-                    <img src="{{ url_for('static', filename='img/default-story.jpg') }}" alt="{{ post.title }}" class="story-image">
-                    {% endif %}
-                    
-                    <div class="story-content">
-                        <span class="story-category">{{ post.get_category_display() }}</span>
-                        <h3 class="story-title">{{ post.title }}</h3>
-                        <div class="story-excerpt d-none d-md-block">
-                            {{ post.content|striptags|truncate(80) }}
-                        </div>
-                        <div class="story-meta">
-                            <span><i class="far fa-calendar"></i> {{ post.created_at.strftime('%d.%m.%Y') }}</span>
-                            <span><i class="far fa-thumbs-up"></i> {{ post.likes }}</span>
-                        </div>
-                        <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-sm btn-primary mt-2">Oku</a>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </section>
+{% block title %}Hepsi Hikaye - Ana Sayfa{% endblock %}
 
-    <!-- Videos Section -->
-    <section class="videos-section mb-5">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="section-title">Son Videolar</h2>
-            <a href="{{ url_for('videos') }}" class="btn btn-outline-primary btn-sm">Tüm Videolar <i class="fas fa-arrow-right"></i></a>
-        </div>
-        
-        <div class="row">
-            {% if videos %}
-                {% for video in videos %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">Son Hikayeler</h2>
+            <div class="row">
+                {% for post in posts %}
                 <div class="col-md-4 mb-4">
-                    <div class="card video-card animate-card {% if loop.index0 < 3 %}delay-{{ loop.index0 + 1 }}{% endif %}">
-                        <div class="embed-responsive embed-responsive-16by9">
-                            <iframe class="embed-responsive-item" style="width: 100%; height: 200px;"
-                                src="https://www.youtube.com/embed/{{ video.youtube_embed }}"
-                                frameborder="0"
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowfullscreen>
-                            </iframe>
-                        </div>
+                    <div class="card h-100">
+                        {% if post.image %}
+                        <img src="{{ url_for('static', filename='uploads/' + post.image) }}" class="card-img-top" alt="{{ post.title }}">
+                        {% endif %}
                         <div class="card-body">
-                            <h5 class="card-title">{{ video.title }}</h5>
-                            <p class="card-text"><small class="text-muted">{{ video.created_at.strftime('%d.%m.%Y') }}</small></p>
+                            <h5 class="card-title">{{ post.title }}</h5>
+                            <p class="card-text">{{ post.content|striptags|truncate(100) }}</p>
+                            <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-primary">Devamını Oku</a>
+                        </div>
+                        <div class="card-footer text-muted">
+                            {{ post.created_at.strftime('%d.%m.%Y') }}
                         </div>
                     </div>
                 </div>
                 {% endfor %}
-            {% else %}
-                <div class="col-12">
-                    <div class="alert alert-light text-center">
-                        Henüz video bulunmamaktadır.
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-5">
+        <div class="col-12">
+            <h2 class="mb-4">Son Videolar</h2>
+            <div class="row">
+                {% for video in videos %}
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100">
+                        {% if video.thumbnail_url %}
+                        <img src="{{ video.thumbnail_url }}" class="card-img-top" alt="{{ video.title }}">
+                        {% endif %}
+                        <div class="card-body">
+                            <h5 class="card-title">{{ video.title }}</h5>
+                            <p class="card-text">{{ video.description|default('')|truncate(100) }}</p>
+                            <a href="{{ url_for('video_detail', video_id=video.id) }}" class="btn btn-primary">İzle</a>
+                        </div>
+                        <div class="card-footer text-muted">
+                            {{ video.created_at.strftime('%d.%m.%Y') }}
+                        </div>
                     </div>
                 </div>
-            {% endif %}
+                {% endfor %}
+            </div>
         </div>
-    </section>
+    </div>
 </div>
 {% endblock %}

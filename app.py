@@ -208,6 +208,36 @@ def logout():
         flash('Çıkış yapılırken bir hata oluştu.', 'error')
         return redirect(url_for('index'))
 
+@app.route('/')
+def index():
+    try:
+        recent_posts = Post.query.order_by(Post.created_at.desc()).limit(6).all()
+        recent_videos = Video.query.order_by(Video.created_at.desc()).limit(6).all()
+        return render_template('index.html', posts=recent_posts, videos=recent_videos)
+    except Exception as e:
+        app.logger.error(f"Index page error: {str(e)}")
+        return render_template('errors/500.html')
+
+@app.route('/post/<int:post_id>')
+def post_detail(post_id):
+    try:
+        post = Post.query.get_or_404(post_id)
+        post.views += 1
+        db.session.commit()
+        return render_template('post_detail.html', post=post)
+    except Exception as e:
+        app.logger.error(f"Post detail error: {str(e)}")
+        return render_template('errors/500.html')
+
+@app.route('/video/<int:video_id>')
+def video_detail(video_id):
+    try:
+        video = Video.query.get_or_404(video_id)
+        return render_template('video_detail.html', video=video)
+    except Exception as e:
+        app.logger.error(f"Video detail error: {str(e)}")
+        return render_template('errors/500.html')
+
 if __name__ == '__main__':
     with app.app_context():
         init_db()

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}{{ video.title }} - Hepsi Hikaye{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <article class="card">
+                <div class="card-body">
+                    <h1 class="card-title">{{ video.title }}</h1>
+                    <div class="text-muted mb-3">
+                        <small>{{ video.created_at.strftime('%d.%m.%Y') }}</small>
+                    </div>
+                    
+                    <!-- YouTube Video Embed -->
+                    <div class="ratio ratio-16x9 mb-4">
+                        <iframe 
+                            src="https://www.youtube.com/embed/{{ video.youtube_id }}"
+                            title="{{ video.title }}"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowfullscreen>
+                        </iframe>
+                    </div>
+
+                    {% if video.description %}
+                    <div class="video-description">
+                        {{ video.description|safe }}
+                    </div>
+                    {% endif %}
+
+                    <div class="mt-4">
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-arrow-left"></i> Ana Sayfaya Dön
+                        </a>
+                    </div>
+                </div>
+            </article>
+
+            <!-- Comments Section -->
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h3 class="card-title">Yorumlar</h3>
+                    {% for comment in video.comments %}
+                    <div class="comment mb-3">
+                        <div class="d-flex justify-content-between">
+                            <strong>{{ comment.author_name }}</strong>
+                            <small class="text-muted">{{ comment.created_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                        </div>
+                        <p class="mb-0">{{ comment.content }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
