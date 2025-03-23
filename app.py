@@ -959,6 +959,112 @@ def admin_change_password():
         flash('Şifre değiştirilirken bir hata oluştu.', 'error')
         return redirect(url_for('admin_settings'))
 
+# Ensure data directories exist
+DATA_DIR = 'data'
+if not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR)
+
+POSTS_FILE = os.path.join(DATA_DIR, 'posts.json')
+VIDEOS_FILE = os.path.join(DATA_DIR, 'videos.json')
+CATEGORIES_FILE = os.path.join(DATA_DIR, 'categories.json')
+COMMENTS_FILE = os.path.join(DATA_DIR, 'comments.json')
+USERS_FILE = os.path.join(DATA_DIR, 'users.json')
+
+# File-based data helpers
+def load_data(file_path, default=None):
+    """Load data from a JSON file or return default if file doesn't exist"""
+    if default is None:
+        default = []
+    
+    try:
+        if os.path.exists(file_path):
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        else:
+            # Create the file with default data
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(default, f, ensure_ascii=False, indent=2)
+            return default
+    except Exception as e:
+        app.logger.error(f"Error loading data from {file_path}: {str(e)}")
+        return default
+
+def save_data(file_path, data):
+    """Save data to a JSON file"""
+    try:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        app.logger.error(f"Error saving data to {file_path}: {str(e)}")
+        return False
+
+def format_datetime(dt_str):
+    """Format a datetime string for display"""
+    if isinstance(dt_str, str):
+        try:
+            dt = datetime.fromisoformat(dt_str)
+            return dt.strftime('%d.%m.%Y %H:%M')
+        except:
+            return dt_str
+    return dt_str
+
+def get_category_by_id(category_id):
+    """Get a category by ID"""
+    categories = load_data(CATEGORIES_FILE, [])
+    for category in categories:
+        if category.get('id') == category_id:
+            return category
+    return None
+
+def init_file_data():
+    """Initialize the file-based data storage with default values"""
+    # Create data directory if it doesn't exist
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
+        app.logger.info(f"Created data directory at {DATA_DIR}")
+    
+    # Default categories
+    default_categories = [
+        {'id': 1, 'name': 'Öykü', 'slug': 'oyku'},
+        {'id': 2, 'name': 'Roman', 'slug': 'roman'},
+        {'id': 3, 'name': 'Şiir', 'slug': 'siir'},
+        {'id': 4, 'name': 'Deneme', 'slug': 'deneme'},
+        {'id': 5, 'name': 'İnceleme', 'slug': 'inceleme'},
+        {'id': 6, 'name': 'Haber', 'slug': 'haber'},
+        {'id': 7, 'name': 'Video', 'slug': 'video'}
+    ]
+    
+    # Default admin user with simple password (only for demo)
+    default_users = [
+        {'id': 1, 'username': 'admin', 'password': 'admin'}
+    ]
+    
+    # Default welcome post
+    default_posts = [
+        {
+            'id': 1,
+            'title': 'Hoş Geldiniz',
+            'content': 'Hepsi Hikaye web sitesine hoş geldiniz. Bu bir örnek içeriktir.',
+            'created_at': datetime.now().isoformat(),
+            'category_id': 1,
+            'views': 0,
+            'likes': 0,
+            'dislikes': 0,
+            'published': True,
+            'featured': True
+        }
+    ]
+    
+    # Load or create default data files
+    load_data(CATEGORIES_FILE, default_categories)
+    load_data(POSTS_FILE, default_posts)
+    load_data(VIDEOS_FILE, [])
+    load_data(COMMENTS_FILE, [])
+    load_data(USERS_FILE, default_users)
+    
+    app.logger.info("File-based data initialization complete")
+
 if __name__ == '__main__':
     # Ensure uploads directory exists
     uploads_dir = os.path.join(app.static_folder, 'uploads')
@@ -988,6 +1094,7 @@ if __name__ == '__main__':
         
     # Initialize the database 
     init_db()
+    init_file_data()
     port = int(os.environ.get('PORT', 5002))
     app.run(host='0.0.0.0', port=port)
 else:
@@ -1018,4 +1125,5 @@ else:
         app.logger.error(f"Error running migrations: {str(e)}")
         
     # Initialize the database 
-    init_db() 
+    init_db()
+    init_file_data() 
