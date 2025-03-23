@@ -305,8 +305,18 @@ def index():
         return render_template('index.html', posts=recent_posts, videos=recent_videos)
     except Exception as e:
         app.logger.error(f"Index error: {str(e)}")
-        # Use a simpler error template without complex URL generation
-        return "Server Error. Please contact the administrator.", 500
+        try:
+            # Fallback query without depending on new fields that might not exist yet
+            app.logger.info("Falling back to simpler query")
+            recent_posts = db.session.execute(
+                text("SELECT id, title, content, image, created_at FROM post ORDER BY created_at DESC LIMIT 6")
+            ).fetchall()
+            recent_videos = Video.query.order_by(Video.created_at.desc()).limit(3).all()
+            return render_template('index.html', posts=recent_posts, videos=recent_videos)
+        except Exception as inner_e:
+            app.logger.error(f"Fallback index error: {str(inner_e)}")
+            # Use a simpler error template without complex URL generation
+            return "Server Error. Please contact the administrator.", 500
 
 @app.route('/post/<int:post_id>')
 def post_detail(post_id):
@@ -905,4 +915,29 @@ if __name__ == '__main__':
     
     init_db()
     port = int(os.environ.get('PORT', 5002))
-    app.run(host='0.0.0.0', port=port) 
+    app.run(host='0.0.0.0', port=port)
+else:
+    # This code runs when imported (e.g., by Gunicorn in production)
+    # Ensure uploads and images directories exist
+    uploads_dir = os.path.join(app.static_folder, 'uploads')
+    if not os.path.exists(uploads_dir):
+        os.makedirs(uploads_dir)
+        app.logger.info(f"Created uploads directory at {uploads_dir}")
+    
+    images_dir = os.path.join(app.static_folder, 'images')
+    if not os.path.exists(images_dir):
+        os.makedirs(images_dir)
+        app.logger.info(f"Created images directory at {images_dir}")
+    
+    # Run database migrations if we have a DATABASE_URL (indicating PostgreSQL)
+    try:
+        database_url = os.environ.get('DATABASE_URL')
+        if database_url and 'postgres' in database_url:
+            app.logger.info("PostgreSQL database detected. Running migrations...")
+            from migrations import run_migrations
+            run_migrations()
+    except Exception as e:
+        app.logger.error(f"Error running migrations: {str(e)}")
+        
+    # Initialize the database 
+    init_db() 
