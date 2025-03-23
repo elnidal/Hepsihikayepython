@@ -1,56 +1,123 @@
-{% extends 'base.html' %}
+{% extends "admin/base.html" %}
 
-{% block title %}{{ title }}{% endblock %}
+{% block title %}{% if video %}Videoyu Düzenle{% else %}Yeni Video{% endif %}{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-md-8 offset-md-2">
-            <div class="card">
-                <div class="card-header">
-                    <h3>{{ title }}</h3>
-                </div>
-                <div class="card-body">
-                    <form method="POST">
-                        {{ form.hidden_tag() }}
-                        
-                        <div class="mb-3">
-                            {{ form.title.label(class="form-label") }}
-                            {{ form.title(class="form-control") }}
-                            {% if form.title.errors %}
-                                <div class="text-danger">
-                                    {% for error in form.title.errors %}
-                                        <span>{{ error }}</span>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
-                        </div>
-                        
-                        <div class="mb-3">
-                            {{ form.youtube_embed.label(class="form-label") }}
-                            {{ form.youtube_embed(class="form-control", placeholder="Video ID veya YouTube URL'si") }}
-                            {% if form.youtube_embed.errors %}
-                                <div class="text-danger">
-                                    {% for error in form.youtube_embed.errors %}
-                                        <span>{{ error }}</span>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
-                            <small class="form-text text-muted">
-                                YouTube video ID'sini veya tam URL'yi girebilirsiniz. Örneğin:<br>
-                                - Video ID: dQw4w9WgXcQ<br>
-                                - Tam URL: https://www.youtube.com/watch?v=dQw4w9WgXcQ
-                            </small>
-                        </div>
-                        
-                        <div class="mb-3">
-                            {{ form.submit(class="btn btn-primary") }}
-                            <a href="{{ url_for('videos') }}" class="btn btn-secondary">İptal</a>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+<div class="content-header">
+    <h1>{% if video %}Videoyu Düzenle{% else %}Yeni Video{% endif %}</h1>
+    <div>
+        <a href="{{ url_for('admin_videos') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-1"></i> Videolara Dön
+        </a>
     </div>
 </div>
+
+<div class="card">
+    <div class="card-header">
+        <div>Video Bilgileri</div>
+    </div>
+    <div class="card-body">
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="mb-3">
+                        <label for="title" class="form-label required-field">Başlık</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="title" 
+                               name="title" 
+                               value="{{ video.title if video else '' }}" 
+                               required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="youtube_id" class="form-label required-field">YouTube Video ID</label>
+                        <div class="input-group">
+                            <span class="input-group-text">https://youtube.com/watch?v=</span>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="youtube_id" 
+                                   name="youtube_id" 
+                                   value="{{ video.youtube_id if video else '' }}" 
+                                   required>
+                        </div>
+                        <div class="form-text">
+                            YouTube video URL'sinden ID kısmını girin. Örnek: 
+                            https://www.youtube.com/watch?v=<strong>VIDEO_ID</strong>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Açıklama</label>
+                        <textarea class="form-control" 
+                                  id="description" 
+                                  name="description" 
+                                  rows="5">{{ video.description if video else '' }}</textarea>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">Önizleme</label>
+                        <div id="videoPreviewContainer" class="mt-2 {% if not video %}d-none{% endif %}">
+                            <div class="ratio ratio-16x9 border rounded overflow-hidden">
+                                <iframe id="videoPreview" 
+                                        src="{% if video %}https://www.youtube.com/embed/{{ video.youtube_id }}{% endif %}" 
+                                        title="{{ video.title if video else 'Video Önizleme' }}"
+                                        allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                        allowfullscreen></iframe>
+                            </div>
+                        </div>
+                        <div id="noPreviewMessage" class="alert alert-info mt-2 {% if video %}d-none{% endif %}">
+                            <i class="fas fa-info-circle me-1"></i> YouTube ID girildiğinde önizleme görüntülenecektir.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-end mt-4">
+                <button type="button" class="btn btn-secondary me-2" onclick="window.location.href='{{ url_for('admin_videos') }}'">
+                    İptal
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save me-1"></i> Kaydet
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const youtubeIdInput = document.getElementById('youtube_id');
+        const videoPreview = document.getElementById('videoPreview');
+        const videoPreviewContainer = document.getElementById('videoPreviewContainer');
+        const noPreviewMessage = document.getElementById('noPreviewMessage');
+        
+        // Update video preview when YouTube ID changes
+        youtubeIdInput.addEventListener('input', updateVideoPreview);
+        
+        // Initial preview update
+        if (youtubeIdInput.value) {
+            updateVideoPreview();
+        }
+        
+        function updateVideoPreview() {
+            const youtubeId = youtubeIdInput.value.trim();
+            
+            if (youtubeId) {
+                videoPreview.src = "https://www.youtube.com/embed/" + youtubeId;
+                videoPreviewContainer.classList.remove('d-none');
+                noPreviewMessage.classList.add('d-none');
+            } else {
+                videoPreviewContainer.classList.add('d-none');
+                noPreviewMessage.classList.remove('d-none');
+            }
+        }
+    });
+</script>
 {% endblock %}

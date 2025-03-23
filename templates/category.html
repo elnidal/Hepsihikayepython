@@ -2,32 +2,27 @@
 
 {% block content %}
 <div class="container">
-    <h1 class="section-title">{{ category_display }}</h1>
+    <h1 class="section-title">{{ category.name }}</h1>
     
     <div class="row">
         {% for post in posts %}
         <div class="col-md-4 mb-4">
             <div class="story-card">
-                {% if post.image_url %}
-                <img src="{{ post.get_image_url() }}" alt="{{ post.title }}" class="story-image">
+                {% if post.image %}
+                <img src="{{ post.image }}" alt="{{ post.title }}" class="story-image">
                 {% else %}
                 <img src="{{ url_for('static', filename='img/default-story.jpg') }}" alt="{{ post.title }}" class="story-image">
                 {% endif %}
                 
                 <div class="story-content">
-                    <span class="story-category">{{ post.get_category_display() }}</span>
+                    <span class="story-category">{{ category.name }}</span>
                     <h3 class="story-title">{{ post.title }}</h3>
                     <div class="story-excerpt">
                         {{ post.content|striptags|truncate(150) }}
                     </div>
                     <div class="story-meta">
-                        {% if post.author %}
-                        <span class="story-author">
-                            <a href="{{ url_for('author_posts', author=post.author) }}">{{ post.author }}</a>
-                        </span>
-                        {% endif %}
                         <span>{{ post.created_at.strftime('%d.%m.%Y') }}</span>
-                        <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-sm btn-outline-primary">Devamını Oku</a>
+                        <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-sm btn-outline-primary">Devamını Oku</a>
                     </div>
                 </div>
             </div>
@@ -40,60 +35,6 @@
         </div>
         {% endif %}
     </div>
-    
-    {% if pagination and pagination.pages > 1 %}
-    <div class="row">
-        <div class="col-12">
-            <nav aria-label="Sayfalama">
-                <ul class="pagination justify-content-center">
-                    {% if pagination.has_prev %}
-                    <li class="page-item">
-                        <a class="page-link" href="{{ url_for(request.endpoint, category=category, page=pagination.prev_num, **request.args) }}" aria-label="Önceki">
-                            <span aria-hidden="true">&laquo;</span>
-                            <span class="sr-only">Önceki</span>
-                        </a>
-                    </li>
-                    {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link" aria-hidden="true">&laquo;</span>
-                    </li>
-                    {% endif %}
-                    
-                    {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-                        {% if page_num %}
-                            {% if page_num == pagination.page %}
-                            <li class="page-item active">
-                                <span class="page-link">{{ page_num }}</span>
-                            </li>
-                            {% else %}
-                            <li class="page-item">
-                                <a class="page-link" href="{{ url_for(request.endpoint, category=category, page=page_num, **request.args) }}">{{ page_num }}</a>
-                            </li>
-                            {% endif %}
-                        {% else %}
-                        <li class="page-item disabled">
-                            <span class="page-link">...</span>
-                        </li>
-                        {% endif %}
-                    {% endfor %}
-                    
-                    {% if pagination.has_next %}
-                    <li class="page-item">
-                        <a class="page-link" href="{{ url_for(request.endpoint, category=category, page=pagination.next_num, **request.args) }}" aria-label="Sonraki">
-                            <span aria-hidden="true">&raquo;</span>
-                            <span class="sr-only">Sonraki</span>
-                        </a>
-                    </li>
-                    {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link" aria-hidden="true">&raquo;</span>
-                    </li>
-                    {% endif %}
-                </ul>
-            </nav>
-        </div>
-    </div>
-    {% endif %}
 </div>
 {% endblock %}
 

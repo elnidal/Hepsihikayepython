@@ -26,6 +26,8 @@ import sys
 from sqlalchemy import text
 from decorators import handle_db_error
 from sqlalchemy.orm import joinedload
+from markupsafe import Markup
+from dotenv import load_dotenv
 
 # Configure logging
 if not os.path.exists('logs'):
@@ -48,13 +50,13 @@ app.logger.info('Application startup')
 @app.errorhandler(404)
 def not_found_error(error):
     app.logger.error(f'Page not found: {request.url}')
-    return render_template('errors/404.html'), 404
+    return "Page not found. Please check the URL.", 404
 
 @app.errorhandler(500)
 def internal_error(error):
     db.session.rollback()
     app.logger.error(f'Server Error: {error}')
-    return render_template('errors/500.html'), 500
+    return "Internal server error. Please contact the administrator.", 500
 
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key')
 
@@ -64,6 +66,11 @@ database_url = os.environ.get('DATABASE_URL', "postgresql://hepsihikaye_wyg3_use
 # Configure SQLAlchemy
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Configure CKEditor
+app.config['CKEDITOR_SERVE_LOCAL'] = True
+app.config['CKEDITOR_HEIGHT'] = 400
+app.config['CKEDITOR_PKG_TYPE'] = 'standard'
 
 # Initialize extensions
 db = SQLAlchemy(app)
@@ -86,12 +93,19 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         return check_password_hash(self.password, password)
 
+class Category(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+    slug = db.Column(db.String(50), unique=True, nullable=False)
+    posts = db.relationship('Post', backref='category', lazy=True)
+
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=False)
     image = db.Column(db.String(200), nullable=True)
     views = db.Column(db.Integer, default=0)
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     comments = db.relationship('Comment', backref='post', lazy=True)
@@ -138,6 +152,26 @@ def init_db():
                 app.logger.info("Default admin user created")
             else:
                 app.logger.info("Admin user already exists")
+
+            # Create default categories
+            default_categories = [
+                {'name': 'Öykü', 'slug': 'oyku'},
+                {'name': 'Roman', 'slug': 'roman'},
+                {'name': 'Şiir', 'slug': 'siir'},
+                {'name': 'Deneme', 'slug': 'deneme'},
+                {'name': 'İnceleme', 'slug': 'inceleme'},
+                {'name': 'Haber', 'slug': 'haber'},
+                {'name': 'Video', 'slug': 'video'}
+            ]
+
+            for cat_data in default_categories:
+                category = Category.query.filter_by(slug=cat_data['slug']).first()
+                if not category:
+                    category = Category(name=cat_data['name'], slug=cat_data['slug'])
+                    db.session.add(category)
+            
+            db.session.commit()
+            app.logger.info("Default categories created")
 
             # Create uploads directory if it doesn't exist
             uploads_dir = os.path.join(app.static_folder, 'uploads')
@@ -189,27 +223,30 @@ def admin_index():
 @login_required
 def admin_dashboard():
     try:
-        # Get recent posts and videos
-        recent_posts = Post.query.order_by(Post.created_at.desc()).limit(10).all()
-        recent_videos = Video.query.order_by(Video.created_at.desc()).limit(10).all()
-        
-        # Get statistics
         total_posts = Post.query.count()
         total_videos = Video.query.count()
         total_comments = Comment.query.count()
         total_views = db.session.query(db.func.sum(Post.views)).scalar() or 0
         
-        return render_template('admin/dashboard.html',
-                             posts=recent_posts,
-                             videos=recent_videos,
-                             total_posts=total_posts,
-                             total_videos=total_videos,
-                             total_comments=total_comments,
-                             total_views=total_views)
+        # Get most recent posts
+        recent_posts = Post.query.order_by(Post.created_at.desc()).limit(5).all()
+        
+        # Get most recent videos
+        recent_videos = Video.query.order_by(Video.created_at.desc()).limit(5).all()
+        
+        return render_template(
+            'admin/dashboard.html',
+            total_posts=total_posts,
+            total_videos=total_videos,
+            total_comments=total_comments,
+            total_views=total_views,
+            recent_posts=recent_posts,
+            recent_videos=recent_videos
+        )
     except Exception as e:
         app.logger.error(f"Admin dashboard error: {str(e)}")
-        flash('Dashboard yüklenirken bir hata oluştu.', 'error')
-        return redirect(url_for('admin_index'))
+        flash('Dashboard yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.', 'danger')
+        return redirect(url_for('admin_login'))
 
 @app.route('/admin/logout')
 @login_required
@@ -226,12 +263,14 @@ def admin_logout():
 @app.route('/')
 def index():
     try:
+        # Get featured content for homepage
         recent_posts = Post.query.order_by(Post.created_at.desc()).limit(6).all()
-        recent_videos = Video.query.order_by(Video.created_at.desc()).limit(6).all()
+        recent_videos = Video.query.order_by(Video.created_at.desc()).limit(3).all()
         return render_template('index.html', posts=recent_posts, videos=recent_videos)
     except Exception as e:
-        app.logger.error(f"Index page error: {str(e)}")
-        return render_template('errors/500.html')
+        app.logger.error(f"Index error: {str(e)}")
+        # Use a simpler error template without complex URL generation
+        return "Server Error. Please contact the administrator.", 500
 
 @app.route('/post/<int:post_id>')
 def post_detail(post_id):
@@ -242,7 +281,7 @@ def post_detail(post_id):
         return render_template('post_detail.html', post=post)
     except Exception as e:
         app.logger.error(f"Post detail error: {str(e)}")
-        return render_template('errors/500.html')
+        return "An error occurred loading this post.", 500
 
 @app.route('/video/<int:video_id>')
 def video_detail(video_id):
@@ -265,7 +304,386 @@ def videos():
         app.logger.error(f"Videos page error: {str(e)}")
         return render_template('errors/500.html')
 
+@app.route('/admin/posts')
+@login_required
+def admin_posts():
+    try:
+        search_query = request.args.get('search', '')
+        if search_query:
+            posts = Post.query.options(joinedload(Post.category)).filter(
+                or_(
+                    Post.title.ilike(f'%{search_query}%'),
+                    Post.content.ilike(f'%{search_query}%')
+                )
+            ).order_by(Post.created_at.desc()).all()
+        else:
+            posts = Post.query.options(joinedload(Post.category)).order_by(Post.created_at.desc()).all()
+        return render_template('admin/posts.html', posts=posts, search_query=search_query)
+    except Exception as e:
+        app.logger.error(f"Admin posts error: {str(e)}")
+        flash('Gönderiler yüklenirken bir hata oluştu.', 'error')
+        return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/posts/new', methods=['GET', 'POST'])
+@login_required
+def admin_new_post():
+    try:
+        categories = Category.query.all()
+        
+        if request.method == 'POST':
+            title = request.form.get('title')
+            content = request.form.get('content')
+            category_id = request.form.get('category_id')
+            image = request.files.get('image')
+            
+            if not title or not content:
+                flash('Başlık ve içerik alanları zorunludur.', 'error')
+                return redirect(url_for('admin_new_post'))
+            
+            post = Post(
+                title=title, 
+                content=content,
+                category_id=category_id if category_id else None
+            )
+            
+            if image and image.filename:
+                filename = secure_filename(image.filename)
+                image_path = os.path.join(app.static_folder, 'uploads', filename)
+                image.save(image_path)
+                post.image = f'/static/uploads/{filename}'
+            
+            db.session.add(post)
+            db.session.commit()
+            flash('Gönderi başarıyla oluşturuldu.', 'success')
+            return redirect(url_for('admin_posts'))
+            
+        return render_template('admin/post_form.html', categories=categories)
+    except Exception as e:
+        app.logger.error(f"New post error: {str(e)}")
+        flash('Gönderi oluşturulurken bir hata oluştu.', 'error')
+        return redirect(url_for('admin_posts'))
+
+@app.route('/admin/posts/<int:post_id>/edit', methods=['GET', 'POST'])
+@login_required
+def admin_edit_post(post_id):
+    try:
+        post = Post.query.get_or_404(post_id)
+        categories = Category.query.all()
+        
+        if request.method == 'POST':
+            post.title = request.form.get('title')
+            post.content = request.form.get('content')
+            post.category_id = request.form.get('category_id') or None
+            
+            image = request.files.get('image')
+            if image and image.filename:
+                # If there's a current image, we might want to delete it to save space
+                # (optional implementation would go here)
+                
+                filename = secure_filename(image.filename)
+                image_path = os.path.join(app.static_folder, 'uploads', filename)
+                image.save(image_path)
+                post.image = f'/static/uploads/{filename}'
+            
+            db.session.commit()
+            flash('Gönderi başarıyla güncellendi.', 'success')
+            return redirect(url_for('admin_posts'))
+            
+        return render_template('admin/post_form.html', post=post, categories=categories)
+    except Exception as e:
+        app.logger.error(f"Edit post error: {str(e)}")
+        flash('Gönderi güncellenirken bir hata oluştu.', 'error')
+        return redirect(url_for('admin_posts'))
+
+@app.route('/admin/posts/<int:post_id>/delete', methods=['POST'])
+@login_required
+def admin_delete_post(post_id):
+    try:
+        post = Post.query.get_or_404(post_id)
+        
+        # Delete the image file if it exists
+        if post.image and post.image.startswith('/static/uploads/'):
+            image_path = os.path.join(app.static_folder, post.image.replace('/static/', ''))
+            if os.path.exists(image_path):
+                os.remove(image_path)
+                app.logger.info(f"Deleted image file: {image_path}")
+        
+        db.session.delete(post)
+        db.session.commit()
+        flash('Gönderi başarıyla silindi.', 'success')
+    except Exception as e:
+        app.logger.error(f"Delete post error: {str(e)}")
+        flash('Gönderi silinirken bir hata oluştu.', 'error')
+    return redirect(url_for('admin_posts'))
+
+@app.route('/admin/videos')
+@login_required
+def admin_videos():
+    try:
+        search_query = request.args.get('search', '')
+        if search_query:
+            videos = Video.query.filter(
+                or_(
+                    Video.title.ilike(f'%{search_query}%'),
+                    Video.description.ilike(f'%{search_query}%')
+                )
+            ).order_by(Video.created_at.desc()).all()
+        else:
+            videos = Video.query.order_by(Video.created_at.desc()).all()
+        return render_template('admin/videos.html', videos=videos, search_query=search_query)
+    except Exception as e:
+        app.logger.error(f"Admin videos error: {str(e)}")
+        flash('Videolar yüklenirken bir hata oluştu.', 'error')
+        return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/videos/new', methods=['GET', 'POST'])
+@login_required
+def admin_new_video():
+    try:
+        if request.method == 'POST':
+            title = request.form.get('title')
+            youtube_id = request.form.get('youtube_id')
+            description = request.form.get('description')
+            
+            if not title or not youtube_id:
+                flash('Başlık ve YouTube ID alanları zorunludur.', 'error')
+                return redirect(url_for('admin_new_video'))
+            
+            video = Video(
+                title=title,
+                youtube_id=youtube_id,
+                description=description,
+                thumbnail_url=f'https://img.youtube.com/vi/{youtube_id}/maxresdefault.jpg'
+            )
+            
+            db.session.add(video)
+            db.session.commit()
+            flash('Video başarıyla eklendi.', 'success')
+            return redirect(url_for('admin_videos'))
+            
+        return render_template('admin/video_form.html')
+    except Exception as e:
+        app.logger.error(f"New video error: {str(e)}")
+        flash('Video eklenirken bir hata oluştu.', 'error')
+        return redirect(url_for('admin_videos'))
+
+@app.route('/admin/videos/<int:video_id>/edit', methods=['GET', 'POST'])
+@login_required
+def admin_edit_video(video_id):
+    try:
+        video = Video.query.get_or_404(video_id)
+        
+        if request.method == 'POST':
+            video.title = request.form.get('title')
+            video.youtube_id = request.form.get('youtube_id')
+            video.description = request.form.get('description')
+            video.thumbnail_url = f'https://img.youtube.com/vi/{video.youtube_id}/maxresdefault.jpg'
+            
+            db.session.commit()
+            flash('Video başarıyla güncellendi.', 'success')
+            return redirect(url_for('admin_videos'))
+            
+        return render_template('admin/video_form.html', video=video)
+    except Exception as e:
+        app.logger.error(f"Edit video error: {str(e)}")
+        flash('Video güncellenirken bir hata oluştu.', 'error')
+        return redirect(url_for('admin_videos'))
+
+@app.route('/admin/videos/<int:video_id>/delete', methods=['POST'])
+@login_required
+def admin_delete_video(video_id):
+    try:
+        video = Video.query.get_or_404(video_id)
+        db.session.delete(video)
+        db.session.commit()
+        flash('Video başarıyla silindi.', 'success')
+    except Exception as e:
+        app.logger.error(f"Delete video error: {str(e)}")
+        flash('Video silinirken bir hata oluştu.', 'error')
+    return redirect(url_for('admin_videos'))
+
+@app.route('/admin/videos/delete/<int:id>')
+def delete_video(id):
+    video = Video.query.get_or_404(id)
+    db.session.delete(video)
+    db.session.commit()
+    return redirect(url_for('admin_videos'))
+
+@app.route('/category/<slug>')
+def category_posts(slug):
+    try:
+        category = Category.query.filter_by(slug=slug).first_or_404()
+        posts = Post.query.filter_by(category_id=category.id).order_by(Post.created_at.desc()).all()
+        return render_template('category.html', category=category, posts=posts)
+    except Exception as e:
+        app.logger.error(f"Category posts error: {str(e)}")
+        return render_template('errors/500.html')
+
+@app.context_processor
+def inject_categories():
+    try:
+        categories = Category.query.all()
+        return dict(categories=categories)
+    except Exception as e:
+        app.logger.error(f"Category injection error: {str(e)}")
+        return dict(categories=[])
+
+@app.route('/admin/categories', methods=['GET'])
+@login_required
+def admin_categories():
+    categories = Category.query.all()
+    return render_template('admin/categories.html', categories=categories)
+
+@app.route('/admin/categories/new', methods=['POST'])
+@login_required
+def admin_new_category():
+    name = request.form.get('name')
+    slug = request.form.get('slug')
+    
+    if not name or not slug:
+        flash('Kategori adı ve slug gereklidir.', 'danger')
+        return redirect(url_for('admin_categories'))
+    
+    # Check if category with same name or slug exists
+    exists = Category.query.filter((Category.name == name) | (Category.slug == slug)).first()
+    if exists:
+        flash('Bu isim veya slug ile bir kategori zaten mevcut.', 'danger')
+        return redirect(url_for('admin_categories'))
+    
+    try:
+        category = Category(name=name, slug=slug)
+        db.session.add(category)
+        db.session.commit()
+        flash('Kategori başarıyla oluşturuldu.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Create category error: {str(e)}")
+        flash('Kategori oluşturulurken bir hata oluştu.', 'danger')
+    
+    return redirect(url_for('admin_categories'))
+
+@app.route('/admin/categories/edit', methods=['POST'])
+@login_required
+def admin_edit_category():
+    category_id = request.form.get('id')
+    name = request.form.get('name')
+    slug = request.form.get('slug')
+    
+    if not name or not slug or not category_id:
+        flash('Eksik bilgi.', 'danger')
+        return redirect(url_for('admin_categories'))
+    
+    try:
+        category = Category.query.get_or_404(category_id)
+        
+        # Check if category with same name or slug exists (excluding this one)
+        exists = Category.query.filter(
+            ((Category.name == name) | (Category.slug == slug)) & 
+            (Category.id != category.id)
+        ).first()
+        
+        if exists:
+            flash('Bu isim veya slug ile başka bir kategori zaten mevcut.', 'danger')
+            return redirect(url_for('admin_categories'))
+        
+        category.name = name
+        category.slug = slug
+        db.session.commit()
+        flash('Kategori başarıyla güncellendi.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Edit category error: {str(e)}")
+        flash('Kategori güncellenirken bir hata oluştu.', 'danger')
+    
+    return redirect(url_for('admin_categories'))
+
+@app.route('/admin/categories/<int:id>/delete', methods=['POST'])
+@login_required
+def admin_delete_category(id):
+    try:
+        category = Category.query.get_or_404(id)
+        
+        # Update posts with this category to have no category
+        posts = Post.query.filter_by(category_id=id).all()
+        for post in posts:
+            post.category_id = None
+        
+        db.session.delete(category)
+        db.session.commit()
+        flash('Kategori başarıyla silindi.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Delete category error: {str(e)}")
+        flash('Kategori silinirken bir hata oluştu.', 'danger')
+    
+    return redirect(url_for('admin_categories'))
+
+@app.route('/admin/comments')
+@login_required
+def admin_comments():
+    try:
+        comments = Comment.query.order_by(Comment.created_at.desc()).all()
+        return render_template('admin/comments.html', comments=comments)
+    except Exception as e:
+        app.logger.error(f"Admin comments error: {str(e)}")
+        flash('Yorumlar yüklenirken bir hata oluştu.', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/comments/<int:comment_id>/delete', methods=['POST'])
+@login_required
+def delete_comment(comment_id):
+    try:
+        comment = Comment.query.get_or_404(comment_id)
+        db.session.delete(comment)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        app.logger.error(f"Delete comment error: {str(e)}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/admin/settings')
+@login_required
+def admin_settings():
+    try:
+        return render_template('admin/settings.html')
+    except Exception as e:
+        app.logger.error(f"Admin settings error: {str(e)}")
+        flash('Ayarlar yüklenirken bir hata oluştu.', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/change-password', methods=['POST'])
+@login_required
+def admin_change_password():
+    try:
+        current_password = request.form.get('current_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if not current_password or not new_password or not confirm_password:
+            flash('Tüm alanları doldurun.', 'error')
+            return redirect(url_for('admin_settings'))
+        
+        if new_password != confirm_password:
+            flash('Yeni şifreler eşleşmiyor.', 'error')
+            return redirect(url_for('admin_settings'))
+        
+        user = User.query.get(current_user.id)
+        if not user.check_password(current_password):
+            flash('Mevcut şifre yanlış.', 'error')
+            return redirect(url_for('admin_settings'))
+        
+        user.password = generate_password_hash(new_password)
+        db.session.commit()
+        
+        flash('Şifreniz başarıyla güncellendi.', 'success')
+        return redirect(url_for('admin_settings'))
+    except Exception as e:
+        app.logger.error(f"Change password error: {str(e)}")
+        flash('Şifre değiştirilirken bir hata oluştu.', 'error')
+        return redirect(url_for('admin_settings'))
+
 if __name__ == '__main__':
     init_db()
-    port = int(os.environ.get('PORT', 5001))
+    port = int(os.environ.get('PORT', 5002))
     app.run(host='0.0.0.0', port=port) 

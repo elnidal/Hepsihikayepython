@@ -23,7 +23,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}" media="screen and (max-width: 768px)">
     {% if current_user.is_authenticated %}
-        {{ ckeditor.load(custom_url=("https://cdn.ckeditor.com/4.16.2/standard/ckeditor.js")) }}
+        {{ ckeditor.load() }}
         {{ ckeditor.config(name='content') }}
     {% endif %}
     <style>
@@ -264,7 +264,7 @@
         <nav class="nav-categories">
             <a href="{{ url_for('index') }}" class="nav-category {% if request.path == url_for('index') %}active{% endif %}">Anasayfa</a>
             {% for category in categories %}
-            <a href="{{ url_for('category', category=category.slug) }}" class="nav-category {% if '/category/' ~ category.slug in request.path %}active{% endif %}">{{ category.name }}</a>
+            <a href="{{ url_for('category_posts', slug=category.slug) }}" class="nav-category {% if '/category/' ~ category.slug in request.path %}active{% endif %}">{{ category.name }}</a>
             {% endfor %}
         </nav>
     </div>
@@ -295,7 +295,7 @@
                     <h3 class="footer-title">Kategoriler</h3>
                     <div class="footer-links">
                         {% for category in categories %}
-                        <a href="{{ url_for('category', category=category.slug) }}">{{ category.name }}</a>
+                        <a href="{{ url_for('category_posts', slug=category.slug) }}">{{ category.name }}</a>
                         {% endfor %}
                     </div>
                 </div>
@@ -331,7 +331,7 @@
             <i class="fas fa-user-shield"></i>
             <span>Admin</span>
         </a>
-        <a href="{{ url_for('logout') }}" class="mobile-nav-item {% if '/logout' in request.path %}active{% endif %}">
+        <a href="{{ url_for('admin_logout') }}" class="mobile-nav-item {% if '/admin/logout' in request.path %}active{% endif %}">
             <i class="fas fa-sign-out-alt"></i>
             <span>Çıkış</span>
         </a>
@@ -349,7 +349,7 @@
         <a href="{{ url_for('admin_index') }}" class="admin-corner-btn">
             <i class="fas fa-user-shield"></i>
         </a>
-        <a href="{{ url_for('logout') }}" class="admin-corner-btn ms-2">
+        <a href="{{ url_for('admin_logout') }}" class="admin-corner-btn ms-2">
             <i class="fas fa-sign-out-alt"></i>
         </a>
         {% else %}
