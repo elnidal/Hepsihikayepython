@@ -45,13 +45,35 @@ def run_migrations():
     try:
         cursor = conn.cursor()
         
-        # Check if columns exist and add them if they don't
+        # First check if the post table exists
+        cursor.execute(
+            "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = 'post')"
+        )
+        if not cursor.fetchone()[0]:
+            logger.error("Post table does not exist. Database may not be initialized properly.")
+            return False
+        
+        # List all required columns with their types and defaults
+        columns = [
+            ('id', 'SERIAL PRIMARY KEY', None),  # This should already exist
+            ('title', 'VARCHAR(200) NOT NULL', None),  # This should already exist
+            ('content', 'TEXT NOT NULL', None),  # This should already exist
+            ('excerpt', 'TEXT', None),
+            ('image', 'VARCHAR(200)', None),  # Missing column found in logs
+            ('views', 'INTEGER', '0'),
+            ('likes', 'INTEGER', '0'),
+            ('dislikes', 'INTEGER', '0'),
+            ('published', 'BOOLEAN', 'TRUE'),
+            ('featured', 'BOOLEAN', 'FALSE'),
+            ('category_id', 'INTEGER', None),  # This should already exist
+            ('created_at', 'TIMESTAMP', 'CURRENT_TIMESTAMP'),  # This should already exist
+            ('updated_at', 'TIMESTAMP', 'CURRENT_TIMESTAMP')  # This should already exist
+        ]
+        
+        # Check each column and add if it doesn't exist
         logger.info("Checking for missing columns in post table...")
-        add_column_if_not_exists(cursor, 'post', 'excerpt', 'TEXT')
-        add_column_if_not_exists(cursor, 'post', 'published', 'BOOLEAN', 'TRUE')
-        add_column_if_not_exists(cursor, 'post', 'featured', 'BOOLEAN', 'FALSE')
-        add_column_if_not_exists(cursor, 'post', 'likes', 'INTEGER', '0')
-        add_column_if_not_exists(cursor, 'post', 'dislikes', 'INTEGER', '0')
+        for column_name, data_type, default in columns:
+            add_column_if_not_exists(cursor, 'post', column_name, data_type, default)
         
         logger.info("All migrations completed successfully")
         conn.close()
@@ -65,6 +87,10 @@ def run_migrations():
 def add_column_if_not_exists(cursor, table, column, data_type, default=None):
     """Add a column to a table if it doesn't exist"""
     try:
+        # Skip id column as it's the primary key and should already exist
+        if column == 'id':
+            return
+            
         # Check if column exists
         cursor.execute(
             sql.SQL("SELECT column_name FROM information_schema.columns WHERE table_name = %s AND column_name = %s"),
@@ -73,17 +99,18 @@ def add_column_if_not_exists(cursor, table, column, data_type, default=None):
         
         if cursor.fetchone() is None:
             # Column doesn't exist, add it
-            query = sql.SQL("ALTER TABLE {} ADD COLUMN {} {}").format(
-                sql.Identifier(table),
-                sql.Identifier(column),
-                sql.SQL(data_type)
-            )
-            
-            # Add default value if provided
             if default is not None:
-                query = sql.SQL("{} DEFAULT {}").format(
-                    query,
+                query = sql.SQL("ALTER TABLE {} ADD COLUMN IF NOT EXISTS {} {} DEFAULT {}").format(
+                    sql.Identifier(table),
+                    sql.Identifier(column),
+                    sql.SQL(data_type),
                     sql.SQL(default)
+                )
+            else:
+                query = sql.SQL("ALTER TABLE {} ADD COLUMN IF NOT EXISTS {} {}").format(
+                    sql.Identifier(table),
+                    sql.Identifier(column),
+                    sql.SQL(data_type)
                 )
             
             cursor.execute(query)

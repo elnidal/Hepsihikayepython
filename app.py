@@ -138,9 +138,13 @@ class Post(db.Model):
         return self.category.name if self.category else "Kategorisiz"
     
     def get_image_url(self):
-        if self.image:
-            return url_for('static', filename=f'uploads/{self.image}')
-        return url_for('static', filename='images/default-post.jpg')
+        try:
+            if hasattr(self, 'image') and self.image:
+                return url_for('static', filename=f'uploads/{self.image}')
+            return url_for('static', filename='images/default-post.jpg')
+        except Exception as e:
+            app.logger.error(f"Error getting image URL: {str(e)}")
+            return url_for('static', filename='images/default-post.jpg')
 
 class Video(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -306,13 +310,27 @@ def index():
     except Exception as e:
         app.logger.error(f"Index error: {str(e)}")
         try:
+            # Rollback any failed transaction
+            db.session.rollback()
+            
             # Fallback query without depending on new fields that might not exist yet
             app.logger.info("Falling back to simpler query")
-            recent_posts = db.session.execute(
-                text("SELECT id, title, content, image, created_at FROM post ORDER BY created_at DESC LIMIT 6")
-            ).fetchall()
-            recent_videos = Video.query.order_by(Video.created_at.desc()).limit(3).all()
-            return render_template('index.html', posts=recent_posts, videos=recent_videos)
+            try:
+                # Use a new connection to avoid transaction issues
+                with db.engine.connect() as conn:
+                    # Execute a simple raw SQL query to get basic post data
+                    recent_posts = conn.execute(
+                        text("SELECT id, title, content, created_at FROM post ORDER BY created_at DESC LIMIT 6")
+                    ).fetchall()
+                    
+                    # Get videos with a separate query
+                    recent_videos = Video.query.order_by(Video.created_at.desc()).limit(3).all()
+                    
+                    return render_template('index.html', posts=recent_posts, videos=recent_videos)
+            except Exception as db_error:
+                app.logger.error(f"Database connection error: {str(db_error)}")
+                # If we still can't connect, return a minimal page without database content
+                return render_template('errors/500.html')
         except Exception as inner_e:
             app.logger.error(f"Fallback index error: {str(inner_e)}")
             # Use a simpler error template without complex URL generation
@@ -913,6 +931,21 @@ if __name__ == '__main__':
         os.makedirs(images_dir)
         app.logger.info(f"Created images directory at {images_dir}")
     
+    # Run database migrations if we have a DATABASE_URL (indicating PostgreSQL)
+    try:
+        database_url = os.environ.get('DATABASE_URL')
+        if database_url and 'postgres' in database_url:
+            app.logger.info("PostgreSQL database detected. Running migrations...")
+            from migrations import run_migrations
+            migration_success = run_migrations()
+            if migration_success:
+                app.logger.info("Migrations completed successfully")
+            else:
+                app.logger.error("Migrations failed, but continuing startup")
+    except Exception as e:
+        app.logger.error(f"Error running migrations: {str(e)}")
+        
+    # Initialize the database 
     init_db()
     port = int(os.environ.get('PORT', 5002))
     app.run(host='0.0.0.0', port=port)
@@ -935,7 +968,11 @@ else:
         if database_url and 'postgres' in database_url:
             app.logger.info("PostgreSQL database detected. Running migrations...")
             from migrations import run_migrations
-            run_migrations()
+            migration_success = run_migrations()
+            if migration_success:
+                app.logger.info("Migrations completed successfully")
+            else:
+                app.logger.error("Migrations failed, but continuing startup")
     except Exception as e:
         app.logger.error(f"Error running migrations: {str(e)}")
         
