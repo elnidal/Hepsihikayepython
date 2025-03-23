@@ -4,9 +4,7 @@
 
 {% block head %}
 {{ super() }}
-{% if request %}
 <meta name="csrf-token" content="{{ csrf_token() }}">
-{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -25,6 +23,25 @@
                     <div class="post-content">
                         {{ post.content|safe }}
                     </div>
+                    
+                    <!-- Rating buttons -->
+                    <div class="post-actions mt-4 mb-4">
+                        <div class="d-flex align-items-center">
+                            <div class="rating-buttons me-3">
+                                <button onclick="ratePost({{ post.id }}, true)" class="btn btn-outline-primary like-btn-{{ post.id }}">
+                                    <i class="fas fa-thumbs-up"></i> Beğen (<span id="likes-{{ post.id }}">{{ post.likes }}</span>)
+                                </button>
+                                <button onclick="ratePost({{ post.id }}, false)" class="btn btn-outline-danger dislike-btn-{{ post.id }}">
+                                    <i class="fas fa-thumbs-down"></i> Beğenme (<span id="dislikes-{{ post.id }}">{{ post.dislikes }}</span>)
+                                </button>
+                            </div>
+                            <div class="rating-info ms-2">
+                                <span class="badge bg-secondary">Toplam Oy: {{ post.likes + post.dislikes }}</span>
+                            </div>
+                        </div>
+                        <div id="rating-message" class="mt-2" style="display: none;"></div>
+                    </div>
+                    
                     <div class="mt-4">
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="text-muted">
@@ -51,6 +68,27 @@
                         <p class="mb-0">{{ comment.content }}</p>
                     </div>
                     {% endfor %}
+                    
+                    <!-- Comment Form -->
+                    <div class="comment-form mt-4">
+                        <h4>Yorum Yap</h4>
+                        <form action="{{ url_for('add_comment', post_id=post.id) }}" method="POST" class="needs-validation mt-3" novalidate>
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="mb-3">
+                                <label for="name" class="form-label">İsminiz</label>
+                                <input type="text" class="form-control" id="name" name="name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="email" class="form-label">E-posta Adresiniz</label>
+                                <input type="email" class="form-control" id="email" name="email">
+                            </div>
+                            <div class="mb-3">
+                                <label for="content" class="form-label">Yorumunuz</label>
+                                <textarea class="form-control" id="content" name="content" rows="4" required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Yorum Gönder</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>

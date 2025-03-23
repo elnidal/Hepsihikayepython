@@ -29,6 +29,9 @@ from sqlalchemy.orm import joinedload
 from markupsafe import Markup
 from dotenv import load_dotenv
 
+# Load environment variables
+load_dotenv()
+
 # Configure logging
 if not os.path.exists('logs'):
     os.makedirs('logs')
@@ -42,9 +45,39 @@ file_handler.setLevel(logging.INFO)
 
 # Initialize Flask app
 app = Flask(__name__)
-app.logger.addHandler(file_handler)
-app.logger.setLevel(logging.INFO)
-app.logger.info('Application startup')
+
+# App configuration
+app.secret_key = os.environ.get('SECRET_KEY', 'hepsihikaye-dev-key')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///hepsihikaye.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['UPLOADS_FOLDER'] = 'uploads'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
+app.config['DEBUG'] = True  # Enable debugging
+app.config['TESTING'] = False
+app.config['CKEDITOR_SERVE_LOCAL'] = True
+app.config['CKEDITOR_HEIGHT'] = 400
+app.config['CKEDITOR_PKG_TYPE'] = 'standard'
+
+# Configure logger
+if not app.logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s '
+        '[in %(pathname)s:%(lineno)d]'
+    ))
+    handler.setLevel(logging.INFO)
+    app.logger.addHandler(handler)
+    app.logger.setLevel(logging.INFO)
+    app.logger.addHandler(file_handler)
+    app.logger.info('Application startup')
+
+@app.before_request
+def log_request_info():
+    app.logger.info('Request: %s %s', request.method, request.path)
+    if request.form:
+        app.logger.debug('Form Data: %s', request.form.to_dict())
+    if request.args:
+        app.logger.debug('Request Args: %s', request.args.to_dict())
 
 # Error handlers
 @app.errorhandler(404)
@@ -57,20 +90,6 @@ def internal_error(error):
     db.session.rollback()
     app.logger.error(f'Server Error: {error}')
     return "Internal server error. Please contact the administrator.", 500
-
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key')
-
-# Get database URL from environment variables with fallback
-database_url = os.environ.get('DATABASE_URL', "postgresql://hepsihikaye_wyg3_user:JWWumjYdrR15YATOT4KJvsRz4XxkRxzX@dpg-cvanpdlumphs73ag0b80-a.oregon-postgres.render.com/hepsihikaye_wyg3")
-
-# Configure SQLAlchemy
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# Configure CKEditor
-app.config['CKEDITOR_SERVE_LOCAL'] = True
-app.config['CKEDITOR_HEIGHT'] = 400
-app.config['CKEDITOR_PKG_TYPE'] = 'standard'
 
 # Initialize extensions
 db = SQLAlchemy(app)
@@ -103,12 +122,25 @@ class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=False)
+    excerpt = db.Column(db.Text, nullable=True)
     image = db.Column(db.String(200), nullable=True)
     views = db.Column(db.Integer, default=0)
+    likes = db.Column(db.Integer, default=0)
+    dislikes = db.Column(db.Integer, default=0)
+    published = db.Column(db.Boolean, default=True)
+    featured = db.Column(db.Boolean, default=False)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     comments = db.relationship('Comment', backref='post', lazy=True)
+    
+    def get_category_display(self):
+        return self.category.name if self.category else "Kategorisiz"
+    
+    def get_image_url(self):
+        if self.image:
+            return url_for('static', filename=f'uploads/{self.image}')
+        return url_for('static', filename='images/default-post.jpg')
 
 class Video(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -131,11 +163,15 @@ class Comment(db.Model):
 def init_db():
     try:
         with app.app_context():
-            # Drop all tables first
-            db.drop_all()
-            app.logger.info("Dropped all existing tables")
+            # In production, don't drop tables
+            is_production = os.environ.get('FLASK_ENV') == 'production'
+            
+            if not is_production:
+                # Drop all tables in development only
+                db.drop_all()
+                app.logger.info("Dropped all existing tables")
 
-            # Create all tables
+            # Create all tables if they don't exist
             db.create_all()
             app.logger.info("Database tables created successfully")
 
@@ -153,7 +189,7 @@ def init_db():
             else:
                 app.logger.info("Admin user already exists")
 
-            # Create default categories
+            # Create default categories if they don't exist
             default_categories = [
                 {'name': 'Öykü', 'slug': 'oyku'},
                 {'name': 'Roman', 'slug': 'roman'},
@@ -278,10 +314,91 @@ def post_detail(post_id):
         post = Post.query.get_or_404(post_id)
         post.views += 1
         db.session.commit()
-        return render_template('post_detail.html', post=post)
+        
+        # Get comments for this post
+        comments = Comment.query.filter_by(post_id=post_id).order_by(Comment.created_at.desc()).all()
+        
+        # Format dates for display
+        for comment in comments:
+            comment.formatted_date = comment.created_at.strftime('%d.%m.%Y %H:%M')
+        
+        return render_template('post.html', post=post, comments=comments)
     except Exception as e:
         app.logger.error(f"Post detail error: {str(e)}")
         return "An error occurred loading this post.", 500
+
+@app.route('/post/<int:post_id>/comment', methods=['POST'])
+def add_comment(post_id):
+    try:
+        post = Post.query.get_or_404(post_id)
+        
+        # Get form data
+        name = request.form.get('name')
+        email = request.form.get('email')
+        content = request.form.get('content')
+        
+        # Validate required fields
+        if not name or not content:
+            flash('İsim ve yorum alanları zorunludur.', 'danger')
+            return redirect(url_for('post_detail', post_id=post_id))
+        
+        # Create new comment
+        comment = Comment(
+            author_name=name,
+            content=content,
+            post_id=post_id
+        )
+        
+        db.session.add(comment)
+        db.session.commit()
+        
+        flash('Yorumunuz başarıyla eklendi.', 'success')
+        return redirect(url_for('post_detail', post_id=post_id))
+    except Exception as e:
+        app.logger.error(f"Add comment error: {str(e)}")
+        flash('Yorumunuz eklenirken bir hata oluştu.', 'danger')
+        return redirect(url_for('post_detail', post_id=post_id))
+
+@app.route('/post/<int:post_id>/rate/<action>', methods=['POST'])
+def rate_post(post_id, action):
+    try:
+        post = Post.query.get_or_404(post_id)
+        
+        # Check if action is valid
+        if action not in ['like', 'dislike']:
+            return jsonify({
+                'success': False,
+                'message': 'Geçersiz işlem.'
+            })
+        
+        # For simplicity, we'll just increment the count without checking for duplicate votes
+        # In a real application, you'd track user IPs or require login to prevent multiple votes
+        
+        if action == 'like':
+            # Add likes field to Post model if it doesn't exist
+            if not hasattr(post, 'likes'):
+                post.likes = 0
+            post.likes = post.likes + 1 if post.likes else 1
+        else:
+            # Add dislikes field to Post model if it doesn't exist
+            if not hasattr(post, 'dislikes'):
+                post.dislikes = 0
+            post.dislikes = post.dislikes + 1 if post.dislikes else 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'likes': post.likes or 0,
+            'dislikes': post.dislikes or 0,
+            'message': 'Oyunuz kaydedildi!'
+        })
+    except Exception as e:
+        app.logger.error(f"Rate post error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Bir hata oluştu. Lütfen daha sonra tekrar deneyin.'
+        })
 
 @app.route('/video/<int:video_id>')
 def video_detail(video_id):
@@ -330,36 +447,82 @@ def admin_new_post():
     try:
         categories = Category.query.all()
         
+        # Process form submission
         if request.method == 'POST':
+            app.logger.info("Received POST request to create new post")
+            # Log form data
+            form_data = {k: v for k, v in request.form.items() if k != 'content'}
+            app.logger.info(f"Form data (excluding content): {form_data}")
+            app.logger.info(f"Content received: {'Yes' if request.form.get('content') else 'No'}")
+            app.logger.info(f"Files: {request.files}")
+            
+            # Get form fields
             title = request.form.get('title')
             content = request.form.get('content')
             category_id = request.form.get('category_id')
+            excerpt = request.form.get('excerpt')
+            published = request.form.get('published') == 'on'
+            featured = request.form.get('featured') == 'on'
             image = request.files.get('image')
             
-            if not title or not content:
-                flash('Başlık ve içerik alanları zorunludur.', 'error')
-                return redirect(url_for('admin_new_post'))
+            # Validate required fields
+            if not title:
+                app.logger.warning("Title is missing")
+                flash('Başlık alanı zorunludur.', 'error')
+                return render_template('admin/post_form.html', categories=categories)
             
+            if not content:
+                app.logger.warning("Content is missing")
+                flash('İçerik alanı zorunludur.', 'error')
+                return render_template('admin/post_form.html', categories=categories)
+            
+            # Create post object
+            app.logger.info("Creating new post object")
             post = Post(
                 title=title, 
                 content=content,
-                category_id=category_id if category_id else None
+                category_id=category_id if category_id else None,
+                excerpt=excerpt,
+                published=published,
+                featured=featured
             )
             
+            # Handle image upload
             if image and image.filename:
+                app.logger.info(f"Processing image: {image.filename}")
+                
+                # Ensure uploads directory exists
+                uploads_dir = os.path.join(app.static_folder, 'uploads')
+                if not os.path.exists(uploads_dir):
+                    app.logger.info(f"Creating uploads directory: {uploads_dir}")
+                    os.makedirs(uploads_dir)
+                
+                # Save image
                 filename = secure_filename(image.filename)
-                image_path = os.path.join(app.static_folder, 'uploads', filename)
+                image_path = os.path.join(uploads_dir, filename)
+                app.logger.info(f"Saving image to: {image_path}")
                 image.save(image_path)
-                post.image = f'/static/uploads/{filename}'
+                post.image = filename
             
-            db.session.add(post)
-            db.session.commit()
-            flash('Gönderi başarıyla oluşturuldu.', 'success')
-            return redirect(url_for('admin_posts'))
-            
-        return render_template('admin/post_form.html', categories=categories)
+            # Save post to database
+            try:
+                app.logger.info("Adding post to database")
+                db.session.add(post)
+                db.session.commit()
+                app.logger.info(f"Post created successfully with ID: {post.id}")
+                flash('Gönderi başarıyla oluşturuldu.', 'success')
+                return redirect(url_for('admin_posts'))
+            except SQLAlchemyError as e:
+                db.session.rollback()
+                app.logger.error(f"Database error: {str(e)}")
+                flash('Veritabanı hatası: Gönderi kaydedilemedi.', 'error')
+                return render_template('admin/post_form.html', categories=categories)
+        
+        # Display form
+        return render_template('admin/post_form.html', categories=categories, ckeditor=ckeditor)
     except Exception as e:
         app.logger.error(f"New post error: {str(e)}")
+        app.logger.exception("Exception details:")
         flash('Gönderi oluşturulurken bir hata oluştu.', 'error')
         return redirect(url_for('admin_posts'))
 
@@ -367,31 +530,75 @@ def admin_new_post():
 @login_required
 def admin_edit_post(post_id):
     try:
+        app.logger.info(f"Fetching post with ID: {post_id}")
         post = Post.query.get_or_404(post_id)
         categories = Category.query.all()
         
         if request.method == 'POST':
+            app.logger.info(f"Received POST request to edit post {post_id}")
+            app.logger.info(f"Form data: {request.form.to_dict()}")
+            app.logger.info(f"Files: {request.files}")
+            
             post.title = request.form.get('title')
             post.content = request.form.get('content')
             post.category_id = request.form.get('category_id') or None
+            post.excerpt = request.form.get('excerpt')
+            post.published = request.form.get('published') == 'on'
+            post.featured = request.form.get('featured') == 'on'
             
+            app.logger.info(f"Updated post data: title={post.title}, category_id={post.category_id}, "
+                         f"excerpt length={len(post.excerpt) if post.excerpt else 0}, "
+                         f"published={post.published}, featured={post.featured}")
+            
+            # Handle image upload or removal
             image = request.files.get('image')
+            remove_image = request.form.get('remove_image') == 'on'
+            
+            app.logger.info(f"Image file present: {bool(image and image.filename)}")
+            app.logger.info(f"Remove image flag: {remove_image}")
+            
+            if remove_image and post.image:
+                app.logger.info(f"Removing image: {post.image}")
+                # Remove the current image
+                image_path = os.path.join(app.static_folder, 'uploads', post.image)
+                if os.path.exists(image_path):
+                    os.remove(image_path)
+                    app.logger.info(f"Deleted image file: {image_path}")
+                post.image = None
+            
             if image and image.filename:
-                # If there's a current image, we might want to delete it to save space
-                # (optional implementation would go here)
+                app.logger.info(f"Processing new image: {image.filename}")
+                # If there's a current image, delete it
+                if post.image:
+                    app.logger.info(f"Replacing existing image: {post.image}")
+                    old_image_path = os.path.join(app.static_folder, 'uploads', post.image)
+                    if os.path.exists(old_image_path):
+                        os.remove(old_image_path)
+                        app.logger.info(f"Deleted old image file: {old_image_path}")
+                
+                # Ensure uploads directory exists
+                uploads_dir = os.path.join(app.static_folder, 'uploads')
+                if not os.path.exists(uploads_dir):
+                    app.logger.info(f"Creating uploads directory: {uploads_dir}")
+                    os.makedirs(uploads_dir)
                 
                 filename = secure_filename(image.filename)
-                image_path = os.path.join(app.static_folder, 'uploads', filename)
+                image_path = os.path.join(uploads_dir, filename)
+                app.logger.info(f"Saving new image to: {image_path}")
                 image.save(image_path)
-                post.image = f'/static/uploads/{filename}'
+                post.image = filename
             
+            app.logger.info("Committing changes to database")
             db.session.commit()
+            
+            app.logger.info(f"Post {post_id} updated successfully")
             flash('Gönderi başarıyla güncellendi.', 'success')
             return redirect(url_for('admin_posts'))
             
         return render_template('admin/post_form.html', post=post, categories=categories)
     except Exception as e:
         app.logger.error(f"Edit post error: {str(e)}")
+        app.logger.exception("Exception details:")
         flash('Gönderi güncellenirken bir hata oluştu.', 'error')
         return redirect(url_for('admin_posts'))
 
@@ -402,8 +609,8 @@ def admin_delete_post(post_id):
         post = Post.query.get_or_404(post_id)
         
         # Delete the image file if it exists
-        if post.image and post.image.startswith('/static/uploads/'):
-            image_path = os.path.join(app.static_folder, post.image.replace('/static/', ''))
+        if post.image:
+            image_path = os.path.join(app.static_folder, 'uploads', post.image)
             if os.path.exists(image_path):
                 os.remove(image_path)
                 app.logger.info(f"Deleted image file: {image_path}")
@@ -684,6 +891,18 @@ def admin_change_password():
         return redirect(url_for('admin_settings'))
 
 if __name__ == '__main__':
+    # Ensure uploads directory exists
+    uploads_dir = os.path.join(app.static_folder, 'uploads')
+    if not os.path.exists(uploads_dir):
+        os.makedirs(uploads_dir)
+        app.logger.info(f"Created uploads directory at {uploads_dir}")
+    
+    # Ensure images directory exists for default images
+    images_dir = os.path.join(app.static_folder, 'images')
+    if not os.path.exists(images_dir):
+        os.makedirs(images_dir)
+        app.logger.info(f"Created images directory at {images_dir}")
+    
     init_db()
     port = int(os.environ.get('PORT', 5002))
     app.run(host='0.0.0.0', port=port) 

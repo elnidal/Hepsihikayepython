@@ -3,13 +3,13 @@ services:
     name: hepsihikaye
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --timeout 120
+    startCommand: gunicorn app:app -c gunicorn_config.py
     envVars:
       - key: PYTHON_VERSION
-        value: 3.9.0
-      - key: FLASK_ENV
-        value: production
-      - key: YOUTUBE_API_KEY
-        sync: false
+        value: 3.9.7
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false # User will need to set this in the Render dashboard
     healthCheckPath: /
     autoDeploy: true

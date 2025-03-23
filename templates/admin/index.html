@@ -89,8 +89,8 @@
                                         <td>{{ post.category }}</td>
                                         <td>{{ post.created_at.strftime('%d.%m.%Y') }}</td>
                                         <td>
-                                            <a href="{{ url_for('post', post_id=post.id) }}" class="btn btn-sm btn-info" target="_blank">Görüntüle</a>
-                                            <a href="{{ url_for('edit_post', post_id=post.id) }}" class="btn btn-sm btn-primary">Düzenle</a>
+                                            <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-sm btn-info" target="_blank">Görüntüle</a>
+                                            <a href="{{ url_for('admin_edit_post', post_id=post.id) }}" class="btn btn-sm btn-primary">Düzenle</a>
                                             <button class="btn btn-sm btn-danger" onclick="deletePost({{ post.id }})">Sil</button>
                                         </td>
                                     </tr>
