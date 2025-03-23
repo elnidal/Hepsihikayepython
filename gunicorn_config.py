@@ -1,37 +1,49 @@
 import os
 import multiprocessing
 
-# Bind to the port provided by Render
-bind = "0.0.0.0:" + os.environ.get("PORT", "8000")
-
-# Use multiple workers based on CPU cores
-workers = int(os.environ.get("WEB_CONCURRENCY", multiprocessing.cpu_count() * 2 + 1))
-
-# Use worker class based on environment variable
-worker_class = os.environ.get("GUNICORN_WORKER_CLASS", "sync")
-
-# Timeout settings
+# Configuration
+bind = "0.0.0.0:10000"
+workers = multiprocessing.cpu_count() * 2 + 1
+worker_class = "sync"
+worker_connections = 1000
 timeout = 120
 keepalive = 5
+spew = False
+daemon = False
+pidfile = None
+umask = 0
+user = None
+group = None
+tmp_upload_dir = None
+errorlog = "-"  # stderr
+loglevel = "info"
+accesslog = "-"  # stdout
+access_log_format = '%({X-Real-IP}i)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
 
-# Restart workers after this many requests
-max_requests = 1000
-max_requests_jitter = 200
-
-# Logging
-accesslog = "-"
-errorlog = "-"
-loglevel = os.environ.get("GUNICORN_LOG_LEVEL", "info")
-
-# Redirect stdout/stderr to log
-capture_output = True
-enable_stdio_inheritance = True
+# Graceful restart timeout
+graceful_timeout = 60
 
 # Preload app for better performance
 preload_app = True
 
-# Set the process name
-proc_name = "hepsihikaye"
+# Process name
+proc_name = None
 
-# Graceful timeout
-graceful_timeout = 30 
+# Server hooks
+def post_fork(server, worker):
+    server.log.info("Worker spawned (pid: %s)", worker.pid)
+
+def pre_fork(server, worker):
+    pass
+
+def pre_exec(server):
+    server.log.info("Forked child, re-executing.")
+
+def when_ready(server):
+    server.log.info("Server is ready. Spawning workers")
+
+def worker_int(worker):
+    worker.log.info("worker received INT or QUIT signal")
+
+def worker_abort(worker):
+    worker.log.info("worker received SIGABRT signal") 

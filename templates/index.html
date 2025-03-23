@@ -1,57 +1,80 @@
-{% extends "base.html" %}
-
-{% block title %}Hepsi Hikaye - Ana Sayfa{% endblock %}
-
-{% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-12">
-            <h2 class="mb-4">Son Hikayeler</h2>
-            <div class="row">
-                {% for post in posts %}
-                <div class="col-md-4 mb-4">
-                    <div class="card h-100">
-                        {% if post.image %}
-                        <img src="{{ url_for('static', filename='uploads/' + post.image) }}" class="card-img-top" alt="{{ post.title }}">
-                        {% endif %}
-                        <div class="card-body">
-                            <h5 class="card-title">{{ post.title }}</h5>
-                            <p class="card-text">{{ post.content|striptags|truncate(100) }}</p>
-                            <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-primary">Devamını Oku</a>
-                        </div>
-                        <div class="card-footer text-muted">
-                            {{ post.created_at.strftime('%d.%m.%Y') }}
-                        </div>
-                    </div>
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hepsi Hikaye - Ana Sayfa</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/simplified.css') }}">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="nav">
+                <div class="logo">
+                    <a href="{{ url_for('index') }}">Hepsi Hikaye</a>
                 </div>
-                {% endfor %}
+                <div class="nav-links">
+                    <a href="{{ url_for('index') }}">Ana Sayfa</a>
+                    {% for category in categories %}
+                    <a href="#">{{ category.name }}</a>
+                    {% endfor %}
+                </div>
             </div>
         </div>
-    </div>
-
-    <div class="row mt-5">
-        <div class="col-12">
-            <h2 class="mb-4">Son Videolar</h2>
-            <div class="row">
+    </header>
+    
+    <div class="container">
+        <main class="content">
+            <h1>Son Yazılar</h1>
+            
+            <div class="posts-grid">
+                {% if posts %}
+                    {% for post in posts %}
+                    <div class="post-card">
+                        <h2 class="post-title">{{ post.title }}</h2>
+                        <div class="post-meta">
+                            <span>{{ post.created_at }}</span>
+                            {% if post.category_id %}
+                                <span>Kategori: {{ post.category_name }}</span>
+                            {% endif %}
+                        </div>
+                        {% if post.excerpt %}
+                            <div class="post-content">{{ post.excerpt }}</div>
+                        {% else %}
+                            <div class="post-content">{{ post.content|truncate(200) }}</div>
+                        {% endif %}
+                        <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-primary">Devamını Oku</a>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p>Henüz içerik eklenmemiş.</p>
+                {% endif %}
+            </div>
+            
+            {% if videos %}
+            <h2>Son Videolar</h2>
+            <div class="videos-grid">
                 {% for video in videos %}
-                <div class="col-md-4 mb-4">
-                    <div class="card h-100">
-                        {% if video.thumbnail_url %}
-                        <img src="{{ video.thumbnail_url }}" class="card-img-top" alt="{{ video.title }}">
-                        {% endif %}
-                        <div class="card-body">
-                            <h5 class="card-title">{{ video.title }}</h5>
-                            <p class="card-text">{{ video.description|default('')|truncate(100) }}</p>
-                            <a href="{{ url_for('video_detail', video_id=video.id) }}" class="btn btn-primary">İzle</a>
-                        </div>
-                        <div class="card-footer text-muted">
-                            {{ video.created_at.strftime('%d.%m.%Y') }}
-                        </div>
+                <div class="post-card">
+                    <h2 class="post-title">{{ video.title }}</h2>
+                    {% if video.thumbnail_url %}
+                    <img src="{{ video.thumbnail_url }}" alt="{{ video.title }}" style="max-width: 100%; height: auto;">
+                    {% endif %}
+                    <div class="post-meta">
+                        <span>{{ video.created_at }}</span>
                     </div>
+                    <a href="{{ url_for('video_detail', video_id=video.id) }}" class="btn btn-primary">İzle</a>
                 </div>
                 {% endfor %}
             </div>
-        </div>
+            {% endif %}
+        </main>
     </div>
-</div>
-{% endblock %}
+    
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Hepsi Hikaye. Tüm hakları saklıdır.</p>
+        </div>
+    </footer>
+</body>
+</html>

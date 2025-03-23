@@ -28,6 +28,8 @@ from decorators import handle_db_error
 from sqlalchemy.orm import joinedload
 from markupsafe import Markup
 from dotenv import load_dotenv
+import json
+import shutil
 
 # Load environment variables
 load_dotenv()
