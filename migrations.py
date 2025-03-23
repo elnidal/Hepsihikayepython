@@ -51,10 +51,10 @@ def run_migrations():
         )
         if not cursor.fetchone()[0]:
             logger.error("Post table does not exist. Database may not be initialized properly.")
-            return False
+            # Continue with migrations anyway, other tables might exist
         
-        # List all required columns with their types and defaults
-        columns = [
+        # List all required columns for Post table with their types and defaults
+        post_columns = [
             ('id', 'SERIAL PRIMARY KEY', None),  # This should already exist
             ('title', 'VARCHAR(200) NOT NULL', None),  # This should already exist
             ('content', 'TEXT NOT NULL', None),  # This should already exist
@@ -70,10 +70,54 @@ def run_migrations():
             ('updated_at', 'TIMESTAMP', 'CURRENT_TIMESTAMP')  # This should already exist
         ]
         
-        # Check each column and add if it doesn't exist
+        # Check each column and add if it doesn't exist for Post table
         logger.info("Checking for missing columns in post table...")
-        for column_name, data_type, default in columns:
+        for column_name, data_type, default in post_columns:
             add_column_if_not_exists(cursor, 'post', column_name, data_type, default)
+        
+        # Now check if Video table exists
+        cursor.execute(
+            "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = 'video')"
+        )
+        if not cursor.fetchone()[0]:
+            logger.error("Video table does not exist. Database may not be initialized properly.")
+            # Continue with migrations anyway, other tables might exist
+        else:
+            # List all required columns for Video table with their types and defaults
+            video_columns = [
+                ('id', 'SERIAL PRIMARY KEY', None),  # This should already exist
+                ('title', 'VARCHAR(200) NOT NULL', None),  # This should already exist
+                ('youtube_id', 'VARCHAR(20) NOT NULL', None),  # Missing column found in logs
+                ('description', 'TEXT', None),
+                ('thumbnail_url', 'VARCHAR(200)', None),
+                ('created_at', 'TIMESTAMP', 'CURRENT_TIMESTAMP'),  # This should already exist
+                ('updated_at', 'TIMESTAMP', 'CURRENT_TIMESTAMP')  # This should already exist
+            ]
+            
+            # Check each column and add if it doesn't exist for Video table
+            logger.info("Checking for missing columns in video table...")
+            for column_name, data_type, default in video_columns:
+                add_column_if_not_exists(cursor, 'video', column_name, data_type, default)
+        
+        # Check if Category table exists
+        cursor.execute(
+            "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = 'category')"
+        )
+        if not cursor.fetchone()[0]:
+            logger.error("Category table does not exist. Database may not be initialized properly.")
+            # Continue with migrations anyway, other tables might exist
+        else:
+            # List all required columns for Category table with their types and defaults
+            category_columns = [
+                ('id', 'SERIAL PRIMARY KEY', None),  # This should already exist
+                ('name', 'VARCHAR(50) NOT NULL', None),  # This should already exist
+                ('slug', 'VARCHAR(50) NOT NULL', None)  # This should already exist
+            ]
+            
+            # Check each column and add if it doesn't exist for Category table
+            logger.info("Checking for missing columns in category table...")
+            for column_name, data_type, default in category_columns:
+                add_column_if_not_exists(cursor, 'category', column_name, data_type, default)
         
         logger.info("All migrations completed successfully")
         conn.close()

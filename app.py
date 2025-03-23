@@ -305,38 +305,74 @@ def admin_logout():
 @app.route('/')
 def index():
     try:
-        # Get featured content for homepage
-        recent_posts = Post.query.order_by(Post.created_at.desc()).limit(6).all()
-        recent_videos = Video.query.order_by(Video.created_at.desc()).limit(3).all()
+        # Use only file-based storage, no database calls
+        posts = load_data(POSTS_FILE, [])
+        videos = load_data(VIDEOS_FILE, [])
+        
+        # Sort by created_at and add default images
+        posts.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        videos.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        
+        # Format dates for display
+        for post in posts:
+            if isinstance(post.get('created_at'), str):
+                try:
+                    post['formatted_date'] = format_datetime(post['created_at'])
+                except:
+                    post['formatted_date'] = post.get('created_at', '')
+            
+            # Add default image if none exists
+            if not post.get('image'):
+                post['image_url'] = url_for('static', filename='images/default-post.jpg')
+            else:
+                post['image_url'] = url_for('static', filename=f'uploads/{post["image"]}')
+            
+            # Add category name if it exists
+            if post.get('category_id'):
+                category = get_category_by_id(post['category_id'])
+                post['category_name'] = category['name'] if category else 'Uncategorized'
+        
+        # Format dates for videos and ensure thumbnail URLs
+        for video in videos:
+            if isinstance(video.get('created_at'), str):
+                try:
+                    video['formatted_date'] = format_datetime(video['created_at'])
+                except:
+                    video['formatted_date'] = video.get('created_at', '')
+            
+            # Add YouTube thumbnail if none exists
+            if not video.get('thumbnail_url') and video.get('youtube_id'):
+                video['thumbnail_url'] = f'https://img.youtube.com/vi/{video["youtube_id"]}/maxresdefault.jpg'
+        
+        # Limit to recent items
+        recent_posts = posts[:6]
+        recent_videos = videos[:3]
+        
+        app.logger.info(f"Successfully loaded {len(recent_posts)} posts and {len(recent_videos)} videos for homepage")
+        
         return render_template('index.html', posts=recent_posts, videos=recent_videos)
     except Exception as e:
         app.logger.error(f"Index error: {str(e)}")
         try:
-            # Rollback any failed transaction
-            db.session.rollback()
+            # Create very minimal data for the homepage if everything fails
+            app.logger.info("Falling back to minimal data for homepage")
             
-            # Fallback query without depending on new fields that might not exist yet
-            app.logger.info("Falling back to simpler query")
-            try:
-                # Use a new connection to avoid transaction issues
-                with db.engine.connect() as conn:
-                    # Execute a simple raw SQL query to get basic post data
-                    recent_posts = conn.execute(
-                        text("SELECT id, title, content, created_at FROM post ORDER BY created_at DESC LIMIT 6")
-                    ).fetchall()
-                    
-                    # Get videos with a separate query
-                    recent_videos = Video.query.order_by(Video.created_at.desc()).limit(3).all()
-                    
-                    return render_template('index.html', posts=recent_posts, videos=recent_videos)
-            except Exception as db_error:
-                app.logger.error(f"Database connection error: {str(db_error)}")
-                # If we still can't connect, return a minimal page without database content
-                return render_template('errors/500.html')
+            # Create default welcome post
+            welcome_post = {
+                'id': 1,
+                'title': 'Hoş Geldiniz',
+                'content': 'Hepsi Hikaye web sitesine hoş geldiniz. İçerik yakında eklenecektir.',
+                'created_at': datetime.now().isoformat(),
+                'formatted_date': datetime.now().strftime('%d.%m.%Y'),
+                'image_url': url_for('static', filename='images/default-post.jpg')
+            }
+            
+            # Return a simple template with minimal data
+            return render_template('index.html', posts=[welcome_post], videos=[])
         except Exception as inner_e:
             app.logger.error(f"Fallback index error: {str(inner_e)}")
             # Use a simpler error template without complex URL generation
-            return "Server Error. Please contact the administrator.", 500
+            return render_template('errors/500.html')
 
 @app.route('/post/<int:post_id>')
 def post_detail(post_id):
@@ -759,10 +795,13 @@ def category_posts(slug):
 @app.context_processor
 def inject_categories():
     try:
-        categories = Category.query.all()
+        # Use file-based storage for categories
+        categories = load_data(CATEGORIES_FILE, [])
+        app.logger.info(f"Injected {len(categories)} categories into template context")
         return dict(categories=categories)
     except Exception as e:
         app.logger.error(f"Category injection error: {str(e)}")
+        # Return empty list as fallback
         return dict(categories=[])
 
 @app.route('/admin/categories', methods=['GET'])
