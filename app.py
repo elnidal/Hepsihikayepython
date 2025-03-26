@@ -235,26 +235,48 @@ def admin_dashboard():
         videos = load_data(VIDEOS_FILE, [])
         comments = load_data(COMMENTS_FILE, [])
         
+        # Get total counts
         total_posts = len(posts)
         total_videos = len(videos)
         total_comments = len(comments)
         total_views = sum(post.get('views', 0) for post in posts) + sum(video.get('views', 0) for video in videos)
         
+        # Get recent posts
         recent_posts = sorted(posts, key=lambda x: x.get('created_at', ''), reverse=True)[:5]
         recent_videos = sorted(videos, key=lambda x: x.get('created_at', ''), reverse=True)[:5]
         
-        return render_template(
-            'admin/dashboard.html',
-            total_posts=total_posts,
-            total_videos=total_videos,
-            total_comments=total_comments,
-            total_views=total_views,
-            recent_posts=recent_posts,
-            recent_videos=recent_videos
-        )
+        # Format dates
+        for post in recent_posts:
+            if isinstance(post.get('created_at'), str):
+                post['formatted_date'] = format_datetime(post['created_at'])
+        
+        for video in recent_videos:
+            if isinstance(video.get('created_at'), str):
+                video['formatted_date'] = format_datetime(video['created_at'])
+        
+        # Load categories for display
+        categories = {c['id']: c for c in load_data(CATEGORIES_FILE, [])}
+        
+        # Add category names
+        for post in recent_posts:
+            category_id = post.get('category_id')
+            post['category'] = categories.get(category_id, {}).get('name', 'Uncategorized')
+        
+        for video in recent_videos:
+            category_id = video.get('category_id')
+            video['category'] = categories.get(category_id, {}).get('name', 'Uncategorized')
+        
+        return render_template('admin/dashboard.html', 
+                              total_posts=total_posts, 
+                              total_videos=total_videos,
+                              total_comments=total_comments,
+                              total_views=total_views,
+                              recent_posts=recent_posts,
+                              recent_videos=recent_videos)
     except Exception as e:
         app.logger.error(f"Admin dashboard error: {str(e)}")
-        return redirect(url_for('admin_login'))
+        flash('Dashboard yüklenirken bir hata oluştu!', 'danger')
+        return render_template('admin/dashboard.html')
 
 @app.route('/admin/logout')
 @login_required
@@ -782,6 +804,37 @@ def admin_videos():
         app.logger.error(f"Admin videos error: {str(e)}")
         flash('Videoları yüklerken bir hata oluştu!', 'danger')
         return render_template('admin/videos.html', videos=[])
+
+@app.route('/admin/posts/<int:post_id>/view')
+@login_required
+def view_post(post_id):
+    try:
+        posts = load_data(POSTS_FILE, [])
+        post = next((p for p in posts if p['id'] == post_id), None)
+        
+        if not post:
+            flash('Gönderi bulunamadı.', 'error')
+            return redirect(url_for('admin_posts'))
+        
+        # Get comments
+        comments = load_data(COMMENTS_FILE, [])
+        post_comments = [c for c in comments if c.get('post_id') == post_id]
+        
+        # Format dates for comments
+        for comment in post_comments:
+            if isinstance(comment.get('created_at'), str):
+                comment['formatted_date'] = format_datetime(comment['created_at'])
+        
+        # Get category name
+        categories = load_data(CATEGORIES_FILE, [])
+        category = next((c for c in categories if c['id'] == post.get('category_id')), None)
+        post['category_name'] = category['name'] if category else 'Uncategorized'
+        
+        return render_template('admin/view_post.html', post=post, comments=post_comments)
+    except Exception as e:
+        app.logger.error(f"View post error: {str(e)}")
+        flash('Gönderi görüntülenirken bir hata oluştu.', 'error')
+        return redirect(url_for('admin_posts'))
 
 if __name__ == '__main__':
     # Create required directories

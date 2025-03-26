@@ -1,0 +1,134 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ post.title }}{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0">Gönderi Detayı</h1>
+            </div>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin_posts') }}">Gönderiler</a></li>
+                    <li class="breadcrumb-item active">Gönderi Detayı</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="content">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">{{ post.title }}</h3>
+                        <div class="card-tools">
+                            <a href="{{ url_for('admin_edit_post', post_id=post.id) }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-edit"></i> Düzenle
+                            </a>
+                            <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-sm btn-info" target="_blank">
+                                <i class="fas fa-eye"></i> Sitede Görüntüle
+                            </a>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        {% if post.image %}
+                        <div class="text-center mb-4">
+                            <img src="{{ url_for('static', filename='uploads/' + post.image) }}" alt="{{ post.title }}" class="img-fluid rounded" style="max-height: 300px;">
+                        </div>
+                        {% endif %}
+                        
+                        <div class="mb-4">
+                            <strong>Kategori:</strong> {{ post.category_name }}
+                        </div>
+                        
+                        <div class="post-content">
+                            {{ post.content|safe }}
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <div class="d-flex justify-content-between">
+                            <span><i class="far fa-calendar-alt"></i> {{ post.formatted_date if post.formatted_date else post.created_at }}</span>
+                            <span><i class="far fa-eye"></i> {{ post.views }} görüntülenme</span>
+                            <span>
+                                <i class="far fa-thumbs-up"></i> {{ post.likes }} beğeni
+                                <i class="far fa-thumbs-down ml-2"></i> {{ post.dislikes }} beğenmeme
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Gönderi Bilgileri</h3>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table">
+                            <tr>
+                                <td>ID</td>
+                                <td>{{ post.id }}</td>
+                            </tr>
+                            <tr>
+                                <td>Durum</td>
+                                <td>
+                                    {% if post.published %}
+                                    <span class="badge badge-success">Yayında</span>
+                                    {% else %}
+                                    <span class="badge badge-secondary">Taslak</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Öne Çıkan</td>
+                                <td>
+                                    {% if post.featured %}
+                                    <span class="badge badge-primary">Evet</span>
+                                    {% else %}
+                                    <span class="badge badge-secondary">Hayır</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Oluşturulma</td>
+                                <td>{{ post.formatted_date if post.formatted_date else post.created_at }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h3 class="card-title">Yorumlar ({{ comments|length }})</h3>
+                    </div>
+                    <div class="card-body p-0">
+                        {% if comments %}
+                        <ul class="list-group list-group-flush">
+                            {% for comment in comments %}
+                            <li class="list-group-item">
+                                <div class="d-flex justify-content-between">
+                                    <strong>{{ comment.author_name }}</strong>
+                                    <small class="text-muted">{{ comment.formatted_date }}</small>
+                                </div>
+                                <p class="mb-0 mt-1">{{ comment.content }}</p>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <div class="text-center p-3">
+                            <p class="mb-0">Henüz yorum yapılmamış.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %} 
