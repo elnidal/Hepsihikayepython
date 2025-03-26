@@ -238,7 +238,7 @@ def admin_dashboard():
         total_posts = len(posts)
         total_videos = len(videos)
         total_comments = len(comments)
-        total_views = sum(post.get('views', 0) for post in posts)
+        total_views = sum(post.get('views', 0) for post in posts) + sum(video.get('views', 0) for video in videos)
         
         recent_posts = sorted(posts, key=lambda x: x.get('created_at', ''), reverse=True)[:5]
         recent_videos = sorted(videos, key=lambda x: x.get('created_at', ''), reverse=True)[:5]
@@ -716,6 +716,72 @@ def search():
     except Exception as e:
         app.logger.error(f"Search error: {str(e)}")
         return render_template('errors/500.html')
+
+@app.route('/admin/new-video', methods=['GET', 'POST'])
+@login_required
+def admin_new_video():
+    try:
+        categories = load_data(CATEGORIES_FILE, [])
+        
+        if request.method == 'POST':
+            title = request.form.get('title')
+            description = request.form.get('description')
+            url = request.form.get('url')
+            thumbnail_url = request.form.get('thumbnail_url')
+            category_id = int(request.form.get('category_id'))
+            
+            videos = load_data(VIDEOS_FILE, [])
+            
+            # Generate a new ID (max + 1)
+            new_id = 1
+            if videos:
+                new_id = max(video.get('id', 0) for video in videos) + 1
+                
+            # Create new video object
+            new_video = {
+                'id': new_id,
+                'title': title,
+                'description': description,
+                'url': url,
+                'thumbnail_url': thumbnail_url,
+                'category_id': category_id,
+                'created_at': datetime.now().isoformat(),
+                'views': 0,
+                'published': True
+            }
+            
+            # Add to videos and save
+            videos.append(new_video)
+            save_data(VIDEOS_FILE, videos)
+            
+            flash('Video başarıyla eklendi!', 'success')
+            return redirect(url_for('admin_videos'))
+        
+        return render_template('admin/new_video.html', categories=categories)
+    except Exception as e:
+        app.logger.error(f"Admin new video error: {str(e)}")
+        flash('Video eklenirken bir hata oluştu!', 'danger')
+        return redirect(url_for('admin_videos'))
+
+@app.route('/admin/videos')
+@login_required
+def admin_videos():
+    try:
+        videos = load_data(VIDEOS_FILE, [])
+        categories = {c['id']: c for c in load_data(CATEGORIES_FILE, [])}
+        
+        # Format dates and add category names
+        for video in videos:
+            if isinstance(video.get('created_at'), str):
+                video['formatted_date'] = format_datetime(video['created_at'])
+            category_id = video.get('category_id')
+            video['category'] = categories.get(category_id, {}).get('name', 'Uncategorized')
+        
+        return render_template('admin/videos.html', videos=videos)
+    except Exception as e:
+        app.logger.error(f"Admin videos error: {str(e)}")
+        flash('Videoları yüklerken bir hata oluştu!', 'danger')
+        return render_template('admin/videos.html', videos=[])
 
 if __name__ == '__main__':
     # Create required directories

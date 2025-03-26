@@ -4,114 +4,70 @@
 
 {% block content %}
 <div class="content-header">
-    <h1>Yeni Video Ekle</h1>
-    <div>
-        <a href="{{ url_for('admin_videos') }}" class="btn btn-secondary">
-            <i class="fas fa-arrow-left me-1"></i> Videolara Dön
-        </a>
-    </div>
-</div>
-
-<div class="card">
-    <div class="card-header">
-        <div>Video Bilgileri</div>
-    </div>
-    <div class="card-body">
-        <form method="POST">
-            {{ form.hidden_tag() }}
-            
-            <div class="row">
-                <div class="col-md-8">
-                    <div class="mb-3">
-                        <label for="title" class="form-label required-field">Video Başlığı</label>
-                        {{ form.title(class="form-control", placeholder="Video başlığını girin") }}
-                        {% if form.title.errors %}
-                            <div class="text-danger">
-                                {% for error in form.title.errors %}
-                                    {{ error }}
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="youtube_id" class="form-label required-field">YouTube Video ID</label>
-                        <div class="input-group">
-                            <span class="input-group-text">https://youtube.com/watch?v=</span>
-                            {{ form.youtube_id(class="form-control", placeholder="Örnek: dQw4w9WgXcQ") }}
-                        </div>
-                        {% if form.youtube_id.errors %}
-                            <div class="text-danger">
-                                {% for error in form.youtube_id.errors %}
-                                    {{ error }}
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                        <div class="form-text">YouTube video bağlantısından ID'yi kopyalayın.</div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="description" class="form-label">Açıklama</label>
-                        {{ form.description(class="form-control", rows=5, placeholder="Video hakkında açıklama...") }}
-                        {% if form.description.errors %}
-                            <div class="text-danger">
-                                {% for error in form.description.errors %}
-                                    {{ error }}
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-                
-                <div class="col-md-4">
-                    <div class="mb-3">
-                        <label class="form-label">Önizleme</label>
-                        <div id="videoPreviewContainer" class="mt-2 d-none">
-                            <div class="ratio ratio-16x9 border rounded overflow-hidden">
-                                <iframe id="videoPreview" 
-                                        src="" 
-                                        title="Video Önizleme"
-                                        allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                        allowfullscreen></iframe>
-                            </div>
-                        </div>
-                        <div id="noPreviewMessage" class="alert alert-info mt-2">
-                            <i class="fas fa-info-circle me-1"></i> YouTube ID girildiğinde önizleme görüntülenecektir.
-                        </div>
-                    </div>
-                </div>
+    <div class="container-fluid">
+        <div class="row mb-2">
+            <div class="col-sm-6">
+                <h1 class="m-0">Yeni Video Ekle</h1>
             </div>
-            
-            <div class="d-flex justify-content-end mt-4">
-                <button type="button" class="btn btn-secondary me-2" onclick="window.location.href='{{ url_for('admin_videos') }}'">
-                    İptal
-                </button>
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-save me-1"></i> Kaydet
-                </button>
+            <div class="col-sm-6">
+                <ol class="breadcrumb float-sm-right">
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin_videos') }}">Videolar</a></li>
+                    <li class="breadcrumb-item active">Yeni Video</li>
+                </ol>
             </div>
-        </form>
-    </div>
-</div>
-
-<div class="card mt-4">
-    <div class="card-header">
-        <div>YouTube Video ID'sini Nasıl Bulurum?</div>
-    </div>
-    <div class="card-body">
-        <p>YouTube video ID'si, video URL'sinde <code>v=</code> parametresinden sonra gelen koddur.</p>
-        <div class="alert alert-secondary">
-            <strong>Örnek URL:</strong> https://www.youtube.com/watch?v=<mark>dQw4w9WgXcQ</mark><br>
-            <strong>Video ID:</strong> dQw4w9WgXcQ
-        </div>
-        
-        <p class="mb-0">Kısa URL'lerden ID nasıl alınır:</p>
-        <div class="alert alert-secondary">
-            <strong>Kısa URL:</strong> https://youtu.be/<mark>dQw4w9WgXcQ</mark><br>
-            <strong>Video ID:</strong> dQw4w9WgXcQ
         </div>
     </div>
 </div>
+
+<section class="content">
+    <div class="container-fluid">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Video Bilgileri</h3>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <div class="form-group">
+                        <label for="title">Başlık</label>
+                        <input type="text" class="form-control" id="title" name="title" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="description">Açıklama</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="url">Video URL</label>
+                        <input type="url" class="form-control" id="url" name="url" required placeholder="YouTube veya Vimeo URL'si">
+                        <small class="form-text text-muted">Örn: https://www.youtube.com/watch?v=XXXXXXXXXXX</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="thumbnail_url">Thumbnail URL</label>
+                        <input type="url" class="form-control" id="thumbnail_url" name="thumbnail_url" placeholder="Küçük resim URL'si">
+                        <small class="form-text text-muted">Boş bırakırsanız, varsayılan bir resim kullanılacaktır.</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="category_id">Kategori</label>
+                        <select class="form-control" id="category_id" name="category_id" required>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                    <a href="{{ url_for('admin_videos') }}" class="btn btn-secondary">İptal</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
 {% endblock %}
 
 {% block scripts %}
