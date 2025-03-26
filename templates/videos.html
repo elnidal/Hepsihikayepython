@@ -4,57 +4,84 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h1 class="mb-4">Videolar</h1>
+    <h1 class="section-title mb-4">Videolar</h1>
     
+    {% if videos %}
     <div class="row">
-        {% for video in videos.items %}
+        {% for video in videos %}
         <div class="col-md-4 mb-4">
             <div class="card h-100">
-                {% if video.thumbnail_url %}
-                <img src="{{ video.thumbnail_url }}" class="card-img-top" alt="{{ video.title }}">
-                {% endif %}
+                <div class="video-thumbnail">
+                    {% if video.thumbnail_url %}
+                    <img src="{{ video.thumbnail_url }}" class="card-img-top" alt="{{ video.title }}">
+                    {% else %}
+                    <img src="{{ url_for('static', filename='img/default-video.jpg') }}" class="card-img-top" alt="{{ video.title }}">
+                    {% endif %}
+                    <div class="play-button">
+                        <i class="fas fa-play"></i>
+                    </div>
+                </div>
                 <div class="card-body">
                     <h5 class="card-title">{{ video.title }}</h5>
-                    <p class="card-text">{{ video.description|default('')|truncate(100) }}</p>
-                    <a href="{{ url_for('video_detail', video_id=video.id) }}" class="btn btn-primary">İzle</a>
-                </div>
-                <div class="card-footer text-muted">
-                    {{ video.created_at.strftime('%d.%m.%Y') }}
+                    {% if video.description %}
+                    <p class="card-text">{{ video.description }}</p>
+                    {% endif %}
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <small class="text-muted">{{ video.formatted_date }}</small>
+                        <a href="{{ video.url }}" class="btn btn-primary btn-sm" target="_blank">İzle</a>
+                    </div>
                 </div>
             </div>
         </div>
         {% endfor %}
     </div>
-
-    <!-- Pagination -->
-    {% if videos.pages > 1 %}
-    <nav aria-label="Video sayfaları" class="mt-4">
-        <ul class="pagination justify-content-center">
-            {% if videos.has_prev %}
-            <li class="page-item">
-                <a class="page-link" href="{{ url_for('videos', page=videos.prev_num) }}">Önceki</a>
-            </li>
-            {% endif %}
-
-            {% for page in videos.iter_pages() %}
-                {% if page %}
-                    <li class="page-item {% if page == videos.page %}active{% endif %}">
-                        <a class="page-link" href="{{ url_for('videos', page=page) }}">{{ page }}</a>
-                    </li>
-                {% else %}
-                    <li class="page-item disabled"><span class="page-link">...</span></li>
-                {% endif %}
-            {% endfor %}
-
-            {% if videos.has_next %}
-            <li class="page-item">
-                <a class="page-link" href="{{ url_for('videos', page=videos.next_num) }}">Sonraki</a>
-            </li>
-            {% endif %}
-        </ul>
-    </nav>
+    {% else %}
+    <div class="alert alert-info">
+        Henüz video eklenmemiştir.
+    </div>
     {% endif %}
 </div>
+
+<style>
+.video-thumbnail {
+    position: relative;
+    overflow: hidden;
+}
+
+.video-thumbnail img {
+    transition: transform 0.3s ease;
+}
+
+.play-button {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.8;
+    transition: all 0.3s ease;
+}
+
+.play-button i {
+    font-size: 24px;
+    color: #e74c3c;
+}
+
+.card:hover .video-thumbnail img {
+    transform: scale(1.05);
+}
+
+.card:hover .play-button {
+    opacity: 1;
+    background: rgba(255, 255, 255, 1);
+}
+</style>
 {% endblock %}
 
 {% block extra_js %}

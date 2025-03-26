@@ -632,20 +632,103 @@ def inject_categories():
         app.logger.error(f"Category injection error: {str(e)}")
         return dict(categories=[])
 
+@app.route('/category/<slug>')
+def category_posts(slug):
+    try:
+        categories = load_data(CATEGORIES_FILE, [])
+        category = next((c for c in categories if c['slug'] == slug), None)
+        
+        if not category:
+            return render_template('errors/404.html'), 404
+        
+        posts = load_data(POSTS_FILE, [])
+        category_posts = [p for p in posts if p.get('category_id') == category['id']]
+        
+        # Format dates and add image URLs
+        for post in category_posts:
+            if isinstance(post.get('created_at'), str):
+                post['formatted_date'] = format_datetime(post['created_at'])
+            post['image_url'] = url_for('static', filename=f'uploads/{post.get("image", "default-post.jpg")}')
+        
+        return render_template('category.html', category=category, posts=category_posts)
+    except Exception as e:
+        app.logger.error(f"Category posts error: {str(e)}")
+        return render_template('errors/500.html')
+
+@app.route('/videos')
+def videos():
+    try:
+        videos = load_data(VIDEOS_FILE, [])
+        
+        # Sort by created_at
+        videos.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        
+        # Format dates
+        for video in videos:
+            if isinstance(video.get('created_at'), str):
+                video['formatted_date'] = format_datetime(video['created_at'])
+        
+        return render_template('videos.html', videos=videos)
+    except Exception as e:
+        app.logger.error(f"Videos page error: {str(e)}")
+        return render_template('errors/500.html')
+
+@app.route('/admin')
+@login_required
+def admin_index():
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/search')
+def search():
+    try:
+        query = request.args.get('search', '')
+        
+        if not query:
+            return redirect(url_for('index'))
+        
+        posts = load_data(POSTS_FILE, [])
+        videos = load_data(VIDEOS_FILE, [])
+        
+        # Filter posts and videos by query
+        matching_posts = [p for p in posts if 
+                         query.lower() in p.get('title', '').lower() or 
+                         query.lower() in p.get('content', '').lower()]
+        
+        matching_videos = [v for v in videos if 
+                          query.lower() in v.get('title', '').lower() or 
+                          query.lower() in v.get('description', '').lower()]
+        
+        # Format dates and add image URLs for posts
+        for post in matching_posts:
+            if isinstance(post.get('created_at'), str):
+                post['formatted_date'] = format_datetime(post['created_at'])
+            post['image_url'] = url_for('static', filename=f'uploads/{post.get("image", "default-post.jpg")}')
+        
+        # Format dates for videos
+        for video in matching_videos:
+            if isinstance(video.get('created_at'), str):
+                video['formatted_date'] = format_datetime(video['created_at'])
+        
+        return render_template('search.html', 
+                              posts=matching_posts, 
+                              videos=matching_videos, 
+                              query=query)
+    except Exception as e:
+        app.logger.error(f"Search error: {str(e)}")
+        return render_template('errors/500.html')
+
 if __name__ == '__main__':
-    # Ensure required directories exist
-    for directory in ['uploads', 'images', 'data', 'logs']:
-        path = os.path.join(app.static_folder, directory)
-        if not os.path.exists(path):
-            os.makedirs(path)
-            app.logger.info(f"Created directory: {path}")
+    # Create required directories
+    for directory in ['static/data', 'static/logs']:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+            app.logger.info(f'Created directory: {os.path.abspath(directory)}')
     
     # Initialize data
     init_file_data()
     
     # Run the app
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(debug=True, port=8080)
 else:
     # This code runs when imported (e.g., by Gunicorn in production)
     # Ensure required directories exist

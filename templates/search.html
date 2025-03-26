@@ -1,35 +1,19 @@
 {% extends "base.html" %}
 
+{% block title %}Arama Sonuçları: {{ query }} - Hepsi Hikaye{% endblock %}
+
 {% block content %}
-<div class="container">
-    <h2 class="mb-4">
+<div class="container mt-4">
+    <h1 class="section-title mb-4">
         {% if query %}
             "{{ query }}" için arama sonuçları
         {% else %}
             Arama
         {% endif %}
-    </h2>
+    </h1>
 
-    {% if posts %}
-        <div class="row">
-            {% for post in posts %}
-            <div class="col-md-4 mb-4">
-                <div class="card h-100">
-                    {% if post.image_path %}
-                    <img src="{{ post.image_path }}" class="card-img-top" alt="{{ post.title }}">
-                    {% endif %}
-                    <div class="card-body">
-                        <h5 class="card-title">{{ post.title }}</h5>
-                        <p class="card-text">{{ post.content[:200] }}{% if post.content|length > 200 %}...{% endif %}</p>
-                        <p class="card-text"><small class="text-muted">{{ post.category }}</small></p>
-                        <p class="card-text"><small class="text-muted">{{ post.created_at.strftime('%Y-%m-%d %H:%M') }}</small></p>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    {% else %}
-        <div class="text-center">
+    {% if not posts and not videos %}
+        <div class="alert alert-info">
             {% if query %}
                 <p>Aramanızla eşleşen sonuç bulunamadı.</p>
             {% else %}
@@ -37,5 +21,101 @@
             {% endif %}
         </div>
     {% endif %}
+
+    {% if posts %}
+        <h2 class="section-title mb-3">Hikayeler</h2>
+        <div class="row">
+            {% for post in posts %}
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <img src="{{ post.image_url }}" class="card-img-top" alt="{{ post.title }}">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ post.title }}</h5>
+                        {% if post.excerpt %}
+                        <p class="card-text">{{ post.excerpt }}</p>
+                        {% endif %}
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <small class="text-muted">{{ post.formatted_date }}</small>
+                            <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-primary btn-sm">Devamını Oku</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% if videos %}
+        <h2 class="section-title mb-3 mt-4">Videolar</h2>
+        <div class="row">
+            {% for video in videos %}
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="video-thumbnail">
+                        {% if video.thumbnail_url %}
+                        <img src="{{ video.thumbnail_url }}" class="card-img-top" alt="{{ video.title }}">
+                        {% else %}
+                        <img src="{{ url_for('static', filename='img/default-video.jpg') }}" class="card-img-top" alt="{{ video.title }}">
+                        {% endif %}
+                        <div class="play-button">
+                            <i class="fas fa-play"></i>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ video.title }}</h5>
+                        {% if video.description %}
+                        <p class="card-text">{{ video.description }}</p>
+                        {% endif %}
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <small class="text-muted">{{ video.formatted_date }}</small>
+                            <a href="{{ video.url }}" class="btn btn-primary btn-sm" target="_blank">İzle</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% endif %}
 </div>
+
+<style>
+.video-thumbnail {
+    position: relative;
+    overflow: hidden;
+}
+
+.video-thumbnail img {
+    transition: transform 0.3s ease;
+}
+
+.play-button {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.8;
+    transition: all 0.3s ease;
+}
+
+.play-button i {
+    font-size: 24px;
+    color: #e74c3c;
+}
+
+.card:hover .video-thumbnail img {
+    transform: scale(1.05);
+}
+
+.card:hover .play-button {
+    opacity: 1;
+    background: rgba(255, 255, 255, 1);
+}
+</style>
 {% endblock %}

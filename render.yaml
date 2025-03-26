@@ -3,13 +3,12 @@ services:
     name: hepsihikaye
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app -c gunicorn_config.py
+    startCommand: gunicorn app:app
+    plan: free
+    healthCheckPath: /
     envVars:
       - key: PYTHON_VERSION
-        value: 3.9.7
+        value: 3.11.0
       - key: SECRET_KEY
         generateValue: true
-      - key: DATABASE_URL
-        sync: false # User will need to set this in the Render dashboard
-    healthCheckPath: /
     autoDeploy: true
