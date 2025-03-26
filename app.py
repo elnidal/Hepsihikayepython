@@ -298,13 +298,18 @@ def post_detail(post_id):
         post['views'] = post.get('views', 0) + 1
         save_data(POSTS_FILE, posts)
         
+        # Format date
+        if isinstance(post.get('created_at'), str):
+            post['formatted_date'] = format_datetime(post['created_at'])
+        
         # Get comments
         comments = load_data(COMMENTS_FILE, [])
         post_comments = [c for c in comments if c.get('post_id') == post_id]
         
-        # Format dates
+        # Format dates for comments
         for comment in post_comments:
-            comment['formatted_date'] = format_datetime(comment.get('created_at', ''))
+            if isinstance(comment.get('created_at'), str):
+                comment['formatted_date'] = format_datetime(comment.get('created_at', ''))
         
         return render_template('post.html', post=post, comments=post_comments)
     except Exception as e:
@@ -377,6 +382,7 @@ def rate_post(post_id, action):
 def admin_posts():
     try:
         posts = load_data(POSTS_FILE, [])
+        categories = {c['id']: c for c in load_data(CATEGORIES_FILE, [])}
         search_query = request.args.get('search', '')
         
         if search_query:
@@ -384,9 +390,28 @@ def admin_posts():
                     search_query.lower() in p.get('title', '').lower() or 
                     search_query.lower() in p.get('content', '').lower()]
         
+        # Sort by created_at, newest first
+        posts.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        
+        # Format dates and add category info
+        for post in posts:
+            if isinstance(post.get('created_at'), str):
+                post['formatted_date'] = format_datetime(post['created_at'])
+            
+            # Add category name
+            category_id = post.get('category_id')
+            post['category_name'] = categories.get(category_id, {}).get('name', 'Kategorisiz')
+            
+            # Add image URL
+            if post.get('image'):
+                post['image_url'] = url_for('static', filename=f'uploads/{post["image"]}')
+            else:
+                post['image_url'] = url_for('static', filename='img/default-story.jpg')
+        
         return render_template('admin/posts.html', posts=posts, search_query=search_query)
     except Exception as e:
         app.logger.error(f"Admin posts error: {str(e)}")
+        flash('Hikayeler yüklenirken bir hata oluştu!', 'danger')
         return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/posts/new', methods=['GET', 'POST'])
@@ -405,12 +430,19 @@ def admin_new_post():
             image = request.files.get('image')
             
             if not title or not content:
-                flash('Başlık ve içerik alanları zorunludur.', 'error')
+                flash('Başlık ve içerik alanları zorunludur.', 'danger')
                 return render_template('admin/post_form.html', categories=categories)
             
             posts = load_data(POSTS_FILE, [])
+            
+            # Generate new ID (max + 1)
+            new_id = 1
+            if posts:
+                new_id = max(post.get('id', 0) for post in posts) + 1
+            
+            # Create new post
             new_post = {
-                'id': len(posts) + 1,
+                'id': new_id,
                 'title': title,
                 'content': content,
                 'category_id': int(category_id) if category_id else None,
@@ -423,72 +455,105 @@ def admin_new_post():
                 'created_at': datetime.now().isoformat()
             }
             
+            # Handle image upload
             if image and image.filename:
-                filename = secure_filename(image.filename)
-                image_path = os.path.join(app.static_folder, 'uploads', filename)
+                filename = secure_filename(f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{image.filename}")
+                image_path = os.path.join('static', 'uploads', filename)
+                
+                # Ensure uploads directory exists
+                os.makedirs(os.path.join('static', 'uploads'), exist_ok=True)
+                
+                # Save the image
                 image.save(image_path)
                 new_post['image'] = filename
             
+            # Add to posts and save
             posts.append(new_post)
             save_data(POSTS_FILE, posts)
             
-            flash('Gönderi başarıyla oluşturuldu.', 'success')
+            flash('Hikaye başarıyla eklendi!', 'success')
             return redirect(url_for('admin_posts'))
         
         return render_template('admin/post_form.html', categories=categories)
     except Exception as e:
-        app.logger.error(f"New post error: {str(e)}")
-        flash('Gönderi oluşturulurken bir hata oluştu.', 'error')
-        return redirect(url_for('admin_posts'))
+        app.logger.error(f"Admin new post error: {str(e)}")
+        flash('Hikaye eklenirken bir hata oluştu!', 'danger')
+        return render_template('admin/post_form.html', categories=categories)
 
 @app.route('/admin/posts/<int:post_id>/edit', methods=['GET', 'POST'])
 @login_required
 def admin_edit_post(post_id):
     try:
         posts = load_data(POSTS_FILE, [])
-        categories = load_data(CATEGORIES_FILE, [])
         post = next((p for p in posts if p['id'] == post_id), None)
         
         if not post:
-            flash('Gönderi bulunamadı.', 'error')
+            flash('Düzenlemek istediğiniz hikaye bulunamadı.', 'danger')
             return redirect(url_for('admin_posts'))
         
+        categories = load_data(CATEGORIES_FILE, [])
+        
         if request.method == 'POST':
-            post['title'] = request.form.get('title')
-            post['content'] = request.form.get('content')
-            post['category_id'] = int(request.form.get('category_id')) if request.form.get('category_id') else None
-            post['excerpt'] = request.form.get('excerpt')
-            post['published'] = request.form.get('published') == 'on'
-            post['featured'] = request.form.get('featured') == 'on'
-            
+            title = request.form.get('title')
+            content = request.form.get('content')
+            category_id = request.form.get('category_id')
+            excerpt = request.form.get('excerpt')
+            published = request.form.get('published') == 'on'
+            featured = request.form.get('featured') == 'on'
             image = request.files.get('image')
             remove_image = request.form.get('remove_image') == 'on'
             
+            if not title or not content:
+                flash('Başlık ve içerik alanları zorunludur.', 'danger')
+                return render_template('admin/post_form.html', post=post, categories=categories)
+            
+            # Update post data
+            post['title'] = title
+            post['content'] = content
+            post['category_id'] = int(category_id) if category_id else None
+            post['excerpt'] = excerpt
+            post['published'] = published
+            post['featured'] = featured
+            
+            # Handle image
             if remove_image and post.get('image'):
-                old_image_path = os.path.join(app.static_folder, 'uploads', post['image'])
-                if os.path.exists(old_image_path):
-                    os.remove(old_image_path)
-                post['image'] = None
+                # Remove the image file (optional)
+                try:
+                    image_path = os.path.join('static', 'uploads', post['image'])
+                    if os.path.exists(image_path):
+                        os.remove(image_path)
+                except Exception as e:
+                    app.logger.error(f"Error removing image: {str(e)}")
+                
+                # Remove image reference
+                post.pop('image', None)
             
             if image and image.filename:
-                if post.get('image'):
-                    old_image_path = os.path.join(app.static_folder, 'uploads', post['image'])
-                    if os.path.exists(old_image_path):
-                        os.remove(old_image_path)
+                # Save new image
+                filename = secure_filename(f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{image.filename}")
+                image_path = os.path.join('static', 'uploads', filename)
                 
-                filename = secure_filename(image.filename)
-                image_path = os.path.join(app.static_folder, 'uploads', filename)
+                # Ensure uploads directory exists
+                os.makedirs(os.path.join('static', 'uploads'), exist_ok=True)
+                
+                # Save the image
                 image.save(image_path)
                 post['image'] = filename
             
+            # Save changes
             save_data(POSTS_FILE, posts)
-            flash('Gönderi başarıyla güncellendi.', 'success')
+            
+            flash('Hikaye başarıyla güncellendi!', 'success')
             return redirect(url_for('admin_posts'))
+        
+        # Format date for display
+        if isinstance(post.get('created_at'), str):
+            post['formatted_date'] = format_datetime(post['created_at'])
         
         return render_template('admin/post_form.html', post=post, categories=categories)
     except Exception as e:
-        app.logger.error(f"Edit post error: {str(e)}")
-        flash('Gönderi güncellenirken bir hata oluştu.', 'error')
+        app.logger.error(f"Admin edit post error: {str(e)}")
+        flash('Hikaye düzenlenirken bir hata oluştu!', 'danger')
         return redirect(url_for('admin_posts'))
 
 @app.route('/admin/posts/<int:post_id>/delete', methods=['POST'])
