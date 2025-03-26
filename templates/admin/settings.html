@@ -7,40 +7,107 @@
     <h1>Ayarlar</h1>
 </div>
 
+<!-- Settings Form -->
 <div class="row">
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                <h5>Kullanıcı Ayarları</h5>
+                <h5 class="mb-0">Site Ayarları</h5>
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ url_for('admin_change_password') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <form action="{{ url_for('admin_settings_update') }}" method="POST">
                     <div class="mb-3">
-                        <label for="current_password" class="form-label">Mevcut Şifre</label>
-                        <input type="password" class="form-control" id="current_password" name="current_password" required>
+                        <label for="siteName" class="form-label">Site Adı</label>
+                        <input type="text" class="form-control" id="siteName" name="site_name" value="{{ settings.site_name }}" required>
                     </div>
                     <div class="mb-3">
-                        <label for="new_password" class="form-label">Yeni Şifre</label>
-                        <input type="password" class="form-control" id="new_password" name="new_password" required>
+                        <label for="siteDescription" class="form-label">Site Açıklaması</label>
+                        <textarea class="form-control" id="siteDescription" name="site_description" rows="3">{{ settings.site_description }}</textarea>
                     </div>
                     <div class="mb-3">
-                        <label for="confirm_password" class="form-label">Yeni Şifre (Tekrar)</label>
-                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                        <label for="siteKeywords" class="form-label">Site Anahtar Kelimeleri</label>
+                        <input type="text" class="form-control" id="siteKeywords" name="site_keywords" value="{{ settings.site_keywords }}">
+                        <small class="form-text text-muted">Virgülle ayırarak yazın</small>
                     </div>
-                    <button type="submit" class="btn btn-primary">Şifreyi Değiştir</button>
+                    <div class="mb-3">
+                        <label for="siteEmail" class="form-label">İletişim E-posta</label>
+                        <input type="email" class="form-control" id="siteEmail" name="site_email" value="{{ settings.site_email }}" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>
+                        Kaydet
+                    </button>
                 </form>
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                <h5>Site Ayarları</h5>
+                <h5 class="mb-0">Sosyal Medya</h5>
             </div>
             <div class="card-body">
-                <p class="text-center">Site ayarları yakında eklenecek.</p>
+                <form action="{{ url_for('admin_social_update') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="facebook" class="form-label">Facebook</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fab fa-facebook"></i></span>
+                            <input type="url" class="form-control" id="facebook" name="facebook" value="{{ settings.facebook }}">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="twitter" class="form-label">Twitter</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fab fa-twitter"></i></span>
+                            <input type="url" class="form-control" id="twitter" name="twitter" value="{{ settings.twitter }}">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="instagram" class="form-label">Instagram</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fab fa-instagram"></i></span>
+                            <input type="url" class="form-control" id="instagram" name="instagram" value="{{ settings.instagram }}">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="youtube" class="form-label">YouTube</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fab fa-youtube"></i></span>
+                            <input type="url" class="form-control" id="youtube" name="youtube" value="{{ settings.youtube }}">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>
+                        Kaydet
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">Yönetici Şifresi</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('admin_password_update') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="currentPassword" class="form-label">Mevcut Şifre</label>
+                        <input type="password" class="form-control" id="currentPassword" name="current_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newPassword" class="form-label">Yeni Şifre</label>
+                        <input type="password" class="form-control" id="newPassword" name="new_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirmPassword" class="form-label">Yeni Şifre (Tekrar)</label>
+                        <input type="password" class="form-control" id="confirmPassword" name="confirm_password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-key me-2"></i>
+                        Şifreyi Değiştir
+                    </button>
+                </form>
             </div>
         </div>
     </div>

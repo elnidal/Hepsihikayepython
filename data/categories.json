@@ -1,0 +1,37 @@
+[
+  {
+    "id": 1,
+    "name": "Öykü",
+    "slug": "oyku"
+  },
+  {
+    "id": 2,
+    "name": "Roman",
+    "slug": "roman"
+  },
+  {
+    "id": 3,
+    "name": "Şiir",
+    "slug": "siir"
+  },
+  {
+    "id": 4,
+    "name": "Deneme",
+    "slug": "deneme"
+  },
+  {
+    "id": 5,
+    "name": "İnceleme",
+    "slug": "inceleme"
+  },
+  {
+    "id": 6,
+    "name": "Haber",
+    "slug": "haber"
+  },
+  {
+    "id": 7,
+    "name": "Video",
+    "slug": "video"
+  }
+]

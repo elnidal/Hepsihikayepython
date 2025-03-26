@@ -5,103 +5,168 @@
 {% block content %}
 <div class="content-header">
     <h1>Videolar</h1>
-    <div>
-        <a href="{{ url_for('admin_new_video') }}" class="btn btn-primary">
-            <i class="fas fa-plus-circle me-1"></i> Yeni Video Ekle
-        </a>
-    </div>
+    <a href="{{ url_for('admin_new_video') }}" class="btn btn-primary">
+        <i class="fas fa-plus-circle me-2"></i>
+        Yeni Video
+    </a>
 </div>
 
+<!-- Videos List -->
 <div class="card">
     <div class="card-header">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>Tüm Videolar</div>
-            <div>
-                <input type="text" id="searchInput" class="form-control form-control-sm" placeholder="Video Ara..." style="width: 250px;">
+        <h5 class="mb-0">Tüm Videolar</h5>
+        <div class="d-flex gap-2">
+            <div class="input-group" style="width: 300px;">
+                <input type="text" class="form-control" id="searchInput" placeholder="Video ara...">
+                <button class="btn btn-outline-secondary" type="button">
+                    <i class="fas fa-search"></i>
+                </button>
             </div>
+            <select class="form-select" style="width: 200px;" id="categoryFilter">
+                <option value="">Tüm Kategoriler</option>
+                {% for category in categories %}
+                <option value="{{ category.id }}">{{ category.name }}</option>
+                {% endfor %}
+            </select>
         </div>
     </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover" id="videosTable">
-                <thead>
-                    <tr>
-                        <th style="width: 5%">#</th>
-                        <th style="width: 15%">Önizleme</th>
-                        <th style="width: 35%">Başlık</th>
-                        <th style="width: 15%">YouTube ID</th>
-                        <th style="width: 15%">Tarih</th>
-                        <th style="width: 15%">İşlemler</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if videos %}
-                        {% for video in videos %}
-                        <tr>
-                            <td>{{ video.id }}</td>
-                            <td>
-                                <img src="https://img.youtube.com/vi/{{ video.youtube_id }}/mqdefault.jpg" 
-                                     alt="{{ video.title }}" 
-                                     class="img-thumbnail" 
-                                     style="max-height: 60px;">
-                            </td>
-                            <td>
-                                <div class="text-truncate" style="max-width: 300px;">{{ video.title }}</div>
-                            </td>
-                            <td>{{ video.youtube_id }}</td>
-                            <td>{{ video.created_at.strftime('%d/%m/%Y') }}</td>
-                            <td class="action-buttons">
-                                <a href="{{ url_for('video', id=video.id) }}" class="btn btn-sm btn-outline-info" target="_blank">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                                <a href="{{ url_for('admin_edit_video', id=video.id) }}" class="btn btn-sm btn-outline-primary">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                <form method="POST" action="{{ url_for('admin_delete_video', id=video.id) }}" class="d-inline">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Bu videoyu silmek istediğinizden emin misiniz?');">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Başlık</th>
+                    <th>Kategori</th>
+                    <th>Yazar</th>
+                    <th>Tarih</th>
+                    <th>Görüntülenme</th>
+                    <th>Durum</th>
+                    <th>İşlemler</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for video in videos %}
+                <tr>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            {% if video.thumbnail %}
+                            <img src="{{ video.thumbnail }}" alt="{{ video.title }}" class="rounded" style="width: 40px; height: 40px; object-fit: cover;">
+                            {% else %}
+                            <div class="rounded bg-light d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                <i class="fas fa-video text-muted"></i>
+                            </div>
+                            {% endif %}
+                            <div>
+                                <div class="fw-medium">{{ video.title }}</div>
+                                <small class="text-muted">{{ video.excerpt[:50] }}...</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge bg-primary">{{ video.category }}</span>
+                    </td>
+                    <td>{{ video.author }}</td>
+                    <td>{{ video.date }}</td>
+                    <td>{{ video.views }}</td>
+                    <td>
+                        {% if video.status == 'published' %}
+                        <span class="badge bg-success">Yayında</span>
+                        {% else %}
+                        <span class="badge bg-warning">Taslak</span>
+                        {% endif %}
+                    </td>
+                    <td class="action-buttons">
+                        <a href="{{ url_for('view_video', video_id=video.id) }}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        <a href="{{ url_for('edit_video', video_id=video.id) }}" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteVideoModal{{ video.id }}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+
+                <!-- Delete Video Modal -->
+                <div class="modal fade" id="deleteVideoModal{{ video.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Video Sil</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>{{ video.title }} videosunu silmek istediğinize emin misiniz?</p>
+                                <p class="text-danger">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    Bu işlem geri alınamaz!
+                                </p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                                <form action="{{ url_for('delete_video', video_id=video.id) }}" method="POST" class="d-inline">
+                                    <button type="submit" class="btn btn-danger">Sil</button>
                                 </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="6" class="text-center">Henüz video bulunmuyor</td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<nav class="mt-4">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('admin_videos', page=current_page-1) }}">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+        </li>
+        {% for page in range(1, total_pages + 1) %}
+        <li class="page-item {% if page == current_page %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('admin_videos', page=page) }}">{{ page }}</a>
+        </li>
+        {% endfor %}
+        <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('admin_videos', page=current_page+1) }}">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+
+{% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const searchInput = document.getElementById('searchInput');
-        const videosTable = document.getElementById('videosTable');
-        const tableRows = videosTable.querySelectorAll('tbody tr');
-        
-        // Search functionality
-        searchInput.addEventListener('keyup', filterVideos);
-        
-        function filterVideos() {
-            const searchTerm = searchInput.value.toLowerCase();
-            
-            tableRows.forEach(row => {
-                const title = row.querySelector('td:nth-child(3)').textContent.toLowerCase();
-                const ytId = row.querySelector('td:nth-child(4)').textContent.toLowerCase();
-                
-                if (title.includes(searchTerm) || ytId.includes(searchTerm)) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-        }
-    });
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    const categoryFilter = document.getElementById('categoryFilter');
+    const tbody = document.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+
+    function filterVideos() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const selectedCategory = categoryFilter.value;
+
+        rows.forEach(row => {
+            const title = row.querySelector('.fw-medium').textContent.toLowerCase();
+            const category = row.querySelector('.badge.bg-primary').textContent;
+            const categoryId = row.querySelector('.badge.bg-primary').dataset.categoryId;
+
+            const matchesSearch = title.includes(searchTerm);
+            const matchesCategory = !selectedCategory || categoryId === selectedCategory;
+
+            row.style.display = matchesSearch && matchesCategory ? '' : 'none';
+        });
+    }
+
+    searchInput.addEventListener('input', filterVideos);
+    categoryFilter.addEventListener('change', filterVideos);
+});
 </script>
+{% endblock %}
 {% endblock %}

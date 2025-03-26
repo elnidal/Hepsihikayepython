@@ -5,88 +5,112 @@
 {% block content %}
 <div class="content-header">
     <h1>Kategoriler</h1>
-    <div>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newCategoryModal">
-            <i class="fas fa-plus-circle me-1"></i> Yeni Kategori Ekle
-        </button>
-    </div>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newCategoryModal">
+        <i class="fas fa-plus-circle me-2"></i>
+        Yeni Kategori
+    </button>
 </div>
 
+<!-- Categories List -->
 <div class="card">
     <div class="card-header">
-        <div>Tüm Kategoriler</div>
+        <h5 class="mb-0">Tüm Kategoriler</h5>
     </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th style="width: 5%">#</th>
-                        <th style="width: 40%">İsim</th>
-                        <th style="width: 20%">Slug</th>
-                        <th style="width: 15%">Hikaye Sayısı</th>
-                        <th style="width: 20%">İşlemler</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if categories %}
-                        {% for category in categories %}
-                        <tr>
-                            <td>{{ category.id }}</td>
-                            <td>{{ category.name }}</td>
-                            <td>{{ category.slug }}</td>
-                            <td>{{ category.posts|length }}</td>
-                            <td class="action-buttons">
-                                <button type="button" class="btn btn-sm btn-outline-primary edit-category-btn" 
-                                        data-id="{{ category.id }}" 
-                                        data-name="{{ category.name }}" 
-                                        data-slug="{{ category.slug }}"
-                                        data-bs-toggle="modal" 
-                                        data-bs-target="#editCategoryModal">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <form method="POST" action="{{ url_for('admin_delete_category', id=category.id) }}" class="d-inline">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Bu kategoriyi silmek istediğinizden emin misiniz? Bu işlem kategoriye ait hikayeleri silmez, ancak onları kategorisiz yapar.');">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Kategori Adı</th>
+                    <th>Slug</th>
+                    <th>Hikaye Sayısı</th>
+                    <th>Video Sayısı</th>
+                    <th>İşlemler</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for category in categories %}
+                <tr>
+                    <td>{{ category.name }}</td>
+                    <td>{{ category.slug }}</td>
+                    <td>{{ category.post_count }}</td>
+                    <td>{{ category.video_count }}</td>
+                    <td class="action-buttons">
+                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editCategoryModal{{ category.id }}">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteCategoryModal{{ category.id }}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+
+                <!-- Edit Category Modal -->
+                <div class="modal fade" id="editCategoryModal{{ category.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Kategori Düzenle</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <form action="{{ url_for('admin_edit_category', category_id=category.id) }}" method="POST">
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <label for="editCategoryName{{ category.id }}" class="form-label">Kategori Adı</label>
+                                        <input type="text" class="form-control" id="editCategoryName{{ category.id }}" name="name" value="{{ category.name }}" required>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Delete Category Modal -->
+                <div class="modal fade" id="deleteCategoryModal{{ category.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Kategori Sil</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>{{ category.name }} kategorisini silmek istediğinize emin misiniz?</p>
+                                <p class="text-danger">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    Bu işlem geri alınamaz!
+                                </p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                                <form action="{{ url_for('admin_delete_category', category_id=category.id) }}" method="POST" class="d-inline">
+                                    <button type="submit" class="btn btn-danger">Sil</button>
                                 </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="5" class="text-center">Henüz kategori bulunmuyor</td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 
 <!-- New Category Modal -->
-<div class="modal fade" id="newCategoryModal" tabindex="-1" aria-labelledby="newCategoryModalLabel" aria-hidden="true">
+<div class="modal fade" id="newCategoryModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="POST" action="{{ url_for('admin_new_category') }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="newCategoryModalLabel">Yeni Kategori</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
+            <div class="modal-header">
+                <h5 class="modal-title">Yeni Kategori</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('admin_new_category') }}" method="POST">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="name" class="form-label required-field">Kategori Adı</label>
-                        <input type="text" class="form-control" id="name" name="name" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="slug" class="form-label required-field">Slug</label>
-                        <div class="input-group">
-                            <span class="input-group-text">/category/</span>
-                            <input type="text" class="form-control" id="new_slug" name="slug" required>
-                        </div>
-                        <div class="form-text">URL-dostu bir format kullanın. Boşluklar yerine tire (-) kullanılacaktır.</div>
+                        <label for="categoryName" class="form-label">Kategori Adı</label>
+                        <input type="text" class="form-control" id="categoryName" name="name" required>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -97,103 +121,4 @@
         </div>
     </div>
 </div>
-
-<!-- Edit Category Modal -->
-<div class="modal fade" id="editCategoryModal" tabindex="-1" aria-labelledby="editCategoryModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form method="POST" action="{{ url_for('admin_edit_category') }}" id="editCategoryForm">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="id" id="edit_category_id">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="editCategoryModalLabel">Kategori Düzenle</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="edit_name" class="form-label required-field">Kategori Adı</label>
-                        <input type="text" class="form-control" id="edit_name" name="name" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="edit_slug" class="form-label required-field">Slug</label>
-                        <div class="input-group">
-                            <span class="input-group-text">/category/</span>
-                            <input type="text" class="form-control" id="edit_slug" name="slug" required>
-                        </div>
-                        <div class="form-text">URL-dostu bir format kullanın. Boşluklar yerine tire (-) kullanılacaktır.</div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
-                    <button type="submit" class="btn btn-primary">Güncelle</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Auto-generate slug for new category
-        const nameInput = document.getElementById('name');
-        const slugInput = document.getElementById('new_slug');
-        
-        if (nameInput && slugInput) {
-            nameInput.addEventListener('keyup', function() {
-                if (!slugInput.dataset.manuallyChanged) {
-                    generateSlug(nameInput, slugInput);
-                }
-            });
-            
-            slugInput.addEventListener('input', function() {
-                slugInput.dataset.manuallyChanged = 'true';
-            });
-        }
-        
-        // Edit category modal population
-        const editButtons = document.querySelectorAll('.edit-category-btn');
-        
-        editButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                const id = this.getAttribute('data-id');
-                const name = this.getAttribute('data-name');
-                const slug = this.getAttribute('data-slug');
-                
-                document.getElementById('edit_category_id').value = id;
-                document.getElementById('edit_name').value = name;
-                document.getElementById('edit_slug').value = slug;
-            });
-        });
-        
-        // Auto-generate slug for edit category
-        const editNameInput = document.getElementById('edit_name');
-        const editSlugInput = document.getElementById('edit_slug');
-        
-        if (editNameInput && editSlugInput) {
-            editNameInput.addEventListener('keyup', function() {
-                if (!editSlugInput.dataset.manuallyChanged) {
-                    generateSlug(editNameInput, editSlugInput);
-                }
-            });
-            
-            editSlugInput.addEventListener('input', function() {
-                editSlugInput.dataset.manuallyChanged = 'true';
-            });
-        }
-        
-        // Helper function to generate slug
-        function generateSlug(nameInput, slugInput) {
-            const slug = nameInput.value
-                .toLowerCase()
-                .replace(/[^a-z0-9\s]/g, '')  // Remove special characters
-                .replace(/\s+/g, '-')        // Replace spaces with hyphens
-                .replace(/-+/g, '-')         // Replace multiple hyphens with a single one
-                .trim();
-            
-            slugInput.value = slug;
-        }
-    });
-</script>
 {% endblock %}

@@ -5,22 +5,21 @@
 {% block content %}
 <div class="content-header">
     <h1>Dashboard</h1>
-    <div>
-        <a href="{{ url_for('index') }}" class="btn btn-outline-primary" target="_blank">
-            <i class="fas fa-external-link-alt me-1"></i> Siteyi Görüntüle
-        </a>
-    </div>
+    <a href="{{ url_for('index') }}" class="btn btn-outline-primary">
+        <i class="fas fa-external-link-alt"></i>
+        Siteyi Görüntüle
+    </a>
 </div>
 
-<!-- Statistics Cards -->
 <div class="row">
+    <!-- Stats Cards -->
     <div class="col-md-3">
         <div class="stats-card">
-            <div class="stats-icon" style="background-color: #1a2a42;">
+            <div class="stats-icon" style="background-color: #e74c3c;">
                 <i class="fas fa-book"></i>
             </div>
             <h3>{{ total_posts }}</h3>
-            <p class="text-muted">Toplam Hikaye</p>
+            <p>Toplam Hikaye</p>
         </div>
     </div>
     <div class="col-md-3">
@@ -29,159 +28,135 @@
                 <i class="fas fa-video"></i>
             </div>
             <h3>{{ total_videos }}</h3>
-            <p class="text-muted">Toplam Video</p>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stats-card">
-            <div class="stats-icon" style="background-color: #e74c3c;">
-                <i class="fas fa-comments"></i>
-            </div>
-            <h3>{{ total_comments }}</h3>
-            <p class="text-muted">Toplam Yorum</p>
+            <p>Toplam Video</p>
         </div>
     </div>
     <div class="col-md-3">
         <div class="stats-card">
             <div class="stats-icon" style="background-color: #2ecc71;">
+                <i class="fas fa-comments"></i>
+            </div>
+            <h3>{{ total_comments }}</h3>
+            <p>Toplam Yorum</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-icon" style="background-color: #9b59b6;">
                 <i class="fas fa-eye"></i>
             </div>
             <h3>{{ total_views }}</h3>
-            <p class="text-muted">Toplam Görüntülenme</p>
+            <p>Toplam Görüntülenme</p>
         </div>
     </div>
 </div>
 
-<div class="row">
+<div class="row mt-4">
     <!-- Recent Posts -->
-    <div class="col-lg-6">
+    <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                <div>Son Eklenen Hikayeler</div>
-                <a href="{{ url_for('admin_posts') }}" class="btn btn-sm btn-outline-primary">Tümünü Görüntüle</a>
+                <h5 class="mb-0">Son Eklenen Hikayeler</h5>
+                <a href="{{ url_for('admin_posts') }}" class="btn btn-sm btn-outline-primary">
+                    Tümünü Gör
+                </a>
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Başlık</th>
-                                <th>Kategori</th>
-                                <th>Tarih</th>
-                                <th>İşlemler</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% if recent_posts %}
-                                {% for post in recent_posts %}
-                                <tr>
-                                    <td>
-                                        <div class="text-truncate" style="max-width: 200px;">{{ post.title }}</div>
-                                    </td>
-                                    <td>
-                                        {% if post.category %}
-                                            <span class="badge bg-primary">{{ post.category.name }}</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary">Kategorisiz</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ post.created_at.strftime('%d/%m/%Y') }}</td>
-                                    <td class="action-buttons">
-                                        <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-sm btn-outline-info" target="_blank">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        <a href="{{ url_for('admin_edit_post', post_id=post.id) }}" class="btn btn-sm btn-outline-primary">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            {% else %}
-                                <tr>
-                                    <td colspan="4" class="text-center">Henüz hikaye yok</td>
-                                </tr>
-                            {% endif %}
-                        </tbody>
-                    </table>
-                </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Başlık</th>
+                            <th>Kategori</th>
+                            <th>Tarih</th>
+                            <th>İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for post in recent_posts %}
+                        <tr>
+                            <td>{{ post.title }}</td>
+                            <td>{{ post.category }}</td>
+                            <td>{{ post.date }}</td>
+                            <td class="action-buttons">
+                                <a href="{{ url_for('view_post', post_id=post.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{{ url_for('edit_post', post_id=post.id) }}" class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
     <!-- Recent Videos -->
-    <div class="col-lg-6">
+    <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                <div>Son Eklenen Videolar</div>
-                <a href="{{ url_for('admin_videos') }}" class="btn btn-sm btn-outline-primary">Tümünü Görüntüle</a>
+                <h5 class="mb-0">Son Eklenen Videolar</h5>
+                <a href="{{ url_for('admin_videos') }}" class="btn btn-sm btn-outline-primary">
+                    Tümünü Gör
+                </a>
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Başlık</th>
-                                <th>Kaynak</th>
-                                <th>Tarih</th>
-                                <th>İşlemler</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% if recent_videos %}
-                                {% for video in recent_videos %}
-                                <tr>
-                                    <td>
-                                        <div class="text-truncate" style="max-width: 200px;">{{ video.title }}</div>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-danger">YouTube</span>
-                                    </td>
-                                    <td>{{ video.created_at.strftime('%d/%m/%Y') }}</td>
-                                    <td class="action-buttons">
-                                        <a href="{{ url_for('video_detail', video_id=video.id) }}" class="btn btn-sm btn-outline-info" target="_blank">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        <a href="{{ url_for('admin_edit_video', video_id=video.id) }}" class="btn btn-sm btn-outline-primary">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            {% else %}
-                                <tr>
-                                    <td colspan="4" class="text-center">Henüz video yok</td>
-                                </tr>
-                            {% endif %}
-                        </tbody>
-                    </table>
-                </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Başlık</th>
+                            <th>Kategori</th>
+                            <th>Tarih</th>
+                            <th>İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for video in recent_videos %}
+                        <tr>
+                            <td>{{ video.title }}</td>
+                            <td>{{ video.category }}</td>
+                            <td>{{ video.date }}</td>
+                            <td class="action-buttons">
+                                <a href="{{ url_for('view_video', video_id=video.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{{ url_for('edit_video', video_id=video.id) }}" class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Quick Access Card -->
-<div class="card mt-4">
-    <div class="card-header">Hızlı Erişim</div>
-    <div class="card-body">
-        <div class="row g-3">
-            <div class="col-md-4">
-                <a href="{{ url_for('admin_new_post') }}" class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2 py-3">
-                    <i class="fas fa-plus-circle"></i>
-                    <span>Yeni Hikaye Ekle</span>
-                </a>
+<!-- Quick Access -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Hızlı Erişim</h5>
             </div>
-            <div class="col-md-4">
-                <a href="{{ url_for('admin_new_video') }}" class="btn btn-danger w-100 d-flex align-items-center justify-content-center gap-2 py-3">
-                    <i class="fas fa-video"></i>
-                    <span>Yeni Video Ekle</span>
-                </a>
-            </div>
-            <div class="col-md-4">
-                <a href="{{ url_for('admin_categories') }}" class="btn btn-success w-100 d-flex align-items-center justify-content-center gap-2 py-3">
-                    <i class="fas fa-tags"></i>
-                    <span>Kategorileri Yönet</span>
-                </a>
+            <div class="card-body">
+                <div class="d-flex gap-3">
+                    <a href="{{ url_for('admin_new_post') }}" class="btn btn-primary">
+                        <i class="fas fa-plus-circle me-2"></i>
+                        Yeni Hikaye Ekle
+                    </a>
+                    <a href="{{ url_for('admin_new_video') }}" class="btn btn-primary">
+                        <i class="fas fa-video me-2"></i>
+                        Yeni Video Ekle
+                    </a>
+                    <a href="{{ url_for('admin_categories') }}" class="btn btn-primary">
+                        <i class="fas fa-tags me-2"></i>
+                        Kategorileri Yönet
+                    </a>
+                </div>
             </div>
         </div>
     </div>

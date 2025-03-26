@@ -1,6 +1,6 @@
 :root {
     --primary-color: #1a2a42;
-    --secondary-color: #2c3e50;
+    --secondary-color: #e74c3c;
     --accent-color: #3498db;
     --dark-color: #0f1c2d;
     --darker-color: #0a1622;
@@ -16,6 +16,8 @@
     --spacing-md: 1rem;
     --spacing-lg: 1.5rem;
     --spacing-xl: 2rem;
+    --border-color: #ddd;
+    --light-bg: #f8f9fa;
 }
 
 /* AJAX Navigation Styles */
@@ -96,8 +98,8 @@
 body {
     font-family: 'Poppins', sans-serif;
     color: var(--text-color);
-    line-height: 1.7;
-    background-color: #ffffff;
+    line-height: 1.6;
+    background-color: #fff;
     overflow-x: hidden; /* Prevent horizontal scroll on mobile */
     font-size: 16px; /* Base font size */
     -webkit-font-smoothing: antialiased;
@@ -116,9 +118,9 @@ h1, h2, h3, h4, h5, h6, .site-title {
 .site-header {
     background-color: var(--primary-color);
     color: white;
-    padding: 2.5rem 0;
+    padding: 2rem 0;
     text-align: center;
-    margin-bottom: 2.5rem;
+    margin-bottom: 2rem;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     position: relative;
     z-index: 100;
@@ -139,7 +141,7 @@ h1, h2, h3, h4, h5, h6, .site-title {
 }
 
 .site-title {
-    font-size: 2.8rem;
+    font-size: 2.5rem;
     font-weight: 700;
     letter-spacing: 0;
     margin-bottom: 0.5rem;
@@ -166,7 +168,7 @@ h1, h2, h3, h4, h5, h6, .site-title {
 
 .logo-icon {
     margin: 0 15px;
-    color: #c10000;
+    color: var(--secondary-color);
     font-size: 1.2em;
     position: relative;
     top: -2px;
@@ -210,33 +212,29 @@ h1, h2, h3, h4, h5, h6, .site-title {
 }
 
 .site-tagline {
-    font-size: 1.2rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1rem;
     position: relative;
     display: inline-block;
-    padding: 0 1.5rem;
-    font-weight: 300;
-    letter-spacing: 1px;
-    color: rgba(255, 255, 255, 0.9);
-    margin-top: 0.5rem;
+    padding: 0 2rem;
 }
 
 .site-tagline:before,
 .site-tagline:after {
     content: "";
-    display: block;
-    height: 1px;
-    width: 100px;
-    background: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0));
     position: absolute;
     top: 50%;
+    width: 30px;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.3);
 }
 
 .site-tagline:before {
-    left: -100px;
+    left: 0;
 }
 
 .site-tagline:after {
-    right: -100px;
+    right: 0;
 }
 
 /* Responsive Navigation */
@@ -263,67 +261,18 @@ h1, h2, h3, h4, h5, h6, .site-title {
 }
 
 .nav-category {
-    padding: 0.6rem 1.2rem;
-    border-radius: 30px;
-    background-color: #ffffff;
     color: var(--primary-color);
-    font-size: 0.9rem;
-    font-weight: 500;
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    cursor: pointer;
     text-decoration: none;
-    box-shadow: var(--card-shadow);
-    border: 1px solid #eee;
-    position: relative;
-    overflow: hidden;
-    z-index: 1;
+    padding: 0.5rem 1.5rem;
+    border-radius: 20px;
+    transition: all 0.3s ease;
 }
 
-.nav-category::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(to right, rgba(193, 0, 0, 0.1), rgba(193, 0, 0, 0.2));
-    opacity: 0;
-    z-index: -1;
-    transition: opacity 0.3s ease;
-}
-
-.nav-category:hover {
-    background-color: rgba(193, 0, 0, 0.9);
-    color: white;
-    transform: translateY(-3px);
-    box-shadow: 0 5px 15px rgba(193, 0, 0, 0.3);
-    border-color: transparent;
-}
-
-.nav-category:hover::before {
-    opacity: 1;
-}
-
-.nav-category.active,
-.nav-category.active:hover {
-    background-color: #c10000;
-    color: white;
-    font-weight: 600;
-    border-color: transparent;
-    box-shadow: 0 5px 15px rgba(193, 0, 0, 0.4);
+.nav-category:hover,
+.nav-category.active {
+    background-color: var(--primary-color);
+    color: #fff;
     transform: translateY(-2px);
-}
-
-.nav-category.active::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 40%;
-    height: 3px;
-    background: rgba(255, 255, 255, 0.7);
-    border-radius: 3px;
 }
 
 .section-title {
@@ -519,10 +468,9 @@ h1, h2, h3, h4, h5, h6, .site-title {
 }
 
 .btn-primary:hover {
-    background-color: var(--accent-color);
-    border-color: var(--accent-color);
+    background-color: darken(var(--primary-color), 10%);
+    border-color: darken(var(--primary-color), 10%);
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 .btn-sm {
@@ -800,7 +748,7 @@ footer {
     }
     
     .site-title {
-        font-size: 1.8rem;
+        font-size: 2rem;
         margin-bottom: 0.3rem;
         color: white;
         text-shadow: 0 0 8px rgba(255,255,255,0.3);

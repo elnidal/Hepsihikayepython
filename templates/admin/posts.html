@@ -5,116 +5,168 @@
 {% block content %}
 <div class="content-header">
     <h1>Hikayeler</h1>
-    <div>
-        <a href="{{ url_for('admin_new_post') }}" class="btn btn-primary">
-            <i class="fas fa-plus-circle me-1"></i> Yeni Hikaye Ekle
-        </a>
-    </div>
+    <a href="{{ url_for('admin_new_post') }}" class="btn btn-primary">
+        <i class="fas fa-plus-circle me-2"></i>
+        Yeni Hikaye
+    </a>
 </div>
 
+<!-- Posts List -->
 <div class="card">
     <div class="card-header">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>Tüm Hikayeler</div>
-            <div class="d-flex gap-2">
-                <input type="text" id="searchInput" class="form-control form-control-sm" placeholder="Hikaye Ara..." style="width: 250px;">
-                <select id="categoryFilter" class="form-select form-select-sm" style="width: 200px;">
-                    <option value="">Tüm Kategoriler</option>
-                    {% for category in categories %}
-                    <option value="{{ category.id }}">{{ category.name }}</option>
-                    {% endfor %}
-                </select>
+        <h5 class="mb-0">Tüm Hikayeler</h5>
+        <div class="d-flex gap-2">
+            <div class="input-group" style="width: 300px;">
+                <input type="text" class="form-control" id="searchInput" placeholder="Hikaye ara...">
+                <button class="btn btn-outline-secondary" type="button">
+                    <i class="fas fa-search"></i>
+                </button>
             </div>
+            <select class="form-select" style="width: 200px;" id="categoryFilter">
+                <option value="">Tüm Kategoriler</option>
+                {% for category in categories %}
+                <option value="{{ category.id }}">{{ category.name }}</option>
+                {% endfor %}
+            </select>
         </div>
     </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover" id="postsTable">
-                <thead>
-                    <tr>
-                        <th style="width: 5%">#</th>
-                        <th style="width: 35%">Başlık</th>
-                        <th style="width: 15%">Kategori</th>
-                        <th style="width: 10%">Görüntülenme</th>
-                        <th style="width: 15%">Tarih</th>
-                        <th style="width: 20%">İşlemler</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if posts %}
-                        {% for post in posts %}
-                        <tr data-category="{{ post.category.id if post.category else '' }}">
-                            <td>{{ post.id }}</td>
-                            <td>
-                                <div class="text-truncate" style="max-width: 300px;">{{ post.title }}</div>
-                            </td>
-                            <td>
-                                {% if post.category %}
-                                    <span class="badge bg-primary">{{ post.category.name }}</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">Kategorisiz</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ post.views }}</td>
-                            <td>{{ post.created_at.strftime('%d/%m/%Y') }}</td>
-                            <td class="action-buttons">
-                                <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-sm btn-outline-info" target="_blank">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                                <a href="{{ url_for('admin_edit_post', post_id=post.id) }}" class="btn btn-sm btn-outline-primary">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                <form method="POST" action="{{ url_for('admin_delete_post', post_id=post.id) }}" class="d-inline">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Bu hikayeyi silmek istediğinizden emin misiniz?');">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Başlık</th>
+                    <th>Kategori</th>
+                    <th>Yazar</th>
+                    <th>Tarih</th>
+                    <th>Görüntülenme</th>
+                    <th>Durum</th>
+                    <th>İşlemler</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for post in posts %}
+                <tr>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            {% if post.image %}
+                            <img src="{{ post.image }}" alt="{{ post.title }}" class="rounded" style="width: 40px; height: 40px; object-fit: cover;">
+                            {% else %}
+                            <div class="rounded bg-light d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                <i class="fas fa-image text-muted"></i>
+                            </div>
+                            {% endif %}
+                            <div>
+                                <div class="fw-medium">{{ post.title }}</div>
+                                <small class="text-muted">{{ post.excerpt[:50] }}...</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge bg-primary">{{ post.category }}</span>
+                    </td>
+                    <td>{{ post.author }}</td>
+                    <td>{{ post.date }}</td>
+                    <td>{{ post.views }}</td>
+                    <td>
+                        {% if post.status == 'published' %}
+                        <span class="badge bg-success">Yayında</span>
+                        {% else %}
+                        <span class="badge bg-warning">Taslak</span>
+                        {% endif %}
+                    </td>
+                    <td class="action-buttons">
+                        <a href="{{ url_for('view_post', post_id=post.id) }}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        <a href="{{ url_for('edit_post', post_id=post.id) }}" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deletePostModal{{ post.id }}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+
+                <!-- Delete Post Modal -->
+                <div class="modal fade" id="deletePostModal{{ post.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Hikaye Sil</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>{{ post.title }} hikayesini silmek istediğinize emin misiniz?</p>
+                                <p class="text-danger">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    Bu işlem geri alınamaz!
+                                </p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                                <form action="{{ url_for('delete_post', post_id=post.id) }}" method="POST" class="d-inline">
+                                    <button type="submit" class="btn btn-danger">Sil</button>
                                 </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="6" class="text-center">Henüz hikaye bulunmuyor</td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<nav class="mt-4">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('admin_posts', page=current_page-1) }}">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+        </li>
+        {% for page in range(1, total_pages + 1) %}
+        <li class="page-item {% if page == current_page %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('admin_posts', page=page) }}">{{ page }}</a>
+        </li>
+        {% endfor %}
+        <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('admin_posts', page=current_page+1) }}">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+
+{% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const searchInput = document.getElementById('searchInput');
-        const categoryFilter = document.getElementById('categoryFilter');
-        const postsTable = document.getElementById('postsTable');
-        const tableRows = postsTable.querySelectorAll('tbody tr');
-        
-        // Search functionality
-        searchInput.addEventListener('keyup', filterPosts);
-        categoryFilter.addEventListener('change', filterPosts);
-        
-        function filterPosts() {
-            const searchTerm = searchInput.value.toLowerCase();
-            const categoryId = categoryFilter.value;
-            
-            tableRows.forEach(row => {
-                const title = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
-                const rowCategoryId = row.getAttribute('data-category');
-                
-                const matchesSearch = title.includes(searchTerm);
-                const matchesCategory = categoryId === '' || rowCategoryId === categoryId;
-                
-                if (matchesSearch && matchesCategory) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-        }
-    });
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    const categoryFilter = document.getElementById('categoryFilter');
+    const tbody = document.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+
+    function filterPosts() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const selectedCategory = categoryFilter.value;
+
+        rows.forEach(row => {
+            const title = row.querySelector('.fw-medium').textContent.toLowerCase();
+            const category = row.querySelector('.badge.bg-primary').textContent;
+            const categoryId = row.querySelector('.badge.bg-primary').dataset.categoryId;
+
+            const matchesSearch = title.includes(searchTerm);
+            const matchesCategory = !selectedCategory || categoryId === selectedCategory;
+
+            row.style.display = matchesSearch && matchesCategory ? '' : 'none';
+        });
+    }
+
+    searchInput.addEventListener('input', filterPosts);
+    categoryFilter.addEventListener('change', filterPosts);
+});
 </script>
+{% endblock %}
 {% endblock %}

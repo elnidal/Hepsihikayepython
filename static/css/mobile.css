@@ -280,4 +280,68 @@ select.form-control {
 .mobile-nav-bar.with-admin .mobile-nav-item i {
     font-size: 1rem;
     margin-bottom: 3px;
+}
+
+@media (max-width: 768px) {
+    .site-header {
+        padding: 1.5rem 0;
+    }
+    
+    .site-title {
+        font-size: 1.8rem;
+    }
+    
+    .site-tagline {
+        font-size: 0.9rem;
+        padding: 0 1.5rem;
+    }
+    
+    .category-nav {
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+        padding: 0.5rem;
+        margin: -0.5rem -1rem;
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .nav-category {
+        padding: 0.4rem 1rem;
+        font-size: 0.9rem;
+        flex-shrink: 0;
+    }
+    
+    .card-img-top {
+        height: 150px;
+    }
+    
+    .section-title {
+        font-size: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .site-header {
+        padding: 1rem 0;
+    }
+    
+    .site-title {
+        font-size: 1.5rem;
+    }
+    
+    .site-tagline {
+        font-size: 0.8rem;
+        padding: 0 1rem;
+    }
+    
+    .card-img-top {
+        height: 120px;
+    }
+    
+    .container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
 } 

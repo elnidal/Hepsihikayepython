@@ -1,80 +1,227 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hepsi Hikaye - Ana Sayfa</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/simplified.css') }}">
-</head>
-<body>
-    <header>
-        <div class="container">
-            <div class="nav">
-                <div class="logo">
-                    <a href="{{ url_for('index') }}">Hepsi Hikaye</a>
+{% extends "base.html" %}
+
+{% block title %}Ana Sayfa{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Search Bar -->
+    <div class="row mb-4">
+        <div class="col-md-8 mx-auto">
+            <form action="{{ url_for('search') }}" method="GET" class="search-form">
+                <div class="input-group">
+                    <input type="text" name="q" class="form-control" placeholder="Ara..." value="{{ request.args.get('q', '') }}">
+                    <button type="submit" class="btn btn-outline-secondary">
+                        <i class="fas fa-search"></i>
+                    </button>
                 </div>
-                <div class="nav-links">
-                    <a href="{{ url_for('index') }}">Ana Sayfa</a>
-                    {% for category in categories %}
-                    <a href="#">{{ category.name }}</a>
-                    {% endfor %}
-                </div>
-            </div>
+            </form>
         </div>
-    </header>
-    
-    <div class="container">
-        <main class="content">
-            <h1>Son Yazılar</h1>
-            
-            <div class="posts-grid">
-                {% if posts %}
-                    {% for post in posts %}
-                    <div class="post-card">
-                        <h2 class="post-title">{{ post.title }}</h2>
-                        <div class="post-meta">
-                            <span>{{ post.created_at }}</span>
-                            {% if post.category_id %}
-                                <span>Kategori: {{ post.category_name }}</span>
-                            {% endif %}
-                        </div>
-                        {% if post.excerpt %}
-                            <div class="post-content">{{ post.excerpt }}</div>
-                        {% else %}
-                            <div class="post-content">{{ post.content|truncate(200) }}</div>
-                        {% endif %}
-                        <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-primary">Devamını Oku</a>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <p>Henüz içerik eklenmemiş.</p>
-                {% endif %}
-            </div>
-            
-            {% if videos %}
-            <h2>Son Videolar</h2>
-            <div class="videos-grid">
-                {% for video in videos %}
-                <div class="post-card">
-                    <h2 class="post-title">{{ video.title }}</h2>
-                    {% if video.thumbnail_url %}
-                    <img src="{{ video.thumbnail_url }}" alt="{{ video.title }}" style="max-width: 100%; height: auto;">
-                    {% endif %}
-                    <div class="post-meta">
-                        <span>{{ video.created_at }}</span>
-                    </div>
-                    <a href="{{ url_for('video_detail', video_id=video.id) }}" class="btn btn-primary">İzle</a>
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-        </main>
     </div>
-    
-    <footer>
-        <div class="container">
-            <p>&copy; 2025 Hepsi Hikaye. Tüm hakları saklıdır.</p>
+
+    <!-- Navigation Categories -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav class="category-nav">
+                <a href="{{ url_for('index') }}" class="nav-category {% if request.endpoint == 'index' %}active{% endif %}">
+                    Anasayfa
+                </a>
+                {% for category in categories %}
+                <a href="{{ url_for('category_posts', slug=category.slug) }}" 
+                   class="nav-category {% if request.view_args.slug == category.slug %}active{% endif %}">
+                    {{ category.name }}
+                </a>
+                {% endfor %}
+            </nav>
         </div>
-    </footer>
-</body>
-</html>
+    </div>
+
+    <!-- Trend Hikayeler Section -->
+    <section class="mb-5">
+        <h2 class="section-title">
+            <span>Trend Hikayeler</span>
+        </h2>
+        <div class="row">
+            {% for post in posts[:3] if post.featured %}
+            <div class="col-md-4 mb-4">
+                <div class="card post-card h-100">
+                    {% if post.image %}
+                    <img src="{{ post.image_url }}" class="card-img-top" alt="{{ post.title }}">
+                    {% endif %}
+                    <div class="card-body">
+                        <h5 class="card-title">{{ post.title }}</h5>
+                        <p class="card-text">{{ post.excerpt or post.content|truncate(150) }}</p>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">{{ post.formatted_date }}</small>
+                            <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-sm btn-primary">Devamını Oku</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Son Eklenenler Section -->
+    <section class="mb-5">
+        <h2 class="section-title">
+            <span>Son Eklenenler</span>
+        </h2>
+        <div class="row">
+            {% for post in posts[3:9] %}
+            <div class="col-md-4 mb-4">
+                <div class="card post-card h-100">
+                    {% if post.image %}
+                    <img src="{{ post.image_url }}" class="card-img-top" alt="{{ post.title }}">
+                    {% endif %}
+                    <div class="card-body">
+                        <h5 class="card-title">{{ post.title }}</h5>
+                        <p class="card-text">{{ post.excerpt or post.content|truncate(150) }}</p>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">{{ post.formatted_date }}</small>
+                            <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-sm btn-primary">Devamını Oku</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    {% if videos %}
+    <!-- En Son Videolar Section -->
+    <section class="mb-5">
+        <h2 class="section-title">
+            <span>En Son Videolar</span>
+        </h2>
+        <div class="row">
+            {% for video in videos[:3] %}
+            <div class="col-md-4 mb-4">
+                <div class="card video-card h-100">
+                    <div class="video-thumbnail">
+                        <img src="https://img.youtube.com/vi/{{ video.youtube_id }}/maxresdefault.jpg" 
+                             class="card-img-top" alt="{{ video.title }}">
+                        <div class="play-button">
+                            <i class="fas fa-play"></i>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ video.title }}</h5>
+                        <p class="card-text">{{ video.description|truncate(150) }}</p>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">{{ video.formatted_date }}</small>
+                            <a href="{{ url_for('video_detail', video_id=video.id) }}" class="btn btn-sm btn-primary">İzle</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .search-form .form-control {
+        border-radius: 20px 0 0 20px;
+        border: 1px solid #ddd;
+        padding: 0.5rem 1rem;
+    }
+    
+    .search-form .btn {
+        border-radius: 0 20px 20px 0;
+        border: 1px solid #ddd;
+        border-left: none;
+    }
+    
+    .category-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        justify-content: center;
+        margin-bottom: 2rem;
+    }
+    
+    .nav-category {
+        padding: 0.5rem 1.5rem;
+        border-radius: 20px;
+        background-color: #f8f9fa;
+        color: #1a2a42;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+    
+    .nav-category:hover,
+    .nav-category.active {
+        background-color: #1a2a42;
+        color: white;
+        transform: translateY(-2px);
+    }
+    
+    .section-title {
+        position: relative;
+        text-align: left;
+        margin-bottom: 2rem;
+        font-family: 'Playfair Display', serif;
+        color: #1a2a42;
+    }
+    
+    .section-title:after {
+        content: '';
+        display: block;
+        width: 50px;
+        height: 3px;
+        background: #1a2a42;
+        margin-top: 0.5rem;
+    }
+    
+    .post-card {
+        border: none;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+    
+    .post-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    
+    .post-card .card-img-top {
+        height: 200px;
+        object-fit: cover;
+    }
+    
+    .video-thumbnail {
+        position: relative;
+    }
+    
+    .play-button {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 60px;
+        height: 60px;
+        background-color: rgba(231, 76, 60, 0.9);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .video-card:hover .play-button {
+        background-color: #e74c3c;
+        transform: translate(-50%, -50%) scale(1.1);
+    }
+</style>
+{% endblock %}
