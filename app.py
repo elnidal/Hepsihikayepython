@@ -281,7 +281,13 @@ def admin_dashboard():
     except Exception as e:
         app.logger.error(f"Admin dashboard error: {str(e)}")
         flash('Dashboard yüklenirken bir hata oluştu!', 'danger')
-        return render_template('admin/dashboard.html')
+        return render_template('admin/dashboard.html', 
+                              total_posts=0, 
+                              total_videos=0,
+                              total_comments=0,
+                              total_views=0,
+                              recent_posts=[],
+                              recent_videos=[])
 
 @app.route('/admin/logout')
 @login_required
