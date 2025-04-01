@@ -810,14 +810,9 @@ def load_data(file_path, default=None):
 def initialize_database():
     """Initialize the database with default data if it's empty"""
     try:
-        # Check if any users exist
-        if User.query.count() == 0:
-            # Create default admin user
-            admin = User(
-                username='admin',
-                password=generate_password_hash('admin')
-            )
-            db.session.add(admin)
+        # Check if categories exist instead of just checking users
+        if Category.query.count() == 0:
+            app.logger.info("No categories found, creating default categories")
             
             # Create default categories
             categories = [
@@ -830,18 +825,28 @@ def initialize_database():
                 Category(name='Video', slug='video')
             ]
             db.session.add_all(categories)
-            
-            # Create a welcome post
-            welcome_post = Post(
-                title='Hoş Geldiniz',
-                content='Hepsi Hikaye web sitesine hoş geldiniz. Bu bir örnek içeriktir.',
-                category=categories[0],  # Öykü
-                published=True,
-                featured=True
-            )
-            db.session.add(welcome_post)
-            
             db.session.commit()
+            
+            # If we also need a default user
+            if User.query.count() == 0:
+                # Create default admin user
+                admin = User(
+                    username='admin',
+                    password=generate_password_hash('admin')
+                )
+                db.session.add(admin)
+                
+                # Create a welcome post
+                welcome_post = Post(
+                    title='Hoş Geldiniz',
+                    content='Hepsi Hikaye web sitesine hoş geldiniz. Bu bir örnek içeriktir.',
+                    category=categories[0],  # Öykü
+                    published=True,
+                    featured=True
+                )
+                db.session.add(welcome_post)
+                db.session.commit()
+                
             app.logger.info("Database initialized with default data")
     except Exception as e:
         db.session.rollback()
@@ -1010,6 +1015,26 @@ def videos():
         return render_template('videos.html', videos=videos_list, category=category if category_slug else None)
     except Exception as e:
         app.logger.error(f"Videos list error: {str(e)}")
+        return render_template('errors/500.html')
+
+@app.context_processor
+def inject_categories():
+    """Make categories available to all templates"""
+    try:
+        categories = Category.query.all()
+        return {'categories': categories}
+    except Exception as e:
+        app.logger.error(f"Context processor error: {str(e)}")
+        return {'categories': []}
+
+@app.route('/category/<slug>')
+def category_posts(slug):
+    try:
+        category = Category.query.filter_by(slug=slug).first_or_404()
+        posts = Post.query.filter_by(category_id=category.id, published=True).order_by(Post.created_at.desc()).all()
+        return render_template('category.html', category=category, posts=posts)
+    except Exception as e:
+        app.logger.error(f"Category posts error: {str(e)}")
         return render_template('errors/500.html')
 
 if __name__ == '__main__':
