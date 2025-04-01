@@ -208,11 +208,26 @@ def post_image_url_filter(post):
 @app.route('/')
 def index():
     try:
-        # Get recent posts and videos
-        recent_posts = Post.query.filter_by(published=True).order_by(Post.created_at.desc()).limit(9).all()
-        recent_videos = Video.query.filter_by(published=True).order_by(Video.created_at.desc()).limit(3).all()
+        # Get trending posts (most liked and most viewed posts)
+        trending_posts = Post.query.filter_by(published=True) \
+            .order_by((Post.likes * 2 + Post.views).desc()) \
+            .limit(3).all()
         
-        return render_template('index.html', posts=recent_posts, videos=recent_videos)
+        # Get recent posts (exclude trending ones to avoid duplication)
+        trending_ids = [post.id for post in trending_posts]
+        recent_posts = Post.query.filter(Post.published == True, ~Post.id.in_(trending_ids)) \
+            .order_by(Post.created_at.desc()) \
+            .limit(6).all()
+        
+        # Get recent videos
+        recent_videos = Video.query.filter_by(published=True) \
+            .order_by(Video.created_at.desc()) \
+            .limit(3).all()
+        
+        return render_template('index.html', 
+                              trending_posts=trending_posts,
+                              posts=recent_posts, 
+                              videos=recent_videos)
     except Exception as e:
         app.logger.error(f"Index error: {str(e)}")
         return render_template('errors/500.html')
