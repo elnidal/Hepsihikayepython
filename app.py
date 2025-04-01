@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_wtf import FlaskForm, CSRFProtect
 from flask_ckeditor import CKEditor, CKEditorField
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.sql import func
 from wtforms import StringField, PasswordField, SubmitField, SelectField, FileField
 from wtforms.validators import DataRequired, ValidationError
 import logging
@@ -43,6 +45,23 @@ app.config['CKEDITOR_PKG_TYPE'] = 'standard'
 app.config['CKEDITOR_ENABLE_CSRF'] = True
 app.config['CKEDITOR_FILE_UPLOADER'] = 'upload'  # Set the upload route for CKEditor
 
+# Database configuration
+database_url = os.environ.get('DATABASE_URL')
+# Fix URI format for SQLAlchemy if needed
+if database_url and database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+if not database_url and not app.config['DEBUG']:
+    raise ValueError("DATABASE_URL environment variable is not set")
+elif not database_url and app.config['DEBUG']:
+    # Use SQLite for local development if no DATABASE_URL is provided
+    database_url = 'sqlite:///hepsihikaye.db'
+    app.logger.warning("Using SQLite for local development. Set DATABASE_URL for PostgreSQL.")
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
 # Configure logger
 if not app.logger.handlers:
     handler = logging.StreamHandler()
@@ -64,75 +83,64 @@ login_manager.login_view = 'admin_login'
 login_manager.login_message = 'Lütfen giriş yapın!'
 login_manager.login_message_category = 'warning'
 
-# Data storage configuration
-DATA_DIR = 'data'
-if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR)
-
-POSTS_FILE = os.path.join(DATA_DIR, 'posts.json')
-VIDEOS_FILE = os.path.join(DATA_DIR, 'videos.json')
-CATEGORIES_FILE = os.path.join(DATA_DIR, 'categories.json')
-COMMENTS_FILE = os.path.join(DATA_DIR, 'comments.json')
-USERS_FILE = os.path.join(DATA_DIR, 'users.json')
-
-# File-based data helpers
-def load_data(file_path, default=None):
-    """Load data from a JSON file or return default if file doesn't exist"""
-    if default is None:
-        default = []
+# Models
+class User(db.Model, UserMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password = db.Column(db.String(250), nullable=False)
     
-    try:
-        if os.path.exists(file_path):
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        else:
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(default, f, ensure_ascii=False, indent=2)
-            return default
-    except Exception as e:
-        app.logger.error(f"Error loading data from {file_path}: {str(e)}")
-        return default
-
-def save_data(file_path, data):
-    """Save data to a JSON file"""
-    try:
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        return True
-    except Exception as e:
-        app.logger.error(f"Error saving data to {file_path}: {str(e)}")
-        return False
-
-def format_datetime(dt_str):
-    """Format a datetime string for display"""
-    if isinstance(dt_str, str):
-        try:
-            dt = datetime.fromisoformat(dt_str)
-            return dt.strftime('%d.%m.%Y %H:%M')
-        except:
-            return dt_str
-    return dt_str
-
-class User(UserMixin):
-    def __init__(self, user_data):
-        self.id = user_data['id']
-        self.username = user_data['username']
-        self.password = user_data['password']
-
-    @staticmethod
-    def get(user_id):
-        users = load_data(USERS_FILE, [])
-        for user_data in users:
-            if user_data['id'] == user_id:
-                return User(user_data)
-        return None
-
     def check_password(self, password):
         return check_password_hash(self.password, password)
 
+class Category(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    slug = db.Column(db.String(100), unique=True, nullable=False)
+    posts = db.relationship('Post', backref='category', lazy=True)
+    videos = db.relationship('Video', backref='category', lazy=True)
+
+class Post(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    excerpt = db.Column(db.Text)
+    image = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
+    views = db.Column(db.Integer, default=0)
+    likes = db.Column(db.Integer, default=0)
+    dislikes = db.Column(db.Integer, default=0)
+    published = db.Column(db.Boolean, default=True)
+    featured = db.Column(db.Boolean, default=False)
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id'))
+    comments = db.relationship('Comment', backref='post', lazy=True, cascade="all, delete-orphan")
+
+class Video(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    url = db.Column(db.String(255), nullable=False)
+    thumbnail_url = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
+    views = db.Column(db.Integer, default=0)
+    published = db.Column(db.Boolean, default=True)
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id'))
+    comments = db.relationship('Comment', backref='video', lazy=True, cascade="all, delete-orphan")
+
+class Comment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    content = db.Column(db.Text, nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='pending')  # pending, approved, rejected
+    post_id = db.Column(db.Integer, db.ForeignKey('post.id'))
+    video_id = db.Column(db.Integer, db.ForeignKey('video.id'))
+
 @login_manager.user_loader
 def load_user(user_id):
-    return User.get(int(user_id))
+    return User.query.get(int(user_id))
 
 def init_file_data():
     """Initialize the file-based data storage with default values"""
@@ -179,44 +187,30 @@ def init_file_data():
 
 # Custom Jinja Filters
 @app.template_filter('format_datetime_filter')
-def format_datetime_filter(dt_str):
-    if isinstance(dt_str, str):
+def format_datetime_filter(dt):
+    if isinstance(dt, datetime):
+        return dt.strftime('%d.%m.%Y %H:%M')
+    elif isinstance(dt, str):
         try:
-            dt = datetime.fromisoformat(dt_str)
+            dt = datetime.fromisoformat(dt)
             return dt.strftime('%d.%m.%Y %H:%M')
         except:
-            return dt_str # Return original string if parsing fails
-    elif isinstance(dt_str, datetime):
-         return dt_str.strftime('%d.%m.%Y %H:%M')
-    return dt_str
+            return dt # Return original string if parsing fails
+    return dt
 
 @app.template_filter('post_image_url')
 def post_image_url_filter(post):
-    image_filename = post.get('image')
-    if image_filename:
-        return url_for('static', filename=f'uploads/{image_filename}')
-    else:
-        return url_for('static', filename='uploads/default_post_image.png')
+    if hasattr(post, 'image') and post.image:
+        return url_for('static', filename=f'uploads/{post.image}')
+    return url_for('static', filename='uploads/default_post_image.png')
 
 # Routes
 @app.route('/')
 def index():
     try:
-        posts = load_data(POSTS_FILE, [])
-        videos = load_data(VIDEOS_FILE, [])
-        
-        # Sort by created_at
-        posts.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-        videos.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-        
-        # Format dates for videos (Posts dates handled by filter)
-        for video in videos:
-            if isinstance(video.get('created_at'), str):
-                video['formatted_date'] = format_datetime(video['created_at'])
-        
-        # Limit to recent items
-        recent_posts = posts[:9] # Show more recent posts
-        recent_videos = videos[:3]
+        # Get recent posts and videos
+        recent_posts = Post.query.filter_by(published=True).order_by(Post.created_at.desc()).limit(9).all()
+        recent_videos = Video.query.filter_by(published=True).order_by(Video.created_at.desc()).limit(3).all()
         
         return render_template('index.html', posts=recent_posts, videos=recent_videos)
     except Exception as e:
@@ -233,11 +227,9 @@ def admin_login():
         password = request.form.get('password')
         remember = request.form.get('remember', False)
         
-        users = load_data(USERS_FILE, [])
-        user_data = next((u for u in users if u['username'] == username), None)
+        user = User.query.filter_by(username=username).first()
         
-        if user_data and check_password_hash(user_data['password'], password):
-            user = User(user_data)
+        if user and user.check_password(password):
             login_user(user, remember=remember)
             return redirect(url_for('admin_dashboard'))
         else:
@@ -249,39 +241,18 @@ def admin_login():
 @login_required
 def admin_dashboard():
     try:
-        posts = load_data(POSTS_FILE, [])
-        videos = load_data(VIDEOS_FILE, [])
-        comments = load_data(COMMENTS_FILE, [])
+        # Get counts and recent items
+        total_posts = Post.query.count()
+        total_videos = Video.query.count()
+        total_comments = Comment.query.count()
+        total_views = db.session.query(func.sum(Post.views)).scalar() or 0
+        total_views += db.session.query(func.sum(Video.views)).scalar() or 0
         
-        # Get total counts
-        total_posts = len(posts)
-        total_videos = len(videos)
-        total_comments = len(comments)
-        total_views = sum(post.get('views', 0) for post in posts) + sum(video.get('views', 0) for video in videos)
+        recent_posts = Post.query.order_by(Post.created_at.desc()).limit(5).all()
+        recent_videos = Video.query.order_by(Video.created_at.desc()).limit(5).all()
         
-        # Get recent posts/videos
-        recent_posts = sorted(posts, key=lambda x: x.get('created_at', ''), reverse=True)[:5]
-        recent_videos = sorted(videos, key=lambda x: x.get('created_at', ''), reverse=True)[:5]
-        
-        # Format dates for videos (Posts/Videos dates handled by filter in template)
-        for video in recent_videos:
-            if isinstance(video.get('created_at'), str):
-                video['formatted_date'] = format_datetime(video['created_at'])
-        
-        # Load categories for display
-        categories = {c['id']: c for c in load_data(CATEGORIES_FILE, [])}
-        
-        # Add category names
-        for post in recent_posts:
-            category_id = post.get('category_id')
-            post['category'] = categories.get(category_id, {}).get('name', 'Uncategorized')
-        
-        for video in recent_videos:
-            category_id = video.get('category_id')
-            video['category'] = categories.get(category_id, {}).get('name', 'Uncategorized')
-        
-        return render_template('admin/dashboard.html', 
-                              total_posts=total_posts, 
+        return render_template('admin/dashboard.html',
+                              total_posts=total_posts,
                               total_videos=total_videos,
                               total_comments=total_comments,
                               total_views=total_views,
@@ -290,8 +261,8 @@ def admin_dashboard():
     except Exception as e:
         app.logger.error(f"Admin dashboard error: {str(e)}")
         flash('Dashboard yüklenirken bir hata oluştu!', 'danger')
-        return render_template('admin/dashboard.html', 
-                              total_posts=0, 
+        return render_template('admin/dashboard.html',
+                              total_posts=0,
                               total_videos=0,
                               total_comments=0,
                               total_views=0,
@@ -308,36 +279,16 @@ def admin_logout():
 @app.route('/post/<int:post_id>')
 def post_detail(post_id):
     try:
-        posts = load_data(POSTS_FILE, [])
-        post = next((p for p in posts if p['id'] == post_id), None)
-        
-        if not post:
-            return render_template('errors/404.html'), 404
+        post = Post.query.get_or_404(post_id)
         
         # Increment views
-        post['views'] = post.get('views', 0) + 1
-        save_data(POSTS_FILE, posts)
+        post.views += 1
+        db.session.commit()
         
-        # Add category name
-        categories = load_data(CATEGORIES_FILE, [])
-        category_id = post.get('category_id')
-        if category_id is not None:
-            category = next((c for c in categories if c['id'] == category_id), None)
-            post['category_name'] = category['name'] if category else 'Uncategorized'
-        else:
-            post['category_name'] = 'Uncategorized'
+        # Get approved comments for this post
+        comments = Comment.query.filter_by(post_id=post_id, status='approved').all()
         
-        # Get comments
-        comments = load_data(COMMENTS_FILE, [])
-        post_comments = [c for c in comments if c.get('post_id') == post_id]
-        
-        # Format/Fix comment data (Date handled by filter)
-        for comment in post_comments:
-            # Fix comment name field
-            if 'author_name' in comment and not 'name' in comment:
-                comment['name'] = comment['author_name']
-        
-        return render_template('post.html', post=post, comments=post_comments)
+        return render_template('post.html', post=post, comments=comments)
     except Exception as e:
         app.logger.error(f"Post detail error: {str(e)}")
         return render_template('errors/500.html')
@@ -345,26 +296,28 @@ def post_detail(post_id):
 @app.route('/post/<int:post_id>/comment', methods=['POST'])
 def add_comment(post_id):
     try:
+        post = Post.query.get_or_404(post_id)
+        
         name = request.form.get('name')
+        email = request.form.get('email')
         content = request.form.get('content')
         
         if not name or not content:
             flash('İsim ve yorum alanları zorunludur.', 'danger')
             return redirect(url_for('post_detail', post_id=post_id))
         
-        comments = load_data(COMMENTS_FILE, [])
-        new_comment = {
-            'id': len(comments) + 1,
-            'author_name': name,
-            'content': content,
-            'post_id': post_id,
-            'created_at': datetime.now().isoformat()
-        }
+        new_comment = Comment(
+            name=name,
+            email=email,
+            content=content,
+            post_id=post_id,
+            status='pending'  # Start as pending for moderation
+        )
         
-        comments.append(new_comment)
-        save_data(COMMENTS_FILE, comments)
+        db.session.add(new_comment)
+        db.session.commit()
         
-        flash('Yorumunuz başarıyla eklendi.', 'success')
+        flash('Yorumunuz gönderildi ve onay bekliyor.', 'success')
         return redirect(url_for('post_detail', post_id=post_id))
     except Exception as e:
         app.logger.error(f"Add comment error: {str(e)}")
@@ -374,7 +327,7 @@ def add_comment(post_id):
 @app.route('/post/<int:post_id>/rate/<action>', methods=['POST'])
 def rate_post(post_id, action):
     try:
-        # Validate CSRF token sent in request headers by JS
+        # Validate CSRF token
         try:
             validate_csrf(request.headers.get('X-CSRFToken'))
         except ValidationError:
@@ -384,23 +337,19 @@ def rate_post(post_id, action):
         if action not in ['like', 'dislike']:
             return jsonify({'success': False, 'message': 'Geçersiz işlem.'}), 400
         
-        posts = load_data(POSTS_FILE, [])
-        post = next((p for p in posts if p['id'] == post_id), None)
-        
-        if not post:
-            return jsonify({'success': False, 'message': 'Gönderi bulunamadı.'})
+        post = Post.query.get_or_404(post_id)
         
         if action == 'like':
-            post['likes'] = post.get('likes', 0) + 1
+            post.likes += 1
         else:
-            post['dislikes'] = post.get('dislikes', 0) + 1
+            post.dislikes += 1
         
-        save_data(POSTS_FILE, posts)
+        db.session.commit()
         
         return jsonify({
             'success': True,
-            'likes': post.get('likes', 0),
-            'dislikes': post.get('dislikes', 0),
+            'likes': post.likes,
+            'dislikes': post.dislikes,
             'message': 'Oyunuz kaydedildi!'
         })
     except Exception as e:
@@ -414,24 +363,16 @@ def rate_post(post_id, action):
 @login_required
 def admin_posts():
     try:
-        posts = load_data(POSTS_FILE, [])
-        categories = {c['id']: c for c in load_data(CATEGORIES_FILE, [])}
         search_query = request.args.get('search', '')
         
         if search_query:
-            posts = [p for p in posts if 
-                    search_query.lower() in p.get('title', '').lower() or 
-                    search_query.lower() in p.get('content', '').lower()]
+            posts = Post.query.filter(
+                Post.title.ilike(f'%{search_query}%') | 
+                Post.content.ilike(f'%{search_query}%')
+            ).order_by(Post.created_at.desc()).all()
+        else:
+            posts = Post.query.order_by(Post.created_at.desc()).all()
         
-        # Sort by created_at, newest first
-        posts.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-        
-        # Add category info (Date and Image URL handled by filter)
-        for post in posts:
-            # Add category name
-            category_id = post.get('category_id')
-            post['category_name'] = categories.get(category_id, {}).get('name', 'Kategorisiz')
-            
         return render_template('admin/posts.html', posts=posts, search_query=search_query)
     except Exception as e:
         app.logger.error(f"Admin posts error: {str(e)}")
@@ -442,7 +383,7 @@ def admin_posts():
 @login_required
 def admin_new_post():
     try:
-        categories = load_data(CATEGORIES_FILE, [])
+        categories = Category.query.all()
         
         if request.method == 'POST':
             title = request.form.get('title')
@@ -457,27 +398,15 @@ def admin_new_post():
                 flash('Başlık ve içerik alanları zorunludur.', 'danger')
                 return render_template('admin/post_form.html', categories=categories)
             
-            posts = load_data(POSTS_FILE, [])
-            
-            # Generate new ID (max + 1)
-            new_id = 1
-            if posts:
-                new_id = max(post.get('id', 0) for post in posts) + 1
-            
             # Create new post
-            new_post = {
-                'id': new_id,
-                'title': title,
-                'content': content,
-                'category_id': int(category_id) if category_id else None,
-                'excerpt': excerpt,
-                'published': published,
-                'featured': featured,
-                'views': 0,
-                'likes': 0,
-                'dislikes': 0,
-                'created_at': datetime.now().isoformat()
-            }
+            new_post = Post(
+                title=title,
+                content=content,
+                category_id=int(category_id) if category_id else None,
+                excerpt=excerpt,
+                published=published,
+                featured=featured
+            )
             
             # Handle image upload
             if image and image.filename:
@@ -489,11 +418,15 @@ def admin_new_post():
                 
                 # Save the image
                 image.save(image_path)
-                new_post['image'] = filename
+                
+                # Resize image if needed
+                resize_image(image_path)
+                
+                new_post.image = filename
             
-            # Add to posts and save
-            posts.append(new_post)
-            save_data(POSTS_FILE, posts)
+            # Add to database
+            db.session.add(new_post)
+            db.session.commit()
             
             flash('Hikaye başarıyla eklendi!', 'success')
             return redirect(url_for('admin_posts'))
@@ -508,14 +441,8 @@ def admin_new_post():
 @login_required
 def admin_edit_post(post_id):
     try:
-        posts = load_data(POSTS_FILE, [])
-        post = next((p for p in posts if p['id'] == post_id), None)
-        
-        if not post:
-            flash('Düzenlemek istediğiniz hikaye bulunamadı.', 'danger')
-            return redirect(url_for('admin_posts'))
-        
-        categories = load_data(CATEGORIES_FILE, [])
+        post = Post.query.get_or_404(post_id)
+        categories = Category.query.all()
         
         if request.method == 'POST':
             title = request.form.get('title')
@@ -532,26 +459,25 @@ def admin_edit_post(post_id):
                 return render_template('admin/post_form.html', post=post, categories=categories)
             
             # Update post data
-            post['title'] = title
-            post['content'] = content
-            post['category_id'] = int(category_id) if category_id else None
-            post['excerpt'] = excerpt
-            post['published'] = published
-            post['featured'] = featured
-            post['updated_at'] = datetime.now().isoformat()
+            post.title = title
+            post.content = content
+            post.category_id = int(category_id) if category_id else None
+            post.excerpt = excerpt
+            post.published = published
+            post.featured = featured
             
             # Handle image
-            if remove_image and post.get('image'):
+            if remove_image and post.image:
                 # Remove the image file (optional)
                 try:
-                    image_path = os.path.join('static', 'uploads', post['image'])
+                    image_path = os.path.join('static', 'uploads', post.image)
                     if os.path.exists(image_path):
                         os.remove(image_path)
                 except Exception as e:
                     app.logger.error(f"Error removing image: {str(e)}")
                 
                 # Remove image reference
-                post.pop('image', None)
+                post.image = None
             
             if image and image.filename:
                 # Save new image
@@ -563,15 +489,18 @@ def admin_edit_post(post_id):
                 
                 # Save the image
                 image.save(image_path)
-                post['image'] = filename
+                
+                # Resize image if needed
+                resize_image(image_path)
+                
+                post.image = filename
             
             # Save changes
-            save_data(POSTS_FILE, posts)
+            db.session.commit()
             
             flash('Hikaye başarıyla güncellendi!', 'success')
             return redirect(url_for('admin_posts'))
         
-        # Pass post data to template (Date handled by filter)
         return render_template('admin/post_form.html', post=post, categories=categories)
     except Exception as e:
         app.logger.error(f"Admin edit post error: {str(e)}")
@@ -582,29 +511,47 @@ def admin_edit_post(post_id):
 @login_required
 def admin_delete_post(post_id):
     try:
-        posts = load_data(POSTS_FILE, [])
-        post = next((p for p in posts if p['id'] == post_id), None)
+        post = Post.query.get_or_404(post_id)
         
-        if post:
-            if post.get('image'):
-                image_path = os.path.join('static', 'uploads', post['image'])
+        if post.image:
+            # Try to remove the image file
+            try:
+                image_path = os.path.join('static', 'uploads', post.image)
                 if os.path.exists(image_path):
                     os.remove(image_path)
-            
-            posts = [p for p in posts if p['id'] != post_id]
-            save_data(POSTS_FILE, posts)
-            flash('Gönderi başarıyla silindi.', 'success')
+            except Exception as e:
+                app.logger.error(f"Error removing image: {str(e)}")
+        
+        # Delete the post (and associated comments via cascade)
+        db.session.delete(post)
+        db.session.commit()
+        
+        flash('Gönderi başarıyla silindi.', 'success')
     except Exception as e:
+        db.session.rollback()
         app.logger.error(f"Delete post error: {str(e)}")
         flash('Gönderi silinirken bir hata oluştu.', 'danger')
     
     return redirect(url_for('admin_posts'))
 
+@app.route('/admin/posts/<int:post_id>/view')
+@login_required
+def admin_view_post(post_id):
+    try:
+        post = Post.query.get_or_404(post_id)
+        comments = Comment.query.filter_by(post_id=post_id).all()
+        
+        return render_template('admin/view_post.html', post=post, comments=comments)
+    except Exception as e:
+        app.logger.error(f"View post error: {str(e)}")
+        flash('Gönderi görüntülenirken bir hata oluştu.', 'danger')
+        return redirect(url_for('admin_posts'))
+
 @app.route('/admin/categories')
 @login_required
 def admin_categories():
     try:
-        categories = load_data(CATEGORIES_FILE, [])
+        categories = Category.query.all()
         return render_template('admin/categories.html', categories=categories)
     except Exception as e:
         app.logger.error(f"Admin categories error: {str(e)}")
@@ -621,23 +568,20 @@ def admin_new_category():
             flash('Kategori adı ve slug gereklidir.', 'danger')
             return redirect(url_for('admin_categories'))
         
-        categories = load_data(CATEGORIES_FILE, [])
-        
         # Check if category with same name or slug exists
-        if any(c['name'] == name or c['slug'] == slug for c in categories):
+        existing = Category.query.filter((Category.name == name) | (Category.slug == slug)).first()
+        if existing:
             flash('Bu isim veya slug ile bir kategori zaten mevcut.', 'danger')
             return redirect(url_for('admin_categories'))
         
-        new_category = {
-            'id': len(categories) + 1,
-            'name': name,
-            'slug': slug
-        }
+        # Create new category
+        new_category = Category(name=name, slug=slug)
+        db.session.add(new_category)
+        db.session.commit()
         
-        categories.append(new_category)
-        save_data(CATEGORIES_FILE, categories)
         flash('Kategori başarıyla oluşturuldu.', 'success')
     except Exception as e:
+        db.session.rollback()
         app.logger.error(f"New category error: {str(e)}")
         flash('Kategori oluşturulurken bir hata oluştu.', 'danger')
     
@@ -647,21 +591,19 @@ def admin_new_category():
 @login_required
 def admin_delete_category(category_id):
     try:
-        categories = load_data(CATEGORIES_FILE, [])
-        posts = load_data(POSTS_FILE, [])
+        category = Category.query.get_or_404(category_id)
         
         # Update posts with this category to have no category
-        for post in posts:
-            if post.get('category_id') == category_id:
-                post['category_id'] = None
+        Post.query.filter_by(category_id=category_id).update({Post.category_id: None})
+        Video.query.filter_by(category_id=category_id).update({Video.category_id: None})
         
-        # Remove the category
-        categories = [c for c in categories if c['id'] != category_id]
+        # Delete the category
+        db.session.delete(category)
+        db.session.commit()
         
-        save_data(CATEGORIES_FILE, categories)
-        save_data(POSTS_FILE, posts)
         flash('Kategori başarıyla silindi.', 'success')
     except Exception as e:
+        db.session.rollback()
         app.logger.error(f"Delete category error: {str(e)}")
         flash('Kategori silinirken bir hata oluştu.', 'danger')
     
@@ -671,7 +613,7 @@ def admin_delete_category(category_id):
 @login_required
 def admin_comments():
     try:
-        comments = load_data(COMMENTS_FILE, [])
+        comments = Comment.query.all()
         return render_template('admin/comments.html', comments=comments)
     except Exception as e:
         app.logger.error(f"Admin comments error: {str(e)}")
@@ -681,13 +623,24 @@ def admin_comments():
 @login_required
 def delete_comment(comment_id):
     try:
-        comments = load_data(COMMENTS_FILE, [])
-        comments = [c for c in comments if c['id'] != comment_id]
-        save_data(COMMENTS_FILE, comments)
+        comment = Comment.query.get_or_404(comment_id)
+        db.session.delete(comment)
+        db.session.commit()
         return jsonify({'success': True})
     except Exception as e:
+        db.session.rollback()
         app.logger.error(f"Delete comment error: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/admin/settings')
+@login_required
+def admin_settings():
+    try:
+        return render_template('admin/settings.html')
+    except Exception as e:
+        app.logger.error(f"Admin settings error: {str(e)}")
+        flash('Ayarlar yüklenirken bir hata oluştu.', 'danger')
+        return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/change-password', methods=['POST'])
 @login_required
@@ -705,223 +658,74 @@ def admin_change_password():
             flash('Yeni şifreler eşleşmiyor.', 'danger')
             return redirect(url_for('admin_settings'))
         
-        users = load_data(USERS_FILE, [])
-        user = next((u for u in users if u['id'] == current_user.id), None)
+        user = User.query.get(current_user.id)
         
-        if not user or not check_password_hash(user['password'], current_password):
+        if not user or not user.check_password(current_password):
             flash('Mevcut şifre yanlış.', 'danger')
             return redirect(url_for('admin_settings'))
         
-        user['password'] = generate_password_hash(new_password)
-        save_data(USERS_FILE, users)
+        user.password = generate_password_hash(new_password)
+        db.session.commit()
         
         flash('Şifreniz başarıyla güncellendi.', 'success')
         return redirect(url_for('admin_settings'))
     except Exception as e:
+        db.session.rollback()
         app.logger.error(f"Change password error: {str(e)}")
         flash('Şifre değiştirilirken bir hata oluştu.', 'danger')
         return redirect(url_for('admin_settings'))
-
-@app.route('/admin/settings')
-@login_required
-def admin_settings():
-    try:
-        return render_template('admin/settings.html')
-    except Exception as e:
-        app.logger.error(f"Admin settings error: {str(e)}")
-        flash('Ayarlar yüklenirken bir hata oluştu.', 'danger')
-        return redirect(url_for('admin_dashboard'))
-
-@app.context_processor
-def inject_categories():
-    try:
-        categories = load_data(CATEGORIES_FILE, [])
-        return dict(categories=categories)
-    except Exception as e:
-        app.logger.error(f"Category injection error: {str(e)}")
-        return dict(categories=[])
-
-@app.route('/category/<slug>')
-def category_posts(slug):
-    try:
-        categories = load_data(CATEGORIES_FILE, [])
-        category = next((c for c in categories if c['slug'] == slug), None)
-        
-        if not category:
-            return render_template('errors/404.html'), 404
-        
-        posts = load_data(POSTS_FILE, [])
-        category_posts = [p for p in posts if p.get('category_id') == category['id']]
-        
-        # Data passed directly, formatting handled by filters
-        return render_template('category.html', category=category, posts=category_posts)
-    except Exception as e:
-        app.logger.error(f"Category posts error: {str(e)}")
-        return render_template('errors/500.html')
-
-@app.route('/videos')
-def videos():
-    try:
-        videos = load_data(VIDEOS_FILE, [])
-        
-        # Sort by created_at
-        videos.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-        
-        # Format dates
-        for video in videos:
-            if isinstance(video.get('created_at'), str):
-                video['formatted_date'] = format_datetime(video['created_at'])
-        
-        return render_template('videos.html', videos=videos)
-    except Exception as e:
-        app.logger.error(f"Videos page error: {str(e)}")
-        return render_template('errors/500.html')
-
-@app.route('/admin')
-@login_required
-def admin_index():
-    return redirect(url_for('admin_dashboard'))
-
-@app.route('/search')
-def search():
-    try:
-        query = request.args.get('search', '')
-        
-        if not query:
-            return redirect(url_for('index'))
-        
-        posts = load_data(POSTS_FILE, [])
-        videos = load_data(VIDEOS_FILE, [])
-        
-        # Filter posts and videos by query
-        matching_posts = [p for p in posts if 
-                         query.lower() in p.get('title', '').lower() or 
-                         query.lower() in p.get('content', '').lower()]
-        
-        matching_videos = [v for v in videos if 
-                          query.lower() in v.get('title', '').lower() or 
-                          query.lower() in v.get('description', '').lower()]
-        
-        # Format dates for videos (Posts handled by filter)
-        for video in matching_videos:
-            if isinstance(video.get('created_at'), str):
-                video['formatted_date'] = format_datetime(video['created_at'])
-        
-        return render_template('search.html', 
-                              posts=matching_posts, 
-                              videos=matching_videos, 
-                              query=query)
-    except Exception as e:
-        app.logger.error(f"Search error: {str(e)}")
-        return render_template('errors/500.html')
-
-@app.route('/admin/new-video', methods=['GET', 'POST'])
-@login_required
-def admin_new_video():
-    try:
-        categories = load_data(CATEGORIES_FILE, [])
-        
-        if request.method == 'POST':
-            title = request.form.get('title')
-            description = request.form.get('description')
-            url = request.form.get('url')
-            thumbnail_url = request.form.get('thumbnail_url')
-            category_id = int(request.form.get('category_id'))
-            
-            videos = load_data(VIDEOS_FILE, [])
-            
-            # Generate a new ID (max + 1)
-            new_id = 1
-            if videos:
-                new_id = max(video.get('id', 0) for video in videos) + 1
-                
-            # Create new video object
-            new_video = {
-                'id': new_id,
-                'title': title,
-                'description': description,
-                'url': url,
-                'thumbnail_url': thumbnail_url,
-                'category_id': category_id,
-                'created_at': datetime.now().isoformat(),
-                'views': 0,
-                'published': True
-            }
-            
-            # Add to videos and save
-            videos.append(new_video)
-            save_data(VIDEOS_FILE, videos)
-            
-            flash('Video başarıyla eklendi!', 'success')
-            return redirect(url_for('admin_videos'))
-        
-        return render_template('admin/new_video.html', categories=categories)
-    except Exception as e:
-        app.logger.error(f"Admin new video error: {str(e)}")
-        flash('Video eklenirken bir hata oluştu!', 'danger')
-        return redirect(url_for('admin_videos'))
 
 @app.route('/admin/videos')
 @login_required
 def admin_videos():
     try:
-        videos = load_data(VIDEOS_FILE, [])
-        categories = {c['id']: c for c in load_data(CATEGORIES_FILE, [])}
-        
-        # Format dates and add category names
-        for video in videos:
-            if isinstance(video.get('created_at'), str):
-                video['formatted_date'] = format_datetime(video['created_at'])
-            category_id = video.get('category_id')
-            video['category'] = categories.get(category_id, {}).get('name', 'Uncategorized')
-        
+        videos = Video.query.all()
         return render_template('admin/videos.html', videos=videos)
     except Exception as e:
         app.logger.error(f"Admin videos error: {str(e)}")
         flash('Videoları yüklerken bir hata oluştu!', 'danger')
         return render_template('admin/videos.html', videos=[])
 
-@app.route('/admin/posts/<int:post_id>/view')
+@app.route('/admin/new-video', methods=['GET', 'POST'])
 @login_required
-def admin_view_post(post_id):
+def admin_new_video():
     try:
-        posts = load_data(POSTS_FILE, [])
-        post = next((p for p in posts if p['id'] == post_id), None)
+        categories = Category.query.all()
         
-        if not post:
-            flash('Gönderi bulunamadı.', 'danger')
-            return redirect(url_for('admin_posts'))
-        
-        # Get comments
-        comments = load_data(COMMENTS_FILE, [])
-        post_comments = [c for c in comments if c.get('post_id') == post_id]
-        
-        # Format/Fix comment data (Date handled by filter)
-        for comment in post_comments:
-            if 'author_name' in comment and not 'name' in comment:
-                comment['name'] = comment['author_name']
-        
-        # Get category name
-        categories = load_data(CATEGORIES_FILE, [])
-        category_id = post.get('category_id')
-        if category_id is not None:
-            category = next((c for c in categories if c['id'] == category_id), None)
-            post['category_name'] = category['name'] if category else 'Uncategorized'
-        else:
-            post['category_name'] = 'Uncategorized'
+        if request.method == 'POST':
+            title = request.form.get('title')
+            description = request.form.get('description')
+            url = request.form.get('url')
+            thumbnail_url = request.form.get('thumbnail_url')
+            category_id = int(request.form.get('category_id')) if request.form.get('category_id') else None
             
-        # Ensure created_at is a datetime object if needed by filter later
-        if isinstance(post.get('created_at'), str):
-            try:
-                post['created_at'] = datetime.fromisoformat(post['created_at'])
-            except ValueError:
-                pass # Keep original string if format is unexpected
+            # Create new video
+            new_video = Video(
+                title=title,
+                description=description,
+                url=url,
+                thumbnail_url=thumbnail_url,
+                category_id=category_id,
+                published=True
+            )
+            
+            db.session.add(new_video)
+            db.session.commit()
+            
+            flash('Video başarıyla eklendi!', 'success')
+            return redirect(url_for('admin_videos'))
         
-        return render_template('admin/view_post.html', post=post, comments=post_comments)
+        return render_template('admin/new_video.html', categories=categories)
     except Exception as e:
-        app.logger.error(f"View post error: {str(e)}")
-        flash('Gönderi görüntülenirken bir hata oluştu.', 'danger')
-        return redirect(url_for('admin_posts'))
+        db.session.rollback()
+        app.logger.error(f"Admin new video error: {str(e)}")
+        flash('Video eklenirken bir hata oluştu!', 'danger')
+        return redirect(url_for('admin_videos'))
+
+@app.route('/admin')
+@login_required
+def admin_index():
+    return redirect(url_for('admin_dashboard'))
 
 # Create a function to resize images to save space
 def resize_image(image_path, max_size=(800, 800)):
@@ -974,26 +778,220 @@ def upload():
             'error': {'message': 'Could not upload file. Please try again.'}
         })
 
+# Data Storage Configuration (for migration)
+DATA_DIR = 'data'
+if not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR)
+
+POSTS_FILE = os.path.join(DATA_DIR, 'posts.json')
+VIDEOS_FILE = os.path.join(DATA_DIR, 'videos.json')
+CATEGORIES_FILE = os.path.join(DATA_DIR, 'categories.json')
+COMMENTS_FILE = os.path.join(DATA_DIR, 'comments.json')
+USERS_FILE = os.path.join(DATA_DIR, 'users.json')
+
+# File-based data helpers (kept for migration)
+def load_data(file_path, default=None):
+    """Load data from a JSON file or return default if file doesn't exist"""
+    if default is None:
+        default = []
+    
+    try:
+        if os.path.exists(file_path):
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        else:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(default, f, ensure_ascii=False, indent=2)
+            return default
+    except Exception as e:
+        app.logger.error(f"Error loading data from {file_path}: {str(e)}")
+        return default
+
+def initialize_database():
+    """Initialize the database with default data if it's empty"""
+    try:
+        # Check if any users exist
+        if User.query.count() == 0:
+            # Create default admin user
+            admin = User(
+                username='admin',
+                password=generate_password_hash('admin')
+            )
+            db.session.add(admin)
+            
+            # Create default categories
+            categories = [
+                Category(name='Öykü', slug='oyku'),
+                Category(name='Roman', slug='roman'),
+                Category(name='Şiir', slug='siir'),
+                Category(name='Deneme', slug='deneme'),
+                Category(name='İnceleme', slug='inceleme'),
+                Category(name='Haber', slug='haber'),
+                Category(name='Video', slug='video')
+            ]
+            db.session.add_all(categories)
+            
+            # Create a welcome post
+            welcome_post = Post(
+                title='Hoş Geldiniz',
+                content='Hepsi Hikaye web sitesine hoş geldiniz. Bu bir örnek içeriktir.',
+                category=categories[0],  # Öykü
+                published=True,
+                featured=True
+            )
+            db.session.add(welcome_post)
+            
+            db.session.commit()
+            app.logger.info("Database initialized with default data")
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Database initialization error: {str(e)}")
+
+def migrate_from_json():
+    """Migrate data from JSON files to the database"""
+    try:
+        # Only run migration if database is empty
+        if User.query.count() > 0:
+            app.logger.info("Database already contains data, skipping migration")
+            return
+            
+        # Migrate categories
+        categories_map = {}  # To store id mappings
+        json_categories = load_data(CATEGORIES_FILE, [])
+        for cat_data in json_categories:
+            category = Category(
+                id=cat_data.get('id'),
+                name=cat_data.get('name'),
+                slug=cat_data.get('slug')
+            )
+            db.session.add(category)
+            categories_map[cat_data.get('id')] = category
+        db.session.commit()
+        app.logger.info(f"Migrated {len(json_categories)} categories")
+        
+        # Migrate posts
+        posts_map = {}  # To store id mappings
+        json_posts = load_data(POSTS_FILE, [])
+        for post_data in json_posts:
+            try:
+                created_at = datetime.fromisoformat(post_data.get('created_at')) if post_data.get('created_at') else datetime.utcnow()
+            except ValueError:
+                created_at = datetime.utcnow()
+                
+            post = Post(
+                id=post_data.get('id'),
+                title=post_data.get('title'),
+                content=post_data.get('content'),
+                excerpt=post_data.get('excerpt'),
+                image=post_data.get('image'),
+                created_at=created_at,
+                views=post_data.get('views', 0),
+                likes=post_data.get('likes', 0),
+                dislikes=post_data.get('dislikes', 0),
+                published=post_data.get('published', True),
+                featured=post_data.get('featured', False),
+                category_id=post_data.get('category_id')
+            )
+            db.session.add(post)
+            posts_map[post_data.get('id')] = post
+        db.session.commit()
+        app.logger.info(f"Migrated {len(json_posts)} posts")
+        
+        # Migrate videos
+        videos_map = {}  # To store id mappings
+        json_videos = load_data(VIDEOS_FILE, [])
+        for video_data in json_videos:
+            try:
+                created_at = datetime.fromisoformat(video_data.get('created_at')) if video_data.get('created_at') else datetime.utcnow()
+            except ValueError:
+                created_at = datetime.utcnow()
+                
+            video = Video(
+                id=video_data.get('id'),
+                title=video_data.get('title'),
+                description=video_data.get('description'),
+                url=video_data.get('url'),
+                thumbnail_url=video_data.get('thumbnail_url'),
+                created_at=created_at,
+                views=video_data.get('views', 0),
+                published=video_data.get('published', True),
+                category_id=video_data.get('category_id')
+            )
+            db.session.add(video)
+            videos_map[video_data.get('id')] = video
+        db.session.commit()
+        app.logger.info(f"Migrated {len(json_videos)} videos")
+        
+        # Migrate comments
+        json_comments = load_data(COMMENTS_FILE, [])
+        for comment_data in json_comments:
+            try:
+                created_at = datetime.fromisoformat(comment_data.get('created_at')) if comment_data.get('created_at') else datetime.utcnow()
+            except ValueError:
+                created_at = datetime.utcnow()
+                
+            comment = Comment(
+                id=comment_data.get('id'),
+                content=comment_data.get('content'),
+                name=comment_data.get('name', comment_data.get('author_name', 'Anonymous')),
+                email=comment_data.get('email'),
+                created_at=created_at,
+                status=comment_data.get('status', 'approved'),
+                post_id=comment_data.get('post_id'),
+                video_id=comment_data.get('video_id')
+            )
+            db.session.add(comment)
+        db.session.commit()
+        app.logger.info(f"Migrated {len(json_comments)} comments")
+        
+        # Migrate users
+        json_users = load_data(USERS_FILE, [])
+        for user_data in json_users:
+            user = User(
+                id=user_data.get('id'),
+                username=user_data.get('username'),
+                password=user_data.get('password')  # Already hashed in JSON
+            )
+            db.session.add(user)
+        db.session.commit()
+        app.logger.info(f"Migrated {len(json_users)} users")
+        
+        app.logger.info("Migration from JSON completed successfully")
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Migration error: {str(e)}")
+
 if __name__ == '__main__':
     # Create required directories
-    for directory in ['static/uploads', 'static/data', 'static/logs']:
+    for directory in ['static/uploads', 'static/logs']:
         if not os.path.exists(directory):
             os.makedirs(directory)
             app.logger.info(f'Created directory: {os.path.abspath(directory)}')
     
-    # Initialize data
-    init_file_data()
-    
+    # Initialize database
+    with app.app_context():
+        db.create_all()
+        initialize_database()
+        
     # Run the app
     app.run(debug=True, port=8080)
 else:
     # This code runs when imported (e.g., by Gunicorn in production)
     # Ensure required directories exist
-    for directory in ['uploads', 'data', 'logs']:
+    for directory in ['uploads', 'logs']:
         path = os.path.join(app.static_folder, directory)
         if not os.path.exists(path):
             os.makedirs(path)
             app.logger.info(f"Created directory: {path}")
     
-    # Initialize data
-    init_file_data() 
+    # Initialize database when the app starts
+    with app.app_context():
+        db.create_all()
+        initialize_database()
+        
+        # Optional: Migrate from JSON files
+        if os.path.exists(DATA_DIR):
+            try:
+                migrate_from_json()
+            except Exception as e:
+                app.logger.error(f"Failed to migrate from JSON: {str(e)}") 
