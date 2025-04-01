@@ -76,12 +76,12 @@
                         <tr>
                             <td>{{ post.title }}</td>
                             <td>{{ post.category }}</td>
-                            <td>{{ post.date }}</td>
-                            <td class="action-buttons">
-                                <a href="{{ url_for('view_post', post_id=post.id) }}" class="btn btn-sm btn-outline-primary">
+                            <td>{{ post.formatted_date }}</td>
+                            <td>
+                                <a href="{{ url_for('admin_view_post', post_id=post.id) }}" class="btn btn-sm btn-outline-primary">
                                     <i class="fas fa-eye"></i>
                                 </a>
-                                <a href="{{ url_for('edit_post', post_id=post.id) }}" class="btn btn-sm btn-outline-secondary">
+                                <a href="{{ url_for('admin_edit_post', post_id=post.id) }}" class="btn btn-sm btn-outline-secondary">
                                     <i class="fas fa-edit"></i>
                                 </a>
                             </td>
@@ -117,12 +117,12 @@
                         <tr>
                             <td>{{ video.title }}</td>
                             <td>{{ video.category }}</td>
-                            <td>{{ video.date }}</td>
-                            <td class="action-buttons">
-                                <a href="{{ url_for('view_video', video_id=video.id) }}" class="btn btn-sm btn-outline-primary">
+                            <td>{{ video.formatted_date }}</td>
+                            <td>
+                                <a href="{{ video.url }}" class="btn btn-sm btn-outline-primary" target="_blank">
                                     <i class="fas fa-eye"></i>
                                 </a>
-                                <a href="{{ url_for('edit_video', video_id=video.id) }}" class="btn btn-sm btn-outline-secondary">
+                                <a href="#" class="btn btn-sm btn-outline-secondary">
                                     <i class="fas fa-edit"></i>
                                 </a>
                             </td>

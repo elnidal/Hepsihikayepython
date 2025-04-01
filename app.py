@@ -39,6 +39,8 @@ app.config['DEBUG'] = True
 app.config['CKEDITOR_SERVE_LOCAL'] = True
 app.config['CKEDITOR_HEIGHT'] = 400
 app.config['CKEDITOR_PKG_TYPE'] = 'standard'
+app.config['CKEDITOR_ENABLE_CSRF'] = True
+app.config['CKEDITOR_FILE_UPLOADER'] = 'upload'  # Set the upload route for CKEditor
 
 # Configure logger
 if not app.logger.handlers:
@@ -898,7 +900,7 @@ def admin_videos():
 
 @app.route('/admin/posts/<int:post_id>/view')
 @login_required
-def view_post(post_id):
+def admin_view_post(post_id):
     try:
         posts = load_data(POSTS_FILE, [])
         post = next((p for p in posts if p['id'] == post_id), None)
@@ -926,6 +928,57 @@ def view_post(post_id):
         app.logger.error(f"View post error: {str(e)}")
         flash('Gönderi görüntülenirken bir hata oluştu.', 'danger')
         return redirect(url_for('admin_posts'))
+
+# Create a function to resize images to save space
+def resize_image(image_path, max_size=(800, 800)):
+    """Resize an image if it's larger than max_size"""
+    try:
+        img = Image.open(image_path)
+        if img.size[0] > max_size[0] or img.size[1] > max_size[1]:
+            img.thumbnail(max_size)
+            img.save(image_path)
+    except Exception as e:
+        app.logger.error(f"Error resizing image: {str(e)}")
+
+# File upload route for CKEditor
+@app.route('/upload', methods=['POST'])
+@login_required
+def upload():
+    """Handle file uploads from CKEditor"""
+    try:
+        f = request.files.get('upload')
+        if not f:
+            return jsonify({'error': {'message': 'No file provided'}})
+        
+        if f and f.filename:
+            # Generate secure filename
+            filename = secure_filename(f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{f.filename}")
+            file_path = os.path.join('static', 'uploads', filename)
+            
+            # Ensure uploads directory exists
+            os.makedirs(os.path.join('static', 'uploads'), exist_ok=True)
+            
+            # Save the file
+            f.save(file_path)
+            
+            # Resize image if it's too large
+            resize_image(file_path)
+            
+            # Generate URL for CKEditor
+            url = url_for('static', filename=f"uploads/{filename}")
+            
+            # Return success response
+            return jsonify({
+                'url': url,
+                'uploaded': 1,
+                'fileName': filename
+            })
+    except Exception as e:
+        app.logger.error(f"Upload error: {str(e)}")
+        return jsonify({
+            'uploaded': 0,
+            'error': {'message': 'Could not upload file. Please try again.'}
+        })
 
 if __name__ == '__main__':
     # Create required directories
