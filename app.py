@@ -995,6 +995,23 @@ def search():
         app.logger.error(f"Search error: {str(e)}")
         return render_template('errors/500.html')
 
+@app.route('/videos')
+def videos():
+    try:
+        # Get all videos or filter by category if provided
+        category_slug = request.args.get('category')
+        
+        if category_slug:
+            category = Category.query.filter_by(slug=category_slug).first_or_404()
+            videos_list = Video.query.filter_by(category_id=category.id, published=True).order_by(Video.created_at.desc()).all()
+        else:
+            videos_list = Video.query.filter_by(published=True).order_by(Video.created_at.desc()).all()
+            
+        return render_template('videos.html', videos=videos_list, category=category if category_slug else None)
+    except Exception as e:
+        app.logger.error(f"Videos list error: {str(e)}")
+        return render_template('errors/500.html')
+
 if __name__ == '__main__':
     # Create required directories
     for directory in ['static/uploads', 'static/logs']:
