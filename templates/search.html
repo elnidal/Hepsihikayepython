@@ -28,14 +28,22 @@
             {% for post in posts %}
             <div class="col-md-4 mb-4">
                 <div class="card h-100">
-                    <img src="{{ post.image_url }}" class="card-img-top" alt="{{ post.title }}">
+                    {% if post.image %}
+                    <img src="{{ url_for('static', filename='uploads/' + post.image) }}" class="card-img-top" alt="{{ post.title }}">
+                    {% endif %}
                     <div class="card-body">
                         <h5 class="card-title">{{ post.title }}</h5>
                         {% if post.excerpt %}
                         <p class="card-text">{{ post.excerpt }}</p>
+                        {% else %}
+                        <p class="card-text">{{ post.content|truncate(150) if post.content else "" }}</p>
                         {% endif %}
                         <div class="d-flex justify-content-between align-items-center mt-3">
-                            <small class="text-muted">{{ post.formatted_date }}</small>
+                            <small class="text-muted">
+                                {% if post.created_at %}
+                                {{ post.created_at|format_datetime_filter if post.created_at is not string else post.created_at }}
+                                {% endif %}
+                            </small>
                             <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-primary btn-sm">Devamını Oku</a>
                         </div>
                     </div>
@@ -67,7 +75,13 @@
                         <p class="card-text">{{ video.description }}</p>
                         {% endif %}
                         <div class="d-flex justify-content-between align-items-center mt-3">
-                            <small class="text-muted">{{ video.formatted_date }}</small>
+                            <small class="text-muted">
+                                {% if video.created_at %}
+                                {{ video.created_at|format_datetime_filter if video.created_at is not string else video.created_at }}
+                                {% elif video.formatted_date %}
+                                {{ video.formatted_date }}
+                                {% endif %}
+                            </small>
                             <a href="{{ video.url }}" class="btn btn-primary btn-sm" target="_blank">İzle</a>
                         </div>
                     </div>

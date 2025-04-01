@@ -974,23 +974,16 @@ def search():
         if not query:
             return redirect(url_for('index'))
         
-        # Load posts and videos from JSON files
-        posts = load_data(POSTS_FILE, [])
-        videos = load_data(VIDEOS_FILE, [])
+        # Use database queries instead of JSON files
+        matching_posts = Post.query.filter(
+            (Post.title.ilike(f'%{query}%') | Post.content.ilike(f'%{query}%')),
+            Post.published == True
+        ).order_by(Post.created_at.desc()).all()
         
-        # Filter posts and videos by query
-        matching_posts = [p for p in posts if 
-                         query.lower() in p.get('title', '').lower() or 
-                         query.lower() in p.get('content', '').lower()]
-        
-        matching_videos = [v for v in videos if 
-                          query.lower() in v.get('title', '').lower() or 
-                          query.lower() in v.get('description', '').lower()]
-        
-        # Format dates for videos (Posts handled by filter)
-        for video in matching_videos:
-            if isinstance(video.get('created_at'), str):
-                video['formatted_date'] = format_datetime_filter(video['created_at'])
+        matching_videos = Video.query.filter(
+            (Video.title.ilike(f'%{query}%') | Video.description.ilike(f'%{query}%')),
+            Video.published == True
+        ).order_by(Video.created_at.desc()).all()
         
         return render_template('search.html', 
                               posts=matching_posts, 
