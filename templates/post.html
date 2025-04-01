@@ -5,7 +5,9 @@
     <div class="row">
         <div class="col-lg-8 mx-auto">
             <article class="post-detail">
-                <span class="story-category">{{ post.get_category_display() }}</span>
+                {% if post.category_name %}
+                <span class="story-category">{{ post.category_name }}</span>
+                {% endif %}
                 <h1 class="mb-3">{{ post.title }}</h1>
                 
                 <div class="post-meta mb-4">
@@ -19,7 +21,7 @@
                     {% endif %}
                     </span>
                     {% if post.author %}
-                    <span class="ms-3"><i class="fas fa-user"></i> <a href="{{ url_for('author_posts', author=post.author) }}">{{ post.author }}</a></span>
+                    <span class="ms-3"><i class="fas fa-user"></i> {{ post.author }}</span>
                     {% endif %}
                 </div>
                 

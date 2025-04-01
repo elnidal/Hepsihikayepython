@@ -320,6 +320,15 @@ def post_detail(post_id):
             except:
                 post['formatted_date'] = post['created_at']
         
+        # Get category name
+        categories = load_data(CATEGORIES_FILE, [])
+        category_id = post.get('category_id')
+        if category_id is not None:
+            category = next((c for c in categories if c['id'] == category_id), None)
+            post['category_name'] = category['name'] if category else 'Uncategorized'
+        else:
+            post['category_name'] = 'Uncategorized'
+        
         # Get comments
         comments = load_data(COMMENTS_FILE, [])
         post_comments = [c for c in comments if c.get('post_id') == post_id]
@@ -328,6 +337,9 @@ def post_detail(post_id):
         for comment in post_comments:
             if isinstance(comment.get('created_at'), str):
                 comment['formatted_date'] = format_datetime(comment.get('created_at', ''))
+            # Fix comment name field
+            if 'author_name' in comment and not 'name' in comment:
+                comment['name'] = comment['author_name']
         
         return render_template('post.html', post=post, comments=post_comments)
     except Exception as e:
