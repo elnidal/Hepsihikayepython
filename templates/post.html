@@ -9,15 +9,23 @@
                 <h1 class="mb-3">{{ post.title }}</h1>
                 
                 <div class="post-meta mb-4">
-                    <span><i class="far fa-calendar"></i> {{ post.created_at.strftime('%d.%m.%Y') }}</span>
+                    <span><i class="far fa-calendar"></i> 
+                    {% if post.formatted_date %}
+                        {{ post.formatted_date }}
+                    {% elif post.created_at is string %}
+                        {{ post.created_at }}
+                    {% else %}
+                        {{ post.created_at.strftime('%d.%m.%Y') }}
+                    {% endif %}
+                    </span>
                     {% if post.author %}
                     <span class="ms-3"><i class="fas fa-user"></i> <a href="{{ url_for('author_posts', author=post.author) }}">{{ post.author }}</a></span>
                     {% endif %}
                 </div>
                 
-                {% if post.image_url %}
+                {% if post.image %}
                 <div class="post-image mb-4">
-                    <img src="{{ post.get_image_url() }}" alt="{{ post.title }}" class="img-fluid rounded">
+                    <img src="{{ url_for('static', filename='uploads/' + post.image) }}" alt="{{ post.title }}" class="img-fluid rounded">
                 </div>
                 {% endif %}
                 

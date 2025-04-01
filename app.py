@@ -189,7 +189,12 @@ def index():
         for post in posts:
             if isinstance(post.get('created_at'), str):
                 post['formatted_date'] = format_datetime(post['created_at'])
-            post['image_url'] = url_for('static', filename=f'uploads/{post.get("image", "default-post.jpg")}')
+            
+            # Add image URL
+            if post.get('image'):
+                post['image_url'] = url_for('static', filename=f'uploads/{post["image"]}')
+            else:
+                post['image_url'] = url_for('static', filename='uploads/default_post_image.png')
         
         # Format dates for videos
         for video in videos:
@@ -300,7 +305,12 @@ def post_detail(post_id):
         
         # Format date
         if isinstance(post.get('created_at'), str):
-            post['formatted_date'] = format_datetime(post['created_at'])
+            try:
+                post['formatted_date'] = format_datetime(post['created_at'])
+                # Also add created_at as datetime object for strftime in template
+                post['created_at'] = datetime.fromisoformat(post['created_at'])
+            except:
+                post['formatted_date'] = post['created_at']
         
         # Get comments
         comments = load_data(COMMENTS_FILE, [])
@@ -406,7 +416,7 @@ def admin_posts():
             if post.get('image'):
                 post['image_url'] = url_for('static', filename=f'uploads/{post["image"]}')
             else:
-                post['image_url'] = url_for('static', filename='img/default-story.jpg')
+                post['image_url'] = url_for('static', filename='uploads/default_post_image.png')
         
         return render_template('admin/posts.html', posts=posts, search_query=search_query)
     except Exception as e:
@@ -735,7 +745,12 @@ def category_posts(slug):
         for post in category_posts:
             if isinstance(post.get('created_at'), str):
                 post['formatted_date'] = format_datetime(post['created_at'])
-            post['image_url'] = url_for('static', filename=f'uploads/{post.get("image", "default-post.jpg")}')
+            
+            # Add image URL
+            if post.get('image'):
+                post['image_url'] = url_for('static', filename=f'uploads/{post["image"]}')
+            else:
+                post['image_url'] = url_for('static', filename='uploads/default_post_image.png')
         
         return render_template('category.html', category=category, posts=category_posts)
     except Exception as e:
@@ -789,7 +804,12 @@ def search():
         for post in matching_posts:
             if isinstance(post.get('created_at'), str):
                 post['formatted_date'] = format_datetime(post['created_at'])
-            post['image_url'] = url_for('static', filename=f'uploads/{post.get("image", "default-post.jpg")}')
+            
+            # Add image URL
+            if post.get('image'):
+                post['image_url'] = url_for('static', filename=f'uploads/{post["image"]}')
+            else:
+                post['image_url'] = url_for('static', filename='uploads/default_post_image.png')
         
         # Format dates for videos
         for video in matching_videos:
