@@ -961,6 +961,40 @@ def migrate_from_json():
         db.session.rollback()
         app.logger.error(f"Migration error: {str(e)}")
 
+@app.route('/search')
+def search():
+    try:
+        query = request.args.get('search', '')
+        
+        if not query:
+            return redirect(url_for('index'))
+        
+        # Load posts and videos from JSON files
+        posts = load_data(POSTS_FILE, [])
+        videos = load_data(VIDEOS_FILE, [])
+        
+        # Filter posts and videos by query
+        matching_posts = [p for p in posts if 
+                         query.lower() in p.get('title', '').lower() or 
+                         query.lower() in p.get('content', '').lower()]
+        
+        matching_videos = [v for v in videos if 
+                          query.lower() in v.get('title', '').lower() or 
+                          query.lower() in v.get('description', '').lower()]
+        
+        # Format dates for videos (Posts handled by filter)
+        for video in matching_videos:
+            if isinstance(video.get('created_at'), str):
+                video['formatted_date'] = format_datetime_filter(video['created_at'])
+        
+        return render_template('search.html', 
+                              posts=matching_posts, 
+                              videos=matching_videos, 
+                              query=query)
+    except Exception as e:
+        app.logger.error(f"Search error: {str(e)}")
+        return render_template('errors/500.html')
+
 if __name__ == '__main__':
     # Create required directories
     for directory in ['static/uploads', 'static/logs']:
