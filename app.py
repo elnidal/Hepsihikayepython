@@ -565,7 +565,7 @@ def admin_delete_post(post_id):
         
         if post:
             if post.get('image'):
-                image_path = os.path.join(app.static_folder, 'uploads', post['image'])
+                image_path = os.path.join('static', 'uploads', post['image'])
                 if os.path.exists(image_path):
                     os.remove(image_path)
             
@@ -574,7 +574,7 @@ def admin_delete_post(post_id):
             flash('Gönderi başarıyla silindi.', 'success')
     except Exception as e:
         app.logger.error(f"Delete post error: {str(e)}")
-        flash('Gönderi silinirken bir hata oluştu.', 'error')
+        flash('Gönderi silinirken bir hata oluştu.', 'danger')
     
     return redirect(url_for('admin_posts'))
 
@@ -676,18 +676,18 @@ def admin_change_password():
         confirm_password = request.form.get('confirm_password')
         
         if not current_password or not new_password or not confirm_password:
-            flash('Tüm alanları doldurun.', 'error')
+            flash('Tüm alanları doldurun.', 'danger')
             return redirect(url_for('admin_settings'))
         
         if new_password != confirm_password:
-            flash('Yeni şifreler eşleşmiyor.', 'error')
+            flash('Yeni şifreler eşleşmiyor.', 'danger')
             return redirect(url_for('admin_settings'))
         
         users = load_data(USERS_FILE, [])
         user = next((u for u in users if u['id'] == current_user.id), None)
         
         if not user or not check_password_hash(user['password'], current_password):
-            flash('Mevcut şifre yanlış.', 'error')
+            flash('Mevcut şifre yanlış.', 'danger')
             return redirect(url_for('admin_settings'))
         
         user['password'] = generate_password_hash(new_password)
@@ -697,7 +697,7 @@ def admin_change_password():
         return redirect(url_for('admin_settings'))
     except Exception as e:
         app.logger.error(f"Change password error: {str(e)}")
-        flash('Şifre değiştirilirken bir hata oluştu.', 'error')
+        flash('Şifre değiştirilirken bir hata oluştu.', 'danger')
         return redirect(url_for('admin_settings'))
 
 @app.route('/admin/settings')
@@ -878,7 +878,7 @@ def view_post(post_id):
         post = next((p for p in posts if p['id'] == post_id), None)
         
         if not post:
-            flash('Gönderi bulunamadı.', 'error')
+            flash('Gönderi bulunamadı.', 'danger')
             return redirect(url_for('admin_posts'))
         
         # Get comments
@@ -898,12 +898,12 @@ def view_post(post_id):
         return render_template('admin/view_post.html', post=post, comments=post_comments)
     except Exception as e:
         app.logger.error(f"View post error: {str(e)}")
-        flash('Gönderi görüntülenirken bir hata oluştu.', 'error')
+        flash('Gönderi görüntülenirken bir hata oluştu.', 'danger')
         return redirect(url_for('admin_posts'))
 
 if __name__ == '__main__':
     # Create required directories
-    for directory in ['static/data', 'static/logs']:
+    for directory in ['static/uploads', 'static/data', 'static/logs']:
         if not os.path.exists(directory):
             os.makedirs(directory)
             app.logger.info(f'Created directory: {os.path.abspath(directory)}')
@@ -916,7 +916,7 @@ if __name__ == '__main__':
 else:
     # This code runs when imported (e.g., by Gunicorn in production)
     # Ensure required directories exist
-    for directory in ['uploads', 'images', 'data', 'logs']:
+    for directory in ['uploads', 'data', 'logs']:
         path = os.path.join(app.static_folder, directory)
         if not os.path.exists(path):
             os.makedirs(path)
