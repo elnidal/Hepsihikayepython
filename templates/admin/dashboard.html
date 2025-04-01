@@ -76,7 +76,7 @@
                         <tr>
                             <td>{{ post.title }}</td>
                             <td>{{ post.category }}</td>
-                            <td>{{ post.formatted_date }}</td>
+                            <td>{{ post.created_at|format_datetime_filter }}</td>
                             <td>
                                 <a href="{{ url_for('admin_view_post', post_id=post.id) }}" class="btn btn-sm btn-outline-primary">
                                     <i class="fas fa-eye"></i>
@@ -117,7 +117,7 @@
                         <tr>
                             <td>{{ video.title }}</td>
                             <td>{{ video.category }}</td>
-                            <td>{{ video.formatted_date }}</td>
+                            <td>{{ video.created_at|format_datetime_filter }}</td>
                             <td>
                                 <a href="{{ video.url }}" class="btn btn-sm btn-outline-primary" target="_blank">
                                     <i class="fas fa-eye"></i>

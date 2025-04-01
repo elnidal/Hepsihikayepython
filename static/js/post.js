@@ -18,9 +18,9 @@ function ratePost(postId, isLike) {
     fetch(`/post/${postId}/rate/${action}`, {
         method: 'POST',
         headers: {
-            'X-Requested-With': 'XMLHttpRequest'
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': csrfToken
         },
-        body: formData,
         credentials: 'same-origin'
     })
     .then(response => {

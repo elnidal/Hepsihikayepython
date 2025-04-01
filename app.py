@@ -3,7 +3,7 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from flask_wtf import FlaskForm, CSRFProtect
 from flask_ckeditor import CKEditor, CKEditorField
 from wtforms import StringField, PasswordField, SubmitField, SelectField, FileField
-from wtforms.validators import DataRequired
+from wtforms.validators import DataRequired, ValidationError
 import logging
 from logging.handlers import RotatingFileHandler
 from PIL import Image
@@ -13,6 +13,7 @@ from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
+from flask_wtf.csrf import validate_csrf
 
 # Load environment variables
 load_dotenv()
@@ -176,6 +177,27 @@ def init_file_data():
     
     app.logger.info("File-based data initialization complete")
 
+# Custom Jinja Filters
+@app.template_filter('format_datetime_filter')
+def format_datetime_filter(dt_str):
+    if isinstance(dt_str, str):
+        try:
+            dt = datetime.fromisoformat(dt_str)
+            return dt.strftime('%d.%m.%Y %H:%M')
+        except:
+            return dt_str # Return original string if parsing fails
+    elif isinstance(dt_str, datetime):
+         return dt_str.strftime('%d.%m.%Y %H:%M')
+    return dt_str
+
+@app.template_filter('post_image_url')
+def post_image_url_filter(post):
+    image_filename = post.get('image')
+    if image_filename:
+        return url_for('static', filename=f'uploads/{image_filename}')
+    else:
+        return url_for('static', filename='uploads/default_post_image.png')
+
 # Routes
 @app.route('/')
 def index():
@@ -187,24 +209,13 @@ def index():
         posts.sort(key=lambda x: x.get('created_at', ''), reverse=True)
         videos.sort(key=lambda x: x.get('created_at', ''), reverse=True)
         
-        # Format dates and add image URLs
-        for post in posts:
-            if isinstance(post.get('created_at'), str):
-                post['formatted_date'] = format_datetime(post['created_at'])
-            
-            # Add image URL
-            if post.get('image'):
-                post['image_url'] = url_for('static', filename=f'uploads/{post["image"]}')
-            else:
-                post['image_url'] = url_for('static', filename='uploads/default_post_image.png')
-        
-        # Format dates for videos
+        # Format dates for videos (Posts dates handled by filter)
         for video in videos:
             if isinstance(video.get('created_at'), str):
                 video['formatted_date'] = format_datetime(video['created_at'])
         
         # Limit to recent items
-        recent_posts = posts[:6]
+        recent_posts = posts[:9] # Show more recent posts
         recent_videos = videos[:3]
         
         return render_template('index.html', posts=recent_posts, videos=recent_videos)
@@ -248,15 +259,11 @@ def admin_dashboard():
         total_comments = len(comments)
         total_views = sum(post.get('views', 0) for post in posts) + sum(video.get('views', 0) for video in videos)
         
-        # Get recent posts
+        # Get recent posts/videos
         recent_posts = sorted(posts, key=lambda x: x.get('created_at', ''), reverse=True)[:5]
         recent_videos = sorted(videos, key=lambda x: x.get('created_at', ''), reverse=True)[:5]
         
-        # Format dates
-        for post in recent_posts:
-            if isinstance(post.get('created_at'), str):
-                post['formatted_date'] = format_datetime(post['created_at'])
-        
+        # Format dates for videos (Posts/Videos dates handled by filter in template)
         for video in recent_videos:
             if isinstance(video.get('created_at'), str):
                 video['formatted_date'] = format_datetime(video['created_at'])
@@ -311,16 +318,7 @@ def post_detail(post_id):
         post['views'] = post.get('views', 0) + 1
         save_data(POSTS_FILE, posts)
         
-        # Format date
-        if isinstance(post.get('created_at'), str):
-            try:
-                post['formatted_date'] = format_datetime(post['created_at'])
-                # Also add created_at as datetime object for strftime in template
-                post['created_at'] = datetime.fromisoformat(post['created_at'])
-            except:
-                post['formatted_date'] = post['created_at']
-        
-        # Get category name
+        # Add category name
         categories = load_data(CATEGORIES_FILE, [])
         category_id = post.get('category_id')
         if category_id is not None:
@@ -333,10 +331,8 @@ def post_detail(post_id):
         comments = load_data(COMMENTS_FILE, [])
         post_comments = [c for c in comments if c.get('post_id') == post_id]
         
-        # Format dates for comments
+        # Format/Fix comment data (Date handled by filter)
         for comment in post_comments:
-            if isinstance(comment.get('created_at'), str):
-                comment['formatted_date'] = format_datetime(comment.get('created_at', ''))
             # Fix comment name field
             if 'author_name' in comment and not 'name' in comment:
                 comment['name'] = comment['author_name']
@@ -378,8 +374,15 @@ def add_comment(post_id):
 @app.route('/post/<int:post_id>/rate/<action>', methods=['POST'])
 def rate_post(post_id, action):
     try:
+        # Validate CSRF token sent in request headers by JS
+        try:
+            validate_csrf(request.headers.get('X-CSRFToken'))
+        except ValidationError:
+            app.logger.warning(f"CSRF validation failed for rate_post attempt on post {post_id}")
+            return jsonify({'success': False, 'message': 'Invalid security token.'}), 400
+        
         if action not in ['like', 'dislike']:
-            return jsonify({'success': False, 'message': 'Geçersiz işlem.'})
+            return jsonify({'success': False, 'message': 'Geçersiz işlem.'}), 400
         
         posts = load_data(POSTS_FILE, [])
         post = next((p for p in posts if p['id'] == post_id), None)
@@ -423,21 +426,12 @@ def admin_posts():
         # Sort by created_at, newest first
         posts.sort(key=lambda x: x.get('created_at', ''), reverse=True)
         
-        # Format dates and add category info
+        # Add category info (Date and Image URL handled by filter)
         for post in posts:
-            if isinstance(post.get('created_at'), str):
-                post['formatted_date'] = format_datetime(post['created_at'])
-            
             # Add category name
             category_id = post.get('category_id')
             post['category_name'] = categories.get(category_id, {}).get('name', 'Kategorisiz')
             
-            # Add image URL
-            if post.get('image'):
-                post['image_url'] = url_for('static', filename=f'uploads/{post["image"]}')
-            else:
-                post['image_url'] = url_for('static', filename='uploads/default_post_image.png')
-        
         return render_template('admin/posts.html', posts=posts, search_query=search_query)
     except Exception as e:
         app.logger.error(f"Admin posts error: {str(e)}")
@@ -544,6 +538,7 @@ def admin_edit_post(post_id):
             post['excerpt'] = excerpt
             post['published'] = published
             post['featured'] = featured
+            post['updated_at'] = datetime.now().isoformat()
             
             # Handle image
             if remove_image and post.get('image'):
@@ -576,10 +571,7 @@ def admin_edit_post(post_id):
             flash('Hikaye başarıyla güncellendi!', 'success')
             return redirect(url_for('admin_posts'))
         
-        # Format date for display
-        if isinstance(post.get('created_at'), str):
-            post['formatted_date'] = format_datetime(post['created_at'])
-        
+        # Pass post data to template (Date handled by filter)
         return render_template('admin/post_form.html', post=post, categories=categories)
     except Exception as e:
         app.logger.error(f"Admin edit post error: {str(e)}")
@@ -761,17 +753,7 @@ def category_posts(slug):
         posts = load_data(POSTS_FILE, [])
         category_posts = [p for p in posts if p.get('category_id') == category['id']]
         
-        # Format dates and add image URLs
-        for post in category_posts:
-            if isinstance(post.get('created_at'), str):
-                post['formatted_date'] = format_datetime(post['created_at'])
-            
-            # Add image URL
-            if post.get('image'):
-                post['image_url'] = url_for('static', filename=f'uploads/{post["image"]}')
-            else:
-                post['image_url'] = url_for('static', filename='uploads/default_post_image.png')
-        
+        # Data passed directly, formatting handled by filters
         return render_template('category.html', category=category, posts=category_posts)
     except Exception as e:
         app.logger.error(f"Category posts error: {str(e)}")
@@ -820,18 +802,7 @@ def search():
                           query.lower() in v.get('title', '').lower() or 
                           query.lower() in v.get('description', '').lower()]
         
-        # Format dates and add image URLs for posts
-        for post in matching_posts:
-            if isinstance(post.get('created_at'), str):
-                post['formatted_date'] = format_datetime(post['created_at'])
-            
-            # Add image URL
-            if post.get('image'):
-                post['image_url'] = url_for('static', filename=f'uploads/{post["image"]}')
-            else:
-                post['image_url'] = url_for('static', filename='uploads/default_post_image.png')
-        
-        # Format dates for videos
+        # Format dates for videos (Posts handled by filter)
         for video in matching_videos:
             if isinstance(video.get('created_at'), str):
                 video['formatted_date'] = format_datetime(video['created_at'])
@@ -925,15 +896,26 @@ def admin_view_post(post_id):
         comments = load_data(COMMENTS_FILE, [])
         post_comments = [c for c in comments if c.get('post_id') == post_id]
         
-        # Format dates for comments
+        # Format/Fix comment data (Date handled by filter)
         for comment in post_comments:
-            if isinstance(comment.get('created_at'), str):
-                comment['formatted_date'] = format_datetime(comment['created_at'])
+            if 'author_name' in comment and not 'name' in comment:
+                comment['name'] = comment['author_name']
         
         # Get category name
         categories = load_data(CATEGORIES_FILE, [])
-        category = next((c for c in categories if c['id'] == post.get('category_id')), None)
-        post['category_name'] = category['name'] if category else 'Uncategorized'
+        category_id = post.get('category_id')
+        if category_id is not None:
+            category = next((c for c in categories if c['id'] == category_id), None)
+            post['category_name'] = category['name'] if category else 'Uncategorized'
+        else:
+            post['category_name'] = 'Uncategorized'
+            
+        # Ensure created_at is a datetime object if needed by filter later
+        if isinstance(post.get('created_at'), str):
+            try:
+                post['created_at'] = datetime.fromisoformat(post['created_at'])
+            except ValueError:
+                pass # Keep original string if format is unexpected
         
         return render_template('admin/view_post.html', post=post, comments=post_comments)
     except Exception as e:

@@ -11,15 +11,7 @@
                 <h1 class="mb-3">{{ post.title }}</h1>
                 
                 <div class="post-meta mb-4">
-                    <span><i class="far fa-calendar"></i> 
-                    {% if post.formatted_date %}
-                        {{ post.formatted_date }}
-                    {% elif post.created_at is string %}
-                        {{ post.created_at }}
-                    {% else %}
-                        {{ post.created_at.strftime('%d.%m.%Y') }}
-                    {% endif %}
-                    </span>
+                    <span><i class="far fa-calendar"></i> {{ post.created_at|format_datetime_filter }}</span>
                     {% if post.author %}
                     <span class="ms-3"><i class="fas fa-user"></i> {{ post.author }}</span>
                     {% endif %}
@@ -27,7 +19,7 @@
                 
                 {% if post.image %}
                 <div class="post-image mb-4">
-                    <img src="{{ url_for('static', filename='uploads/' + post.image) }}" alt="{{ post.title }}" class="img-fluid rounded">
+                    <img src="{{ post|post_image_url }}" alt="{{ post.title }}" class="img-fluid rounded">
                 </div>
                 {% endif %}
                 
@@ -63,7 +55,7 @@
                             <div class="comment-header d-flex justify-content-between">
                                 <div>
                                     <strong>{{ comment.name }}</strong>
-                                    <span class="text-muted ms-2"><i class="far fa-clock"></i> {{ comment.formatted_date }}</span>
+                                    <span class="text-muted ms-2"><i class="far fa-clock"></i> {{ comment.created_at|format_datetime_filter }}</span>
                                 </div>
                             </div>
                             <div class="comment-body mt-2">

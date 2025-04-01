@@ -14,7 +14,7 @@
             <div class="col-md-4 mb-4">
                 <div class="card post-card h-100">
                     {% if post.image %}
-                    <img src="{{ post.image_url }}" class="card-img-top" alt="{{ post.title }}">
+                    <img src="{{ post|post_image_url }}" class="card-img-top" alt="{{ post.title }}">
                     {% endif %}
                     <div class="card-body">
                         <h5 class="card-title">{{ post.title }}</h5>
@@ -22,7 +22,7 @@
                     </div>
                     <div class="card-footer bg-transparent">
                         <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted">{{ post.formatted_date }}</small>
+                            <small class="text-muted">{{ post.created_at|format_datetime_filter }}</small>
                             <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-sm btn-primary">Devamını Oku</a>
                         </div>
                     </div>
@@ -42,7 +42,7 @@
             <div class="col-md-4 mb-4">
                 <div class="card post-card h-100">
                     {% if post.image %}
-                    <img src="{{ post.image_url }}" class="card-img-top" alt="{{ post.title }}">
+                    <img src="{{ post|post_image_url }}" class="card-img-top" alt="{{ post.title }}">
                     {% endif %}
                     <div class="card-body">
                         <h5 class="card-title">{{ post.title }}</h5>
@@ -50,7 +50,7 @@
                     </div>
                     <div class="card-footer bg-transparent">
                         <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted">{{ post.formatted_date }}</small>
+                            <small class="text-muted">{{ post.created_at|format_datetime_filter }}</small>
                             <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-sm btn-primary">Devamını Oku</a>
                         </div>
                     </div>

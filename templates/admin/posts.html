@@ -36,7 +36,7 @@
                 <tr>
                     <th>Başlık</th>
                     <th>Kategori</th>
-                    <th>Yazar</th>
+                    <!-- <th>Yazar</th> -->
                     <th>Tarih</th>
                     <th>Görüntülenme</th>
                     <th>Durum</th>
@@ -49,7 +49,7 @@
                     <td>
                         <div class="d-flex align-items-center gap-2">
                             {% if post.image %}
-                            <img src="{{ post.image_url }}" alt="{{ post.title }}" class="rounded" style="width: 40px; height: 40px; object-fit: cover;">
+                            <img src="{{ post|post_image_url }}" alt="{{ post.title }}" class="rounded" style="width: 40px; height: 40px; object-fit: cover;">
                             {% else %}
                             <div class="rounded bg-light d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
                                 <i class="fas fa-image text-muted"></i>
@@ -64,8 +64,8 @@
                     <td>
                         <span class="badge bg-primary">{{ post.category_name }}</span>
                     </td>
-                    <td>Admin</td>
-                    <td>{{ post.formatted_date }}</td>
+                    <!-- <td>Admin</td> -->
+                    <td>{{ post.created_at|format_datetime_filter }}</td>
                     <td>{{ post.views }}</td>
                     <td>
                         {% if post.published %}
