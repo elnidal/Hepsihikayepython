@@ -760,6 +760,9 @@ def delete_comment(comment_id):
 @login_required
 def admin_settings():
     try:
+        # First, ensure the current admin user is also in admin_users table
+        sync_admin_user(current_user)
+        
         # Fetch admin users, email settings, and registration settings
         admins = AdminUser.query.order_by(AdminUser.username).all()
         email_settings = EmailSettings.query.first()
@@ -1431,6 +1434,26 @@ def category_posts(slug):
     except Exception as e:
         app.logger.error(f"Category posts error: {str(e)}")
         return render_template('errors/500.html')
+
+def sync_admin_user(user):
+    """Ensure the current admin user from User model is also in AdminUser model"""
+    try:
+        # Check if this user already exists in AdminUser
+        admin_user = AdminUser.query.filter_by(username=user.username).first()
+        
+        if not admin_user:
+            # Create a new entry in AdminUser for this user
+            admin_user = AdminUser(
+                username=user.username,
+                email=f"{user.username}@hepsihikaye.net",  # Default email since User doesn't have email
+                password_hash=user.password  # Copy the password hash
+            )
+            db.session.add(admin_user)
+            db.session.commit()
+            app.logger.info(f"Synced user {user.username} to admin_users table")
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error syncing admin user: {str(e)}")
 
 if __name__ == '__main__':
     # Create required directories
