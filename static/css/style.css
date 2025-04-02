@@ -1341,3 +1341,20 @@ footer {
         justify-content: center;
     }
 }
+
+/* Manifesto styling */
+.manifesto-list {
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 0;
+}
+
+.manifesto-list li {
+    margin-bottom: 0.5rem;
+    line-height: 1.5;
+    font-style: italic;
+}
+
+/* More spacing in footer sections */
+.footer-title {
+    margin-bottom: 1.25rem;
+}
