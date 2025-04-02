@@ -11,23 +11,21 @@
         {% for video in videos %}
         <div class="col-md-4 mb-4">
             <div class="card h-100">
-                <div class="video-thumbnail">
-                    {% if video.thumbnail_url %}
-                    <img src="{{ video.thumbnail_url }}" class="card-img-top" alt="{{ video.title }}">
-                    {% else %}
-                    <img src="{{ url_for('static', filename='img/default-video.jpg') }}" class="card-img-top" alt="{{ video.title }}">
-                    {% endif %}
-                    <div class="play-button">
-                        <i class="fas fa-play"></i>
+                <a href="{{ video.url }}" target="_blank" class="video-thumbnail-link">
+                    <div class="video-thumbnail">
+                        <img src="{{ video|video_thumbnail_url }}" class="card-img-top" alt="{{ video.title }}">
+                        <div class="play-button">
+                            <i class="fas fa-play"></i>
+                        </div>
                     </div>
-                </div>
+                </a>
                 <div class="card-body">
                     <h5 class="card-title">{{ video.title }}</h5>
                     {% if video.description %}
                     <p class="card-text">{{ video.description }}</p>
                     {% endif %}
                     <div class="d-flex justify-content-between align-items-center mt-3">
-                        <small class="text-muted">{{ video.formatted_date }}</small>
+                        <small class="text-muted">{{ video.created_at|format_datetime_filter }}</small>
                         <a href="{{ video.url }}" class="btn btn-primary btn-sm" target="_blank">İzle</a>
                     </div>
                 </div>

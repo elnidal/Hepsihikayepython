@@ -47,14 +47,15 @@
                     </div>
                     
                     <div class="form-group">
-                        <label for="thumbnail_url">Thumbnail URL</label>
-                        <input type="url" class="form-control" id="thumbnail_url" name="thumbnail_url" placeholder="Küçük resim URL'si">
-                        <small class="form-text text-muted">Boş bırakırsanız, varsayılan bir resim kullanılacaktır.</small>
+                        <label for="thumbnail_file">Küçük Resim Yükle</label>
+                        <input type="file" class="form-control" id="thumbnail_file" name="thumbnail_file" accept="image/png, image/jpeg, image/webp">
+                        <small class="form-text text-muted">İsteğe bağlı. Yüklenmezse varsayılan resim kullanılır.</small>
                     </div>
                     
                     <div class="form-group">
                         <label for="category_id">Kategori</label>
                         <select class="form-control" id="category_id" name="category_id" required>
+                            <option value="">-- Kategori Seçin --</option>
                             {% for category in categories %}
                             <option value="{{ category.id }}">{{ category.name }}</option>
                             {% endfor %}

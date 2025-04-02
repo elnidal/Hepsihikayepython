@@ -204,6 +204,15 @@ def post_image_url_filter(post):
         return url_for('static', filename=f'uploads/{post.image}')
     return url_for('static', filename='uploads/default_post_image.png')
 
+@app.template_filter('video_thumbnail_url')
+def video_thumbnail_url_filter(video):
+    """Generate URL for video thumbnail or default image."""
+    if hasattr(video, 'thumbnail_url') and video.thumbnail_url:
+        # Assume thumbnail_url stores the filename
+        return url_for('static', filename=f'uploads/{video.thumbnail_url}')
+    # Provide a default video thumbnail
+    return url_for('static', filename='uploads/default_video_thumb.png') # You might need to create this default image
+
 # Routes
 @app.route('/')
 def index():
@@ -634,6 +643,34 @@ def admin_comments():
         app.logger.error(f"Admin comments error: {str(e)}")
         return redirect(url_for('admin_dashboard'))
 
+@app.route('/admin/comments/<int:comment_id>/approve', methods=['POST'])
+@login_required
+def approve_comment(comment_id):
+    try:
+        comment = Comment.query.get_or_404(comment_id)
+        comment.status = 'approved'
+        db.session.commit()
+        flash(f'Yorum onaylandı.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Approve comment error: {str(e)}")
+        flash('Yorum onaylanırken bir hata oluştu.', 'danger')
+    return redirect(url_for('admin_comments'))
+
+@app.route('/admin/comments/<int:comment_id>/reject', methods=['POST'])
+@login_required
+def reject_comment(comment_id):
+    try:
+        comment = Comment.query.get_or_404(comment_id)
+        comment.status = 'rejected'
+        db.session.commit()
+        flash(f'Yorum reddedildi.', 'warning')
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Reject comment error: {str(e)}")
+        flash('Yorum reddedilirken bir hata oluştu.', 'danger')
+    return redirect(url_for('admin_comments'))
+
 @app.route('/admin/comments/<int:comment_id>/delete', methods=['POST'])
 @login_required
 def delete_comment(comment_id):
@@ -711,7 +748,8 @@ def admin_new_video():
             title = request.form.get('title')
             description = request.form.get('description')
             url = request.form.get('url')
-            thumbnail_url = request.form.get('thumbnail_url')
+            thumbnail_file = request.files.get('thumbnail_file')
+            
             # Safer category_id handling
             category_id_str = request.form.get('category_id')
             category_id = int(category_id_str) if category_id_str and category_id_str.isdigit() else None
@@ -720,13 +758,36 @@ def admin_new_video():
             if not title or not url:
                 flash('Başlık ve URL alanları zorunludur.', 'danger')
                 return render_template('admin/new_video.html', categories=categories)
+                
+            # Basic URL validation
+            if not url.startswith('http://') and not url.startswith('https://'):
+                flash('Geçerli bir URL giriniz (http:// veya https:// ile başlamalı).', 'danger')
+                return render_template('admin/new_video.html', categories=categories, title=title, description=description, url=url)
             
+            thumbnail_filename = None
+            if thumbnail_file and thumbnail_file.filename:
+                 # Save new thumbnail
+                filename = secure_filename(f"video_thumb_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{thumbnail_file.filename}")
+                image_path = os.path.join('static', 'uploads', filename)
+                
+                # Ensure uploads directory exists
+                os.makedirs(os.path.join('static', 'uploads'), exist_ok=True)
+                
+                # Save the image
+                thumbnail_file.save(image_path)
+                
+                # Resize image if needed (using the existing function)
+                resize_image(image_path)
+                
+                thumbnail_filename = filename
+
             # Create new video
             new_video = Video(
                 title=title,
                 description=description,
                 url=url,
-                thumbnail_url=thumbnail_url,
+                # Store filename, not URL
+                thumbnail_url=thumbnail_filename,
                 category_id=category_id,
                 published=True
             )
@@ -741,7 +802,7 @@ def admin_new_video():
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Admin new video error: {str(e)}")
-        flash('Video eklenirken bir hata oluştu! Detaylar için logları kontrol edin.', 'danger') # Added more detail to flash
+        flash('Video eklenirken bir hata oluştu! Detaylar için logları kontrol edin.', 'danger')
         return redirect(url_for('admin_videos'))
 
 @app.route('/admin/video/<int:video_id>/view')
