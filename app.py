@@ -16,6 +16,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from flask_wtf.csrf import validate_csrf
+from supabase import create_client, Client
 
 # Load environment variables
 load_dotenv()
@@ -44,6 +45,68 @@ app.config['CKEDITOR_HEIGHT'] = 400
 app.config['CKEDITOR_PKG_TYPE'] = 'standard'
 app.config['CKEDITOR_ENABLE_CSRF'] = True
 app.config['CKEDITOR_FILE_UPLOADER'] = 'upload'  # Set the upload route for CKEditor
+
+# Supabase Configuration
+supabase_url = os.environ.get("SUPABASE_URL")
+supabase_key = os.environ.get("SUPABASE_SERVICE_KEY")
+
+if not supabase_url or not supabase_key:
+    app.logger.warning("Supabase URL or Key not found in environment variables. Storage uploads will fail.")
+    supabase = None
+else:
+    try:
+        supabase = create_client(supabase_url, supabase_key)
+        app.logger.info("Supabase client initialized successfully.")
+    except Exception as e:
+        app.logger.error(f"Failed to initialize Supabase client: {e}")
+        supabase = None
+
+# Function to upload files to Supabase
+def upload_to_supabase(file, folder="posts"):
+    """
+    Upload a file to Supabase Storage and return its public URL
+    
+    Parameters:
+    - file: The file object from Flask request
+    - folder: The folder within the bucket to store the file (default: "posts")
+    
+    Returns:
+    - The public URL of the uploaded file, or None if upload failed
+    """
+    if not supabase or not file:
+        return None
+        
+    try:
+        # Generate a unique filename
+        original_filename = secure_filename(file.filename)
+        unique_filename = f"{datetime.now().timestamp()}_{original_filename}"
+        supabase_path = f"{folder}/{unique_filename}"
+        
+        app.logger.info(f"Uploading to Supabase bucket 'uploads' at path: {supabase_path}")
+        
+        # Reset file pointer and read data
+        file.seek(0)
+        file_data = file.read()
+        
+        # Get content type
+        content_type = file.content_type or 'application/octet-stream'
+        
+        # Upload to Supabase Storage
+        supabase.storage.from_("uploads").upload(
+            path=supabase_path,
+            file=file_data,
+            file_options={"content-type": content_type}
+        )
+        
+        # Get the public URL
+        public_url = supabase.storage.from_("uploads").get_public_url(supabase_path)
+        app.logger.info(f"Successfully uploaded to Supabase. Public URL: {public_url}")
+        
+        return public_url
+        
+    except Exception as e:
+        app.logger.error(f"Supabase upload failed: {e}")
+        return None
 
 # Database configuration
 database_url = os.environ.get('DATABASE_URL')
@@ -232,6 +295,10 @@ def format_datetime_filter(dt):
 @app.template_filter('post_image_url')
 def post_image_url_filter(post):
     if hasattr(post, 'image') and post.image:
+        # If the image is already a full URL (from Supabase), return it directly
+        if post.image.startswith('http'):
+            return post.image
+        # Otherwise, treat it as a local file
         return url_for('static', filename=f'uploads/{post.image}')
     return url_for('static', filename='uploads/default_post_image.png')
 
@@ -239,10 +306,13 @@ def post_image_url_filter(post):
 def video_thumbnail_url_filter(video):
     """Generate URL for video thumbnail or default image."""
     if hasattr(video, 'thumbnail_url') and video.thumbnail_url:
-        # Assume thumbnail_url stores the filename
+        # If the thumbnail is already a full URL (from Supabase), return it directly
+        if video.thumbnail_url.startswith('http'):
+            return video.thumbnail_url
+        # Otherwise, treat thumbnail_url as a filename
         return url_for('static', filename=f'uploads/{video.thumbnail_url}')
     # Provide a default video thumbnail
-    return url_for('static', filename='uploads/default_video_thumb.png') # You might need to create this default image
+    return url_for('static', filename='uploads/default_video_thumb.png')
 
 # Routes
 @app.route('/')
@@ -467,19 +537,43 @@ def admin_new_post():
             
             # Handle image upload
             if image and image.filename:
-                filename = secure_filename(f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{image.filename}")
-                image_path = os.path.join('static', 'uploads', filename)
-                
-                # Ensure uploads directory exists
-                os.makedirs(os.path.join('static', 'uploads'), exist_ok=True)
-                
-                # Save the image
-                image.save(image_path)
-                
-                # Resize image if needed
-                resize_image(image_path)
-                
-                new_post.image = filename
+                # Check if Supabase integration is available
+                if supabase:
+                    # Upload to Supabase Storage
+                    image_url = upload_to_supabase(image, folder="posts")
+                    if image_url:
+                        new_post.image = image_url  # Store the full URL
+                    else:
+                        app.logger.warning("Supabase upload failed, falling back to local storage")
+                        # Fall back to local storage if Supabase upload fails
+                        filename = secure_filename(f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{image.filename}")
+                        image_path = os.path.join('static', 'uploads', filename)
+                        
+                        # Ensure uploads directory exists
+                        os.makedirs(os.path.join('static', 'uploads'), exist_ok=True)
+                        
+                        # Save the image
+                        image.save(image_path)
+                        
+                        # Resize image if needed
+                        resize_image(image_path)
+                        
+                        new_post.image = filename  # Store just the filename
+                else:
+                    # Supabase integration not available, use local storage
+                    filename = secure_filename(f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{image.filename}")
+                    image_path = os.path.join('static', 'uploads', filename)
+                    
+                    # Ensure uploads directory exists
+                    os.makedirs(os.path.join('static', 'uploads'), exist_ok=True)
+                    
+                    # Save the image
+                    image.save(image_path)
+                    
+                    # Resize image if needed
+                    resize_image(image_path)
+                    
+                    new_post.image = filename  # Store just the filename
             
             # Add to database
             db.session.add(new_post)
@@ -527,32 +621,47 @@ def admin_edit_post(post_id):
             
             # Handle image
             if remove_image and post.image:
-                # Remove the image file (optional)
-                try:
-                    image_path = os.path.join('static', 'uploads', post.image)
-                    if os.path.exists(image_path):
-                        os.remove(image_path)
-                except Exception as e:
-                    app.logger.error(f"Error removing image: {str(e)}")
-                
                 # Remove image reference
                 post.image = None
             
             if image and image.filename:
-                # Save new image
-                filename = secure_filename(f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{image.filename}")
-                image_path = os.path.join('static', 'uploads', filename)
-                
-                # Ensure uploads directory exists
-                os.makedirs(os.path.join('static', 'uploads'), exist_ok=True)
-                
-                # Save the image
-                image.save(image_path)
-                
-                # Resize image if needed
-                resize_image(image_path)
-                
-                post.image = filename
+                # Check if Supabase integration is available
+                if supabase:
+                    # Upload to Supabase Storage
+                    image_url = upload_to_supabase(image, folder="posts")
+                    if image_url:
+                        post.image = image_url  # Store the full URL
+                    else:
+                        app.logger.warning("Supabase upload failed, falling back to local storage")
+                        # Fall back to local storage if Supabase upload fails
+                        filename = secure_filename(f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{image.filename}")
+                        image_path = os.path.join('static', 'uploads', filename)
+                        
+                        # Ensure uploads directory exists
+                        os.makedirs(os.path.join('static', 'uploads'), exist_ok=True)
+                        
+                        # Save the image
+                        image.save(image_path)
+                        
+                        # Resize image if needed
+                        resize_image(image_path)
+                        
+                        post.image = filename  # Store just the filename
+                else:
+                    # Supabase integration not available, use local storage
+                    filename = secure_filename(f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{image.filename}")
+                    image_path = os.path.join('static', 'uploads', filename)
+                    
+                    # Ensure uploads directory exists
+                    os.makedirs(os.path.join('static', 'uploads'), exist_ok=True)
+                    
+                    # Save the image
+                    image.save(image_path)
+                    
+                    # Resize image if needed
+                    resize_image(image_path)
+                    
+                    post.image = filename  # Store just the filename
             
             # Save changes
             db.session.commit()
@@ -1044,30 +1153,51 @@ def admin_new_video():
                 flash('Geçerli bir URL giriniz (http:// veya https:// ile başlamalı).', 'danger')
                 return render_template('admin/new_video.html', categories=categories, title=title, description=description, url=url)
             
-            thumbnail_filename = None
+            thumbnail_url = None
             if thumbnail_file and thumbnail_file.filename:
-                 # Save new thumbnail
-                filename = secure_filename(f"video_thumb_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{thumbnail_file.filename}")
-                image_path = os.path.join('static', 'uploads', filename)
-                
-                # Ensure uploads directory exists
-                os.makedirs(os.path.join('static', 'uploads'), exist_ok=True)
-                
-                # Save the image
-                thumbnail_file.save(image_path)
-                
-                # Resize image if needed (using the existing function)
-                resize_image(image_path)
-                
-                thumbnail_filename = filename
+                # Check if Supabase integration is available
+                if supabase:
+                    # Upload to Supabase Storage
+                    thumbnail_url = upload_to_supabase(thumbnail_file, folder="video_thumbnails")
+                    if not thumbnail_url:
+                        app.logger.warning("Supabase upload failed, falling back to local storage")
+                        # Fall back to local storage if Supabase upload fails
+                        filename = secure_filename(f"video_thumb_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{thumbnail_file.filename}")
+                        image_path = os.path.join('static', 'uploads', filename)
+                        
+                        # Ensure uploads directory exists
+                        os.makedirs(os.path.join('static', 'uploads'), exist_ok=True)
+                        
+                        # Save the image
+                        thumbnail_file.save(image_path)
+                        
+                        # Resize image if needed
+                        resize_image(image_path)
+                        
+                        thumbnail_url = filename  # Store just the filename
+                else:
+                    # Supabase integration not available, use local storage
+                    filename = secure_filename(f"video_thumb_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{thumbnail_file.filename}")
+                    image_path = os.path.join('static', 'uploads', filename)
+                    
+                    # Ensure uploads directory exists
+                    os.makedirs(os.path.join('static', 'uploads'), exist_ok=True)
+                    
+                    # Save the image
+                    thumbnail_file.save(image_path)
+                    
+                    # Resize image if needed
+                    resize_image(image_path)
+                    
+                    thumbnail_url = filename  # Store just the filename
 
             # Create new video
             new_video = Video(
                 title=title,
                 description=description,
                 url=url,
-                # Store filename, not URL
-                thumbnail_url=thumbnail_filename,
+                # Use the thumbnail URL (either from Supabase or local)
+                thumbnail_url=thumbnail_url,
                 category_id=category_id,
                 published=True
             )
@@ -1162,27 +1292,36 @@ def upload():
             return jsonify({'error': {'message': 'No file provided'}})
         
         if f and f.filename:
-            # Generate secure filename
-            filename = secure_filename(f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{f.filename}")
-            file_path = os.path.join('static', 'uploads', filename)
+            url = None
             
-            # Ensure uploads directory exists
-            os.makedirs(os.path.join('static', 'uploads'), exist_ok=True)
+            # Check if Supabase integration is available
+            if supabase:
+                # Upload to Supabase Storage
+                url = upload_to_supabase(f, folder="editor")
             
-            # Save the file
-            f.save(file_path)
-            
-            # Resize image if it's too large
-            resize_image(file_path)
-            
-            # Generate URL for CKEditor
-            url = url_for('static', filename=f"uploads/{filename}")
+            # If Supabase upload failed or is not available, fall back to local storage
+            if not url:
+                # Generate secure filename
+                filename = secure_filename(f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{f.filename}")
+                file_path = os.path.join('static', 'uploads', filename)
+                
+                # Ensure uploads directory exists
+                os.makedirs(os.path.join('static', 'uploads'), exist_ok=True)
+                
+                # Save the file
+                f.save(file_path)
+                
+                # Resize image if it's too large
+                resize_image(file_path)
+                
+                # Generate URL for CKEditor
+                url = url_for('static', filename=f"uploads/{filename}")
             
             # Return success response
             return jsonify({
                 'url': url,
                 'uploaded': 1,
-                'fileName': filename
+                'fileName': f.filename
             })
     except Exception as e:
         app.logger.error(f"Upload error: {str(e)}")
