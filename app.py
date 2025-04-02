@@ -760,16 +760,26 @@ def delete_comment(comment_id):
 @login_required
 def admin_settings():
     try:
+        # Add debug output
+        app.logger.info("Starting admin_settings route")
+        
         # First, ensure the current admin user is also in admin_users table
         sync_admin_user(current_user)
+        app.logger.info(f"Synced admin user: {current_user.username}")
         
         # Fetch admin users, email settings, and registration settings
         admins = AdminUser.query.order_by(AdminUser.username).all()
+        app.logger.info(f"Found {len(admins)} admin users")
+        
         email_settings = EmailSettings.query.first()
+        app.logger.info(f"Email settings found: {email_settings is not None}")
+        
         registration_settings = RegistrationSettings.query.first()
+        app.logger.info(f"Registration settings found: {registration_settings is not None}")
 
         # If no email settings exist, create default settings
         if not email_settings:
+            app.logger.info("Creating default email settings")
             email_settings = EmailSettings(
                 smtp_server='',
                 smtp_port=587,
@@ -782,6 +792,7 @@ def admin_settings():
 
         # If no registration settings exist, create default settings
         if not registration_settings:
+            app.logger.info("Creating default registration settings")
             registration_settings = RegistrationSettings(
                 enable_registration=True,
                 require_email_verification=True,
@@ -796,7 +807,11 @@ def admin_settings():
             # Re-query after commit to get IDs if created
             email_settings = EmailSettings.query.first()
             registration_settings = RegistrationSettings.query.first()
+            app.logger.info("Committed default settings")
 
+        app.logger.info("Rendering admin/settings.html with all context variables")
+        app.logger.info(f"Template variables: admins={len(admins)}, email_settings={email_settings is not None}, registration_settings={registration_settings is not None}")
+        
         return render_template('admin/settings.html',
                               admins=admins,
                               email_settings=email_settings,
@@ -804,6 +819,7 @@ def admin_settings():
     except Exception as e:
         db.session.rollback()  # Rollback in case of error during fetch/create
         app.logger.error(f"Admin settings error: {str(e)}")
+        app.logger.error(f"Exception details: {e}", exc_info=True)
         flash('Ayarlar yüklenirken bir hata oluştu.', 'danger')
         return redirect(url_for('admin_dashboard'))
 
