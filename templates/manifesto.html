@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Manifesto - Hepsi Hikaye{% endblock %}
+
+{% block content %}
+<div class="container mt-5 mb-5">
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <div class="card manifesto-card">
+                <div class="card-body p-md-5">
+                    <h1 class="text-center mb-4">Manifesto</h1>
+                    
+                    <div class="manifesto-content">
+                        <ol class="manifesto-items">
+                            <li>Her işi yolunda giden insanlar giremez.</li>
+                            
+                            <li>Kızılderililerin "ateş suyu"na, Köroğlu'nun tüfeğe olan nefreti kutsaldır.</li>
+                            
+                            <li>Dum spiro, spero. Post tenebras lux.</li>
+                            
+                            <li>Kimse kazanamaz, sadece birileri daha yavaş kaybeder.</li>
+                            
+                            <li>Bir şeyi iyi öğrenmek, her şeyi öğrenebilmeyi sağlar.</li>
+                            
+                            <li>Mutsuz olmak için bir zamanlar çok mutlu olmak lazım.</li>
+                            
+                            <li>Kendinizi bir çukurun içinde bulduğunuzda yapılacak en önemli şey, çukur kazmayı bırakmaktır.</li>
+                            
+                            <li>Düşmek bir şey değildir, düşkün kalmak ise korkunç.</li>
+                            
+                            <li>Bir insana dikkat etmek, o insan için dua etmektir.</li>
+                            
+                            <li>İnsana kalacak yer bırakmayıp, "gitme" denmez.</li>
+                            
+                            <li>Yola çıkarken, evden hiç ayrılmamışlardan akıl alma.</li>
+                            
+                            <li>Kimse harakiri yapacak kadar Japon değildir.</li>
+                            
+                            <li>Bir bakmışsın Yusuf zordadır, bir bakmışsın Yusuf Mısır'a sultan.</li>
+                            
+                            <li>İnsan, bastırdıklarının esiri olur.</li>
+                            
+                            <li>Ben sana aldanabilirim, sen beni aldattın sanma.</li>
+                            
+                            <li>"Fikir" kelimesinin çoğulu "efkâr"dır.</li>
+                            
+                            <li>Kazanmanın iki kuralı vardır:<br>
+                                1. Bildiğin her şeyi asla kimseye söyleme.</li>
+                            
+                            <li>Kuş uçmalı, balık yüzmeli ve biz yazmalıyız.</li>
+                            
+                            <li>Dert etmek herkese, dert edinmek "insan"a mahsustur.</li>
+                            
+                            <li>Einmal ist keinmal, zweimal ist zu viel.</li>
+                            
+                            <li>İyi fotoğraf, fotoğrafta görünmeyeni akla getirendir.</li>
+                            
+                            <li>Sınanmadığınız günahın mümini sayılmazsınız.</li>
+                            
+                            <li>Acı çekmemiş biriyle yapılan sohbet, gevezeliktir.</li>
+                            
+                            <li>İnsan, uçurumun kenarına gelmeden kanatlanmaz.</li>
+                            
+                            <li>Sadece gerekli şeyler söylenseydi, dünyaya derin bir sessizlik hâkim olurdu.</li>
+                            
+                            <li>Porê bênamûsa spî nabe.</li>
+                            
+                            <li>Ekici ol, bilici olma.</li>
+                            
+                            <li>Bir insanın anlayanı olmalı, dinleyeni değil.</li>
+                            
+                            <li>Eğer her günah içki gibi sarhoş etseydi, hiçbirimiz ayık dolaşamazdık.</li>
+                            
+                            <li>Bidayeti olan her şeyin bir nihayeti vardır.</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .manifesto-card {
+        border: none;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        border-radius: 12px;
+        background-color: #fff;
+    }
+    
+    .manifesto-content {
+        font-family: 'Playfair Display', serif;
+    }
+    
+    .manifesto-items {
+        counter-reset: item;
+        list-style-type: none;
+        padding-left: 0;
+    }
+    
+    .manifesto-items li {
+        position: relative;
+        padding: 1.2rem 0 1.2rem 3rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        line-height: 1.7;
+        font-size: 1.1rem;
+    }
+    
+    .manifesto-items li:before {
+        position: absolute;
+        left: 0;
+        content: counter(item) ".";
+        counter-increment: item;
+        font-weight: 700;
+        color: #1a2a42;
+        font-size: 1.1rem;
+    }
+    
+    .manifesto-items li:last-child {
+        border-bottom: none;
+    }
+    
+    @media (max-width: 767px) {
+        .manifesto-items li {
+            font-size: 1rem;
+            padding: 1rem 0 1rem 2.5rem;
+        }
+        
+        .manifesto-items li:before {
+            font-size: 1rem;
+        }
+    }
+</style>
+{% endblock %} 

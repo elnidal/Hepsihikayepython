@@ -1423,6 +1423,10 @@ def videos():
         app.logger.error(f"Videos list error: {str(e)}")
         return render_template('errors/500.html')
 
+@app.route('/manifesto')
+def manifesto():
+    return render_template('manifesto.html')
+
 @app.context_processor
 def inject_categories():
     """Make categories available to all templates"""
