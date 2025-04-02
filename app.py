@@ -139,6 +139,36 @@ class Comment(db.Model):
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'))
     video_id = db.Column(db.Integer, db.ForeignKey('video.id'))
 
+class AdminUser(db.Model):
+    __tablename__ = 'admin_users'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(100), nullable=False, unique=True)
+    email = db.Column(db.String(255), nullable=False, unique=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+class EmailSettings(db.Model):
+    __tablename__ = 'email_settings'
+    id = db.Column(db.Integer, primary_key=True)
+    smtp_server = db.Column(db.String(255), nullable=False)
+    smtp_port = db.Column(db.Integer, nullable=False)
+    smtp_username = db.Column(db.String(255), nullable=False)
+    smtp_password = db.Column(db.String(255), nullable=False)
+    default_from_email = db.Column(db.String(255), nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class RegistrationSettings(db.Model):
+    __tablename__ = 'registration_settings'
+    id = db.Column(db.Integer, primary_key=True)
+    enable_registration = db.Column(db.Boolean, default=True)
+    require_email_verification = db.Column(db.Boolean, default=True)
+    allow_guest_posts = db.Column(db.Boolean, default=False)
+    default_user_role = db.Column(db.String(50), default='user')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -730,7 +760,38 @@ def delete_comment(comment_id):
 @login_required
 def admin_settings():
     try:
-        return render_template('admin/settings.html')
+        # Fetch admin users, email settings, and registration settings
+        admins = AdminUser.query.all()
+        email_settings = EmailSettings.query.first()
+        registration_settings = RegistrationSettings.query.first()
+        
+        # If no email settings exist, create default settings
+        if not email_settings:
+            email_settings = EmailSettings(
+                smtp_server='',
+                smtp_port=587,
+                smtp_username='',
+                smtp_password='',
+                default_from_email=''
+            )
+            db.session.add(email_settings)
+            db.session.commit()
+        
+        # If no registration settings exist, create default settings
+        if not registration_settings:
+            registration_settings = RegistrationSettings(
+                enable_registration=True,
+                require_email_verification=True,
+                allow_guest_posts=False,
+                default_user_role='user'
+            )
+            db.session.add(registration_settings)
+            db.session.commit()
+        
+        return render_template('admin/settings.html', 
+                              admins=admins,
+                              email_settings=email_settings,
+                              registration_settings=registration_settings)
     except Exception as e:
         app.logger.error(f"Admin settings error: {str(e)}")
         flash('Ayarlar yüklenirken bir hata oluştu.', 'danger')
@@ -767,6 +828,134 @@ def admin_change_password():
         db.session.rollback()
         app.logger.error(f"Change password error: {str(e)}")
         flash('Şifre değiştirilirken bir hata oluştu.', 'danger')
+        return redirect(url_for('admin_settings'))
+
+@app.route('/admin/settings/add-admin', methods=['POST'])
+@login_required
+def admin_add_admin():
+    try:
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        # Validate inputs
+        if not username or not email or not password:
+            flash('Tüm alanları doldurun.', 'danger')
+            return redirect(url_for('admin_settings'))
+        
+        # Check if username or email already exists
+        if AdminUser.query.filter_by(username=username).first():
+            flash('Bu kullanıcı adı zaten kullanılıyor.', 'danger')
+            return redirect(url_for('admin_settings'))
+        
+        if AdminUser.query.filter_by(email=email).first():
+            flash('Bu e-posta adresi zaten kullanılıyor.', 'danger')
+            return redirect(url_for('admin_settings'))
+        
+        # Create new admin user
+        new_admin = AdminUser(
+            username=username,
+            email=email,
+            password_hash=generate_password_hash(password)
+        )
+        
+        db.session.add(new_admin)
+        db.session.commit()
+        
+        flash('Yeni yönetici başarıyla eklenmiştir.', 'success')
+        return redirect(url_for('admin_settings'))
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Add admin error: {str(e)}")
+        flash('Yönetici eklenirken bir hata oluştu.', 'danger')
+        return redirect(url_for('admin_settings'))
+
+@app.route('/admin/settings/delete-admin/<int:admin_id>', methods=['POST'])
+@login_required
+def admin_delete_admin(admin_id):
+    try:
+        admin = AdminUser.query.get_or_404(admin_id)
+        
+        # Prevent deletion of the current user
+        if admin.username == current_user.username:
+            return jsonify({'success': False, 'message': 'Kendinizi silemezsiniz.'})
+        
+        db.session.delete(admin)
+        db.session.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Delete admin error: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/admin/settings/update-email', methods=['POST'])
+@login_required
+def admin_update_email_settings():
+    try:
+        smtp_server = request.form.get('smtp_server')
+        smtp_port = request.form.get('smtp_port')
+        smtp_username = request.form.get('smtp_username')
+        smtp_password = request.form.get('smtp_password')
+        default_from_email = request.form.get('default_from_email')
+        
+        # Validate inputs
+        if not smtp_server or not smtp_port or not smtp_username or not smtp_password or not default_from_email:
+            flash('Tüm alanları doldurun.', 'danger')
+            return redirect(url_for('admin_settings'))
+        
+        # Get or create email settings
+        email_settings = EmailSettings.query.first()
+        if not email_settings:
+            email_settings = EmailSettings()
+            db.session.add(email_settings)
+        
+        # Update email settings
+        email_settings.smtp_server = smtp_server
+        email_settings.smtp_port = int(smtp_port)
+        email_settings.smtp_username = smtp_username
+        email_settings.smtp_password = smtp_password
+        email_settings.default_from_email = default_from_email
+        
+        db.session.commit()
+        
+        flash('E-posta ayarları başarıyla güncellendi.', 'success')
+        return redirect(url_for('admin_settings'))
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Update email settings error: {str(e)}")
+        flash('E-posta ayarları güncellenirken bir hata oluştu.', 'danger')
+        return redirect(url_for('admin_settings'))
+
+@app.route('/admin/settings/update-registration', methods=['POST'])
+@login_required
+def admin_update_registration_settings():
+    try:
+        enable_registration = 'enable_registration' in request.form
+        require_email_verification = 'require_email_verification' in request.form
+        allow_guest_posts = 'allow_guest_posts' in request.form
+        default_user_role = request.form.get('default_user_role')
+        
+        # Get or create registration settings
+        registration_settings = RegistrationSettings.query.first()
+        if not registration_settings:
+            registration_settings = RegistrationSettings()
+            db.session.add(registration_settings)
+        
+        # Update registration settings
+        registration_settings.enable_registration = enable_registration
+        registration_settings.require_email_verification = require_email_verification
+        registration_settings.allow_guest_posts = allow_guest_posts
+        registration_settings.default_user_role = default_user_role
+        
+        db.session.commit()
+        
+        flash('Kayıt ayarları başarıyla güncellendi.', 'success')
+        return redirect(url_for('admin_settings'))
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Update registration settings error: {str(e)}")
+        flash('Kayıt ayarları güncellenirken bir hata oluştu.', 'danger')
         return redirect(url_for('admin_settings'))
 
 @app.route('/admin/videos')
