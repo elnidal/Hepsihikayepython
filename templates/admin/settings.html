@@ -9,6 +9,8 @@
 
 <!-- Settings Form -->
 <div class="row">
+    {# Removed Site Settings and Social Media forms as functionality is not implemented #}
+    {#
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
@@ -84,13 +86,18 @@
                 </form>
             </div>
         </div>
+    </div>
+    #}
 
+    <div class="col-md-6 offset-md-3"> {# Centering the remaining card #}
         <div class="card mt-4">
             <div class="card-header">
                 <h5 class="mb-0">Yönetici Şifresi</h5>
             </div>
             <div class="card-body">
-                <form action="{{ url_for('admin_password_update') }}" method="POST">
+                {# Corrected form action #}
+                <form action="{{ url_for('admin_change_password') }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> {# Add CSRF token #}
                     <div class="mb-3">
                         <label for="currentPassword" class="form-label">Mevcut Şifre</label>
                         <input type="password" class="form-control" id="currentPassword" name="current_password" required>
