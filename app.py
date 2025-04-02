@@ -1487,25 +1487,16 @@ if __name__ == '__main__':
         db.create_all()
         initialize_database()
         
-    # Run the app
-    app.run(debug=True, port=8080)
-else:
-    # This code runs when imported (e.g., by Gunicorn in production)
-    # Ensure required directories exist
-    for directory in ['uploads', 'logs']:
-        path = os.path.join(app.static_folder, directory)
-        if not os.path.exists(path):
-            os.makedirs(path)
-            app.logger.info(f"Created directory: {path}")
-    
-    # Initialize database when the app starts
-    with app.app_context():
-        db.create_all()
-        initialize_database()
-        
-        # Optional: Migrate from JSON files
-        if os.path.exists(DATA_DIR):
-            try:
-                migrate_from_json()
-            except Exception as e:
-                app.logger.error(f"Failed to migrate from JSON: {str(e)}") 
+    app.logger.info('Flask application started')
+    # Run app on specified host and port, default 5000
+    # Use 0.0.0.0 to be accessible on the network
+    app.run(host=os.environ.get('FLASK_RUN_HOST', '127.0.0.1'), 
+            port=int(os.environ.get('FLASK_RUN_PORT', 5000)), 
+            debug=app.config['DEBUG'])
+
+# --- MILESTONE MARKER ---
+# Project: HepsiHikaye
+# Milestone: First fully working version completed!
+# Date: April 2, 2025
+# Notes: Built with persistence and pair programming.
+# ------------------------- 
