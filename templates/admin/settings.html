@@ -7,7 +7,7 @@
     <h1>Ayarlar</h1>
 </div>
 
-<div class="row">
+<div class="row settings-row">
     <!-- Admin Management -->
     <div class="col-md-6">
         <div class="card mb-4">
@@ -125,7 +125,7 @@
                         <label for="defaultFromEmail" class="form-label">Varsayılan Gönderen E-posta</label>
                         <input type="email" class="form-control" id="defaultFromEmail" name="default_from_email" value="{{ email_settings.default_from_email if email_settings else '' }}" required>
                     </div>
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary w-100 w-md-auto">
                         <i class="fas fa-save me-2"></i>
                         E-posta Ayarlarını Kaydet
                     </button>
@@ -170,7 +170,7 @@
                             <option value="editor" {{ 'selected' if registration_settings.default_user_role == 'editor' else '' }}>Editör</option>
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary w-100 w-md-auto">
                         <i class="fas fa-save me-2"></i>
                         Kayıt Ayarlarını Kaydet
                     </button>

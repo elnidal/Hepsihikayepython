@@ -344,4 +344,125 @@ select.form-control {
         padding-left: 1rem;
         padding-right: 1rem;
     }
+}
+
+/* Additional mobile optimizations */
+
+/* Optimize images for mobile loading */
+img.lazy {
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+img.lazy.loaded {
+    opacity: 1;
+}
+
+/* Prevent font boosting on mobile */
+.card-title, 
+.card-text, 
+h1, h2, h3, h4, h5, h6, 
+p {
+    max-height: 999999px;
+}
+
+/* Fix admin settings page on mobile */
+@media (max-width: 767px) {
+    .admin-settings .card {
+        margin-bottom: 1.5rem;
+    }
+    
+    .table-responsive {
+        border: 0;
+        width: 100%;
+        margin-bottom: 15px;
+        overflow-y: hidden;
+        -ms-overflow-style: -ms-autohiding-scrollbar;
+    }
+    
+    /* Make buttons more tappable on mobile */
+    .btn {
+        padding: 0.5rem 1rem;
+        font-size: 1rem;
+    }
+    
+    /* Better form elements on mobile */
+    .form-control, .form-select {
+        height: 46px;
+        font-size: 16px; /* Prevent auto-zoom on iOS */
+    }
+    
+    textarea.form-control {
+        height: auto;
+    }
+    
+    /* Improve card layouts */
+    .card-footer {
+        padding: 0.75rem 1rem;
+    }
+    
+    /* Better spacing for action buttons */
+    .action-buttons .btn {
+        margin-bottom: 0.5rem;
+    }
+}
+
+/* Admin specific mobile improvements */
+@media (max-width: 767px) {
+    .admin-main {
+        padding: 1rem;
+        padding-top: 3.5rem;
+    }
+    
+    .content-header {
+        margin-bottom: 1rem;
+    }
+    
+    .content-header h1 {
+        font-size: 1.5rem;
+    }
+    
+    /* Settings page improvements */
+    .settings-row > div + div {
+        margin-top: 1.5rem;
+    }
+    
+    /* Improve tap targets in settings */
+    .form-check-input {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+    
+    .form-check-label {
+        line-height: 1.5;
+        padding-left: 0.25rem;
+    }
+    
+    /* Full width buttons on mobile */
+    .settings-row .btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+}
+
+/* Make alerts visible on mobile */
+.alert {
+    position: relative;
+    z-index: 1;
+}
+
+/* Improve the mobile bottom navbar size */
+@media (max-width: 374px) {
+    .mobile-nav-bar {
+        padding: 8px 0;
+    }
+    
+    .mobile-nav-item {
+        font-size: 0.7rem;
+    }
+    
+    .mobile-nav-item i {
+        font-size: 1rem;
+        margin-bottom: 3px;
+    }
 } 
