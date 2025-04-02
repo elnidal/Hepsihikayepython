@@ -744,6 +744,43 @@ def admin_new_video():
         flash('Video eklenirken bir hata oluştu! Detaylar için logları kontrol edin.', 'danger') # Added more detail to flash
         return redirect(url_for('admin_videos'))
 
+@app.route('/admin/video/<int:video_id>/view')
+@login_required
+def admin_view_video(video_id):
+    # Placeholder - Add logic to fetch and display video details
+    video = Video.query.get_or_404(video_id)
+    flash('Video görüntüleme işlevi henüz tamamlanmadı.', 'info')
+    return render_template('admin/view_video.html', video=video) # Assuming view_video.html exists
+
+@app.route('/admin/video/<int:video_id>/edit', methods=['GET', 'POST'])
+@login_required
+def admin_edit_video(video_id):
+    # Placeholder - Add logic to fetch video and handle form submission for editing
+    video = Video.query.get_or_404(video_id)
+    categories = Category.query.all()
+    if request.method == 'POST':
+        # Placeholder for processing form data
+        flash('Video düzenleme işlevi henüz tamamlanmadı.', 'info')
+        return redirect(url_for('admin_videos'))
+    return render_template('admin/edit_video.html', video=video, categories=categories) # Assuming edit_video.html exists
+
+@app.route('/admin/video/<int:video_id>/delete', methods=['POST'])
+@login_required
+def admin_delete_video(video_id):
+    # Placeholder - Add logic to delete the video
+    video = Video.query.get_or_404(video_id)
+    try:
+        # Placeholder: Add deletion logic here
+        # db.session.delete(video)
+        # db.session.commit()
+        flash(f'"{video.title}" videosunu silme işlevi henüz tamamlanmadı.', 'info')
+        # flash(f'{video.title} videosu başarıyla silindi.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error deleting video {video_id}: {str(e)}")
+        flash('Video silinirken bir hata oluştu!', 'danger')
+    return redirect(url_for('admin_videos'))
+
 @app.route('/admin')
 @login_required
 def admin_index():

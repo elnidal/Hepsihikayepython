@@ -14,33 +14,40 @@
 <div class="row">
     <!-- Stats Cards -->
     <div class="col-md-3">
-        <div class="stats-card">
-            <div class="stats-icon" style="background-color: #e74c3c;">
-                <i class="fas fa-book"></i>
+        <a href="{{ url_for('admin_posts') }}" class="stats-card-link">
+            <div class="stats-card">
+                <div class="stats-icon" style="background-color: #e74c3c;">
+                    <i class="fas fa-book"></i>
+                </div>
+                <h3>{{ total_posts }}</h3>
+                <p>Toplam Hikaye</p>
             </div>
-            <h3>{{ total_posts }}</h3>
-            <p>Toplam Hikaye</p>
-        </div>
+        </a>
     </div>
     <div class="col-md-3">
-        <div class="stats-card">
-            <div class="stats-icon" style="background-color: #3498db;">
-                <i class="fas fa-video"></i>
+        <a href="{{ url_for('admin_videos') }}" class="stats-card-link">
+            <div class="stats-card">
+                <div class="stats-icon" style="background-color: #3498db;">
+                    <i class="fas fa-video"></i>
+                </div>
+                <h3>{{ total_videos }}</h3>
+                <p>Toplam Video</p>
             </div>
-            <h3>{{ total_videos }}</h3>
-            <p>Toplam Video</p>
-        </div>
+        </a>
     </div>
     <div class="col-md-3">
-        <div class="stats-card">
-            <div class="stats-icon" style="background-color: #2ecc71;">
-                <i class="fas fa-comments"></i>
+        <a href="{{ url_for('admin_comments') }}" class="stats-card-link">
+            <div class="stats-card">
+                <div class="stats-icon" style="background-color: #2ecc71;">
+                    <i class="fas fa-comments"></i>
+                </div>
+                <h3>{{ total_comments }}</h3>
+                <p>Toplam Yorum</p>
             </div>
-            <h3>{{ total_comments }}</h3>
-            <p>Toplam Yorum</p>
-        </div>
+        </a>
     </div>
     <div class="col-md-3">
+        {# This one doesn't have a specific page, so no link #}
         <div class="stats-card">
             <div class="stats-icon" style="background-color: #9b59b6;">
                 <i class="fas fa-eye"></i>
