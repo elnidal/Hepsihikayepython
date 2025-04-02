@@ -44,7 +44,10 @@
                         {% endif %}
                         
                         <div class="mb-4">
-                            <strong>Kategori:</strong> {{ post.category_name }}
+                            <strong>Kategori:</strong>
+                            <span class="badge bg-primary" data-category-id="{{ post.category.id if post.category else '' }}">
+                                {{ post.category.name if post.category else 'Yok' }}
+                            </span>
                         </div>
                         
                         <div class="post-content">

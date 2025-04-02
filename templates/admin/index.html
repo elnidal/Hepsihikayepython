@@ -86,7 +86,11 @@
                                     <tr>
                                         <td>{{ post.id }}</td>
                                         <td>{{ post.title }}</td>
-                                        <td>{{ post.category }}</td>
+                                        <td>
+                                            <span class="badge bg-primary" data-category-id="{{ post.category.id if post.category else '' }}">
+                                                {{ post.category.name if post.category else 'Yok' }}
+                                            </span>
+                                        </td>
                                         <td>{{ post.created_at.strftime('%d.%m.%Y') }}</td>
                                         <td>
                                             <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-sm btn-info" target="_blank">Görüntüle</a>

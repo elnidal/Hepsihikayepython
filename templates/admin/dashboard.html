@@ -82,7 +82,11 @@
                         {% for post in recent_posts %}
                         <tr>
                             <td>{{ post.title }}</td>
-                            <td>{{ post.category }}</td>
+                            <td>
+                                <span class="badge bg-primary" data-category-id="{{ post.category.id if post.category else '' }}">
+                                    {{ post.category.name if post.category else 'Yok' }}
+                                </span>
+                            </td>
                             <td>{{ post.created_at|format_datetime_filter }}</td>
                             <td>
                                 <a href="{{ url_for('admin_view_post', post_id=post.id) }}" class="btn btn-sm btn-outline-primary">
@@ -123,7 +127,11 @@
                         {% for video in recent_videos %}
                         <tr>
                             <td>{{ video.title }}</td>
-                            <td>{{ video.category }}</td>
+                            <td>
+                                <span class="badge bg-primary" data-category-id="{{ video.category.id if video.category else '' }}">
+                                    {{ video.category.name if video.category else 'Yok' }}
+                                </span>
+                            </td>
                             <td>{{ video.created_at|format_datetime_filter }}</td>
                             <td>
                                 <a href="{{ video.url }}" class="btn btn-sm btn-outline-primary" target="_blank">
