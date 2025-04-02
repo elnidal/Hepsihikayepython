@@ -731,12 +731,29 @@ def admin_change_password():
 @login_required
 def admin_videos():
     try:
-        videos = Video.query.all()
-        return render_template('admin/videos.html', videos=videos)
+        page = request.args.get('page', 1, type=int)
+        per_page = 10 # Show 10 videos per page
+        
+        # Query videos with pagination
+        pagination = Video.query.order_by(Video.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        videos = pagination.items
+        
+        # Pass categories for filtering (optional, but the template has the dropdown)
+        categories = Category.query.all()
+        
+        return render_template('admin/videos.html', 
+                              videos=videos,
+                              categories=categories,
+                              current_page=pagination.page,
+                              total_pages=pagination.pages)
     except Exception as e:
         app.logger.error(f"Admin videos error: {str(e)}")
         flash('Videoları yüklerken bir hata oluştu!', 'danger')
-        return render_template('admin/videos.html', videos=[])
+        # Still render the template but with empty list and potentially no pagination
+        return render_template('admin/videos.html', videos=[], categories=[], current_page=1, total_pages=1)
 
 @app.route('/admin/new-video', methods=['GET', 'POST'])
 @login_required
