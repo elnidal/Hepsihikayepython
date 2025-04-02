@@ -576,9 +576,16 @@ def admin_view_post(post_id):
 def admin_categories():
     try:
         categories = Category.query.all()
+        
+        # Add post and video counts to each category
+        for category in categories:
+            category.post_count = Post.query.filter_by(category_id=category.id).count()
+            category.video_count = Video.query.filter_by(category_id=category.id).count()
+            
         return render_template('admin/categories.html', categories=categories)
     except Exception as e:
         app.logger.error(f"Admin categories error: {str(e)}")
+        flash('Kategoriler yüklenirken bir hata oluştu.', 'danger')
         return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/categories/new', methods=['POST'])
@@ -630,6 +637,36 @@ def admin_delete_category(category_id):
         db.session.rollback()
         app.logger.error(f"Delete category error: {str(e)}")
         flash('Kategori silinirken bir hata oluştu.', 'danger')
+    
+    return redirect(url_for('admin_categories'))
+
+@app.route('/admin/categories/<int:category_id>/edit', methods=['POST'])
+@login_required
+def admin_edit_category(category_id):
+    try:
+        category = Category.query.get_or_404(category_id)
+        
+        name = request.form.get('name')
+        
+        if not name:
+            flash('Kategori adı gereklidir.', 'danger')
+            return redirect(url_for('admin_categories'))
+        
+        # Check if category with same name exists (excluding this category)
+        existing = Category.query.filter(Category.name == name, Category.id != category_id).first()
+        if existing:
+            flash('Bu isim ile bir kategori zaten mevcut.', 'danger')
+            return redirect(url_for('admin_categories'))
+        
+        # Update category name
+        category.name = name
+        db.session.commit()
+        
+        flash('Kategori başarıyla güncellendi.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Edit category error: {str(e)}")
+        flash('Kategori güncellenirken bir hata oluştu.', 'danger')
     
     return redirect(url_for('admin_categories'))
 
@@ -771,6 +808,12 @@ def admin_new_video():
             category_id_str = request.form.get('category_id')
             category_id = int(category_id_str) if category_id_str and category_id_str.isdigit() else None
             
+            # If no category is selected, try to find and use the 'video' category
+            if not category_id:
+                video_category = Category.query.filter_by(slug='video').first()
+                if video_category:
+                    category_id = video_category.id
+            
             # Validate required fields (optional but good practice)
             if not title or not url:
                 flash('Başlık ve URL alanları zorunludur.', 'danger')
@@ -845,18 +888,31 @@ def admin_edit_video(video_id):
 @app.route('/admin/video/<int:video_id>/delete', methods=['POST'])
 @login_required
 def admin_delete_video(video_id):
-    # Placeholder - Add logic to delete the video
-    video = Video.query.get_or_404(video_id)
     try:
-        # Placeholder: Add deletion logic here
-        # db.session.delete(video)
-        # db.session.commit()
-        flash(f'"{video.title}" videosunu silme işlevi henüz tamamlanmadı.', 'info')
-        # flash(f'{video.title} videosu başarıyla silindi.', 'success')
+        video = Video.query.get_or_404(video_id)
+        
+        # If the video has a thumbnail, try to delete it
+        if video.thumbnail_url:
+            try:
+                thumbnail_path = os.path.join('static', 'uploads', video.thumbnail_url)
+                if os.path.exists(thumbnail_path):
+                    os.remove(thumbnail_path)
+            except Exception as e:
+                app.logger.error(f"Error removing thumbnail for video {video_id}: {str(e)}")
+        
+        # Delete any comments associated with this video (should be handled by cascade)
+        video_title = video.title  # Store title before deletion
+        
+        # Delete the video
+        db.session.delete(video)
+        db.session.commit()
+        
+        flash(f'"{video_title}" videosu başarıyla silindi.', 'success')
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Error deleting video {video_id}: {str(e)}")
         flash('Video silinirken bir hata oluştu!', 'danger')
+    
     return redirect(url_for('admin_videos'))
 
 @app.route('/admin')
@@ -1161,8 +1217,16 @@ def inject_categories():
 def category_posts(slug):
     try:
         category = Category.query.filter_by(slug=slug).first_or_404()
-        posts = Post.query.filter_by(category_id=category.id, published=True).order_by(Post.created_at.desc()).all()
-        return render_template('category.html', category=category, posts=posts)
+        
+        # Check if this is the video category
+        if slug == 'video':
+            # For video category, fetch videos instead of posts
+            videos = Video.query.filter_by(category_id=category.id, published=True).order_by(Video.created_at.desc()).all()
+            return render_template('videos.html', videos=videos, category=category)
+        else:
+            # For other categories, fetch posts as before
+            posts = Post.query.filter_by(category_id=category.id, published=True).order_by(Post.created_at.desc()).all()
+            return render_template('category.html', category=category, posts=posts)
     except Exception as e:
         app.logger.error(f"Category posts error: {str(e)}")
         return render_template('errors/500.html')
