@@ -55,7 +55,7 @@
                         </div>
                     </td>
                     <td>
-                        <span class="badge bg-primary">{{ video.category.name if video.category else 'Yok' }}</span>
+                        <span class="badge bg-primary" data-category-id="{{ video.category_id if video.category_id else '' }}">{{ video.category.name if video.category else 'Yok' }}</span>
                     </td>
                     <td>Admin</td>
                     <td>{{ video.created_at|format_datetime_filter }}</td>
@@ -148,11 +148,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         rows.forEach(row => {
             const title = row.querySelector('.fw-medium').textContent.toLowerCase();
-            const category = row.querySelector('.badge.bg-primary').textContent;
-            const categoryId = row.querySelector('.badge.bg-primary').dataset.categoryId;
+            const categoryElement = row.querySelector('.badge.bg-primary');
+            const categoryId = categoryElement.dataset.categoryId;
 
             const matchesSearch = title.includes(searchTerm);
-            const matchesCategory = !selectedCategory || categoryId === selectedCategory;
+            const matchesCategory = !selectedCategory || selectedCategory === "" || categoryId === selectedCategory;
 
             row.style.display = matchesSearch && matchesCategory ? '' : 'none';
         });
