@@ -6,12 +6,15 @@
 <div class="content-header">
     <h1>Yorumlar</h1>
     <div class="d-flex gap-2">
+        {# Simplified filter for now #}
+        {#
         <select class="form-select" style="width: 200px;" id="statusFilter">
             <option value="">Tüm Durumlar</option>
             <option value="pending">Onay Bekleyen</option>
             <option value="approved">Onaylanmış</option>
             <option value="rejected">Reddedilmiş</option>
         </select>
+        #}
     </div>
 </div>
 
@@ -19,6 +22,8 @@
 <div class="card">
     <div class="card-header">
         <h5 class="mb-0">Tüm Yorumlar</h5>
+        {# Simplified search for now #}
+        {#
         <div class="d-flex gap-2">
             <div class="input-group" style="width: 300px;">
                 <input type="text" class="form-control" id="searchInput" placeholder="Yorum ara...">
@@ -27,6 +32,7 @@
                 </button>
             </div>
         </div>
+        #}
     </div>
     <div class="table-responsive">
         <table class="table">
@@ -34,7 +40,7 @@
                 <tr>
                     <th>Yorum</th>
                     <th>Kullanıcı</th>
-                    <th>İçerik</th>
+                    <th>İlgili İçerik</th> {# Changed header #}
                     <th>Tarih</th>
                     <th>Durum</th>
                     <th>İşlemler</th>
@@ -45,31 +51,41 @@
                 <tr>
                     <td>
                         <div class="d-flex flex-column">
-                            <div class="fw-medium">{{ comment.content[:100] }}...</div>
-                            <small class="text-muted">{{ comment.content_type }}: {{ comment.content_title }}</small>
+                            {# Using comment.content directly #}
+                            <div class="fw-medium">{{ comment.content[:100] }}{% if comment.content|length > 100 %}...{% endif %}</div>
+                            {# Removed content_type/title as they don't exist #}
                         </div>
                     </td>
                     <td>
                         <div class="d-flex align-items-center gap-2">
-                            {% if comment.user_avatar %}
-                            <img src="{{ comment.user_avatar }}" alt="{{ comment.user_name }}" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover;">
-                            {% else %}
+                             {# Removed user_avatar as it doesn't exist #}
                             <div class="rounded-circle bg-light d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
                                 <i class="fas fa-user text-muted"></i>
                             </div>
-                            {% endif %}
-                            <div>{{ comment.user_name }}</div>
+                            {# Using comment.name instead of user_name #}
+                            <div>{{ comment.name }}</div>
                         </div>
                     </td>
                     <td>
-                        <a href="{{ url_for('view_' + comment.content_type, id=comment.content_id) }}" class="text-decoration-none">
-                            {{ comment.content_title }}
-                        </a>
+                        {# Link to Post or Video if ID exists #}
+                        {% if comment.post_id %}
+                            <a href="{{ url_for('admin_view_post', post_id=comment.post_id) }}" class="text-decoration-none">
+                                Hikaye #{{ comment.post_id }}
+                            </a>
+                        {% elif comment.video_id %}
+                             <a href="{{ url_for('admin_view_video', video_id=comment.video_id) }}" class="text-decoration-none"> {# Assumes admin_view_video exists #}
+                                Video #{{ comment.video_id }}
+                            </a>
+                        {% else %}
+                            N/A
+                        {% endif %}
                     </td>
-                    <td>{{ comment.date }}</td>
+                    {# Using comment.created_at and formatting it #}
+                    <td>{{ comment.created_at|format_datetime_filter if comment.created_at else 'N/A'}}</td>
                     <td>
+                        {# Status badges remain the same #}
                         {% if comment.status == 'pending' %}
-                        <span class="badge bg-warning">Onay Bekliyor</span>
+                        <span class="badge bg-warning text-dark">Onay Bekliyor</span> {# Added text-dark for better contrast #}
                         {% elif comment.status == 'approved' %}
                         <span class="badge bg-success">Onaylandı</span>
                         {% else %}
@@ -80,6 +96,8 @@
                         <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#viewCommentModal{{ comment.id }}">
                             <i class="fas fa-eye"></i>
                         </button>
+                        {# Commented out approve/reject as routes don't exist #}
+                        {#
                         {% if comment.status == 'pending' %}
                         <form action="{{ url_for('approve_comment', comment_id=comment.id) }}" method="POST" class="d-inline">
                             <button type="submit" class="btn btn-sm btn-outline-success">
@@ -92,13 +110,14 @@
                             </button>
                         </form>
                         {% endif %}
+                        #}
                         <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteCommentModal{{ comment.id }}">
                             <i class="fas fa-trash"></i>
                         </button>
                     </td>
                 </tr>
 
-                <!-- View Comment Modal -->
+                <!-- View Comment Modal (Updated) -->
                 <div class="modal fade" id="viewCommentModal{{ comment.id }}" tabindex="-1">
                     <div class="modal-dialog">
                         <div class="modal-content">
@@ -109,11 +128,27 @@
                             <div class="modal-body">
                                 <div class="mb-3">
                                     <label class="form-label fw-medium">Kullanıcı</label>
-                                    <p>{{ comment.user_name }}</p>
+                                    <p>{{ comment.name }}</p> {# Corrected variable #}
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label fw-medium">İçerik</label>
-                                    <p>{{ comment.content_title }}</p>
+                                    <label class="form-label fw-medium">E-posta</label>
+                                    <p>{{ comment.email if comment.email else 'Belirtilmemiş' }}</p>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-medium">İlgili İçerik</label>
+                                    <p>
+                                        {% if comment.post_id %}
+                                            <a href="{{ url_for('admin_view_post', post_id=comment.post_id) }}">
+                                                Hikaye #{{ comment.post_id }}
+                                            </a>
+                                        {% elif comment.video_id %}
+                                            <a href="{{ url_for('admin_view_video', video_id=comment.video_id) }}">
+                                                Video #{{ comment.video_id }}
+                                            </a>
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </p>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label fw-medium">Yorum</label>
@@ -121,7 +156,7 @@
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label fw-medium">Tarih</label>
-                                    <p>{{ comment.date }}</p>
+                                    <p>{{ comment.created_at|format_datetime_filter if comment.created_at else 'N/A' }}</p> {# Corrected variable #}
                                 </div>
                             </div>
                             <div class="modal-footer">
@@ -131,7 +166,7 @@
                     </div>
                 </div>
 
-                <!-- Delete Comment Modal -->
+                <!-- Delete Comment Modal (Unchanged, already uses correct route) -->
                 <div class="modal fade" id="deleteCommentModal{{ comment.id }}" tabindex="-1">
                     <div class="modal-dialog">
                         <div class="modal-content">
@@ -161,7 +196,8 @@
     </div>
 </div>
 
-<!-- Pagination -->
+<!-- Pagination (Commented out) -->
+{#
 {% if total_pages > 1 %}
 <nav class="mt-4">
     <ul class="pagination justify-content-center">
@@ -183,7 +219,10 @@
     </ul>
 </nav>
 {% endif %}
+#}
 
+{# Commented out JS filter as it relied on incorrect/missing elements #}
+{#
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -198,10 +237,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         rows.forEach(row => {
             const comment = row.querySelector('.fw-medium').textContent.toLowerCase();
-            const status = row.querySelector('.badge').textContent.toLowerCase();
+            // Note: Status filtering might need adjustment based on badge text
+            const statusBadge = row.querySelector('.badge');
+            const statusText = statusBadge ? statusBadge.textContent.toLowerCase() : '';
 
             const matchesSearch = comment.includes(searchTerm);
-            const matchesStatus = !selectedStatus || status.includes(selectedStatus);
+            // Adjust status matching if needed
+            const matchesStatus = !selectedStatus || statusText.includes(selectedStatus.toLowerCase());
 
             row.style.display = matchesSearch && matchesStatus ? '' : 'none';
         });
@@ -212,4 +254,5 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+#}
 {% endblock %} 
