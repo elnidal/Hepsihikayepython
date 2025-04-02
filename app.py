@@ -761,10 +761,10 @@ def delete_comment(comment_id):
 def admin_settings():
     try:
         # Fetch admin users, email settings, and registration settings
-        admins = AdminUser.query.all()
+        admins = AdminUser.query.order_by(AdminUser.username).all()
         email_settings = EmailSettings.query.first()
         registration_settings = RegistrationSettings.query.first()
-        
+
         # If no email settings exist, create default settings
         if not email_settings:
             email_settings = EmailSettings(
@@ -775,8 +775,8 @@ def admin_settings():
                 default_from_email=''
             )
             db.session.add(email_settings)
-            db.session.commit()
-        
+            # Don't commit here, commit at the end if needed
+
         # If no registration settings exist, create default settings
         if not registration_settings:
             registration_settings = RegistrationSettings(
@@ -786,13 +786,20 @@ def admin_settings():
                 default_user_role='user'
             )
             db.session.add(registration_settings)
+
+        # Commit if we created default settings
+        if not EmailSettings.query.first() or not RegistrationSettings.query.first():
             db.session.commit()
-        
-        return render_template('admin/settings.html', 
+            # Re-query after commit to get IDs if created
+            email_settings = EmailSettings.query.first()
+            registration_settings = RegistrationSettings.query.first()
+
+        return render_template('admin/settings.html',
                               admins=admins,
                               email_settings=email_settings,
                               registration_settings=registration_settings)
     except Exception as e:
+        db.session.rollback()  # Rollback in case of error during fetch/create
         app.logger.error(f"Admin settings error: {str(e)}")
         flash('Ayarlar yüklenirken bir hata oluştu.', 'danger')
         return redirect(url_for('admin_dashboard'))
