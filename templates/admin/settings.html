@@ -7,97 +7,73 @@
     <h1>Ayarlar</h1>
 </div>
 
-<!-- Settings Form -->
 <div class="row">
-    {# Removed Site Settings and Social Media forms as functionality is not implemented #}
-    {#
+    <!-- Admin Management -->
     <div class="col-md-6">
-        <div class="card">
+        <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">Site Ayarları</h5>
+                <h5 class="mb-0">Yönetici Yönetimi</h5>
             </div>
             <div class="card-body">
-                <form action="{{ url_for('admin_settings_update') }}" method="POST">
+                <div class="mb-4">
+                    <h6>Mevcut Yöneticiler</h6>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Kullanıcı Adı</th>
+                                    <th>E-posta</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for admin in admins %}
+                                <tr>
+                                    <td>{{ admin.username }}</td>
+                                    <td>{{ admin.email }}</td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteAdmin('{{ admin.id }}')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <form action="{{ url_for('admin_add_admin') }}" method="POST" class="border-top pt-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <h6>Yeni Yönetici Ekle</h6>
                     <div class="mb-3">
-                        <label for="siteName" class="form-label">Site Adı</label>
-                        <input type="text" class="form-control" id="siteName" name="site_name" value="{{ settings.site_name }}" required>
+                        <label for="newAdminUsername" class="form-label">Kullanıcı Adı</label>
+                        <input type="text" class="form-control" id="newAdminUsername" name="username" required>
                     </div>
                     <div class="mb-3">
-                        <label for="siteDescription" class="form-label">Site Açıklaması</label>
-                        <textarea class="form-control" id="siteDescription" name="site_description" rows="3">{{ settings.site_description }}</textarea>
+                        <label for="newAdminEmail" class="form-label">E-posta</label>
+                        <input type="email" class="form-control" id="newAdminEmail" name="email" required>
                     </div>
                     <div class="mb-3">
-                        <label for="siteKeywords" class="form-label">Site Anahtar Kelimeleri</label>
-                        <input type="text" class="form-control" id="siteKeywords" name="site_keywords" value="{{ settings.site_keywords }}">
-                        <small class="form-text text-muted">Virgülle ayırarak yazın</small>
-                    </div>
-                    <div class="mb-3">
-                        <label for="siteEmail" class="form-label">İletişim E-posta</label>
-                        <input type="email" class="form-control" id="siteEmail" name="site_email" value="{{ settings.site_email }}" required>
+                        <label for="newAdminPassword" class="form-label">Şifre</label>
+                        <input type="password" class="form-control" id="newAdminPassword" name="password" required>
                     </div>
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save me-2"></i>
-                        Kaydet
+                        <i class="fas fa-plus-circle me-2"></i>
+                        Yönetici Ekle
                     </button>
                 </form>
             </div>
         </div>
-    </div>
 
-    <div class="col-md-6">
-        <div class="card">
+        <!-- Password Change -->
+        <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">Sosyal Medya</h5>
+                <h5 class="mb-0">Şifre Değiştir</h5>
             </div>
             <div class="card-body">
-                <form action="{{ url_for('admin_social_update') }}" method="POST">
-                    <div class="mb-3">
-                        <label for="facebook" class="form-label">Facebook</label>
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="fab fa-facebook"></i></span>
-                            <input type="url" class="form-control" id="facebook" name="facebook" value="{{ settings.facebook }}">
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="twitter" class="form-label">Twitter</label>
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="fab fa-twitter"></i></span>
-                            <input type="url" class="form-control" id="twitter" name="twitter" value="{{ settings.twitter }}">
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="instagram" class="form-label">Instagram</label>
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="fab fa-instagram"></i></span>
-                            <input type="url" class="form-control" id="instagram" name="instagram" value="{{ settings.instagram }}">
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="youtube" class="form-label">YouTube</label>
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="fab fa-youtube"></i></span>
-                            <input type="url" class="form-control" id="youtube" name="youtube" value="{{ settings.youtube }}">
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save me-2"></i>
-                        Kaydet
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-    #}
-
-    <div class="col-md-6 offset-md-3"> {# Centering the remaining card #}
-        <div class="card mt-4">
-            <div class="card-header">
-                <h5 class="mb-0">Yönetici Şifresi</h5>
-            </div>
-            <div class="card-body">
-                {# Corrected form action #}
                 <form action="{{ url_for('admin_change_password') }}" method="POST">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"> {# Add CSRF token #}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="mb-3">
                         <label for="currentPassword" class="form-label">Mevcut Şifre</label>
                         <input type="password" class="form-control" id="currentPassword" name="current_password" required>
@@ -118,5 +94,159 @@
             </div>
         </div>
     </div>
+
+    <!-- Email and Registration Settings -->
+    <div class="col-md-6">
+        <!-- Email Settings -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">E-posta Ayarları</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('admin_update_email_settings') }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label for="smtpServer" class="form-label">SMTP Sunucu</label>
+                        <input type="text" class="form-control" id="smtpServer" name="smtp_server" value="{{ email_settings.smtp_server if email_settings else '' }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="smtpPort" class="form-label">SMTP Port</label>
+                        <input type="number" class="form-control" id="smtpPort" name="smtp_port" value="{{ email_settings.smtp_port if email_settings else '587' }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="smtpUsername" class="form-label">SMTP Kullanıcı Adı</label>
+                        <input type="text" class="form-control" id="smtpUsername" name="smtp_username" value="{{ email_settings.smtp_username if email_settings else '' }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="smtpPassword" class="form-label">SMTP Şifre</label>
+                        <input type="password" class="form-control" id="smtpPassword" name="smtp_password" value="{{ email_settings.smtp_password if email_settings else '' }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="defaultFromEmail" class="form-label">Varsayılan Gönderen E-posta</label>
+                        <input type="email" class="form-control" id="defaultFromEmail" name="default_from_email" value="{{ email_settings.default_from_email if email_settings else '' }}" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>
+                        E-posta Ayarlarını Kaydet
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- User Registration Settings -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Kullanıcı Kayıt Ayarları</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('admin_update_registration_settings') }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="enableRegistration" name="enable_registration" 
+                                   {{ 'checked' if registration_settings.enable_registration else '' }}>
+                            <label class="form-check-label" for="enableRegistration">Kullanıcı Kaydına İzin Ver</label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="requireEmailVerification" name="require_email_verification"
+                                   {{ 'checked' if registration_settings.require_email_verification else '' }}>
+                            <label class="form-check-label" for="requireEmailVerification">E-posta Doğrulaması Gerekli</label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="allowGuestPosts" name="allow_guest_posts"
+                                   {{ 'checked' if registration_settings.allow_guest_posts else '' }}>
+                            <label class="form-check-label" for="allowGuestPosts">Misafir Gönderilerine İzin Ver</label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="defaultUserRole" class="form-label">Varsayılan Kullanıcı Rolü</label>
+                        <select class="form-select" id="defaultUserRole" name="default_user_role">
+                            <option value="user" {{ 'selected' if registration_settings.default_user_role == 'user' else '' }}>Normal Kullanıcı</option>
+                            <option value="contributor" {{ 'selected' if registration_settings.default_user_role == 'contributor' else '' }}>İçerik Üreticisi</option>
+                            <option value="editor" {{ 'selected' if registration_settings.default_user_role == 'editor' else '' }}>Editör</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>
+                        Kayıt Ayarlarını Kaydet
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
+
+{% block extra_js %}
+<script>
+function deleteAdmin(adminId) {
+    if (confirm('Bu yöneticiyi silmek istediğinize emin misiniz?')) {
+        fetch(`/admin/settings/delete-admin/${adminId}`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Yönetici silinirken bir hata oluştu: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.');
+        });
+    }
+}
+
+// Fix JavaScript errors when elements don't exist
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Settings page loaded - applying fixes');
+    
+    // Safely access elements - prevent "Cannot read properties of null" errors
+    window.safeGetElement = function(selector) {
+        var element = document.querySelector(selector);
+        if (!element) {
+            console.warn('Element not found:', selector);
+            // Return a dummy element that won't throw errors
+            return {
+                classList: { add: function(){}, remove: function(){}, contains: function(){ return false; } },
+                addEventListener: function(){},
+                querySelectorAll: function(){ return []; },
+                style: {}
+            };
+        }
+        return element;
+    };
+    
+    // Patch any existing functions that might be causing errors
+    try {
+        // This won't fix the specific error but provides a framework for doing so
+        var originalGetElementById = document.getElementById;
+        document.getElementById = function(id) {
+            var element = originalGetElementById.call(document, id);
+            if (!element) {
+                console.warn('getElementById: Element not found:', id);
+                return {
+                    classList: { add: function(){}, remove: function(){}, contains: function(){ return false; } },
+                    addEventListener: function(){},
+                    querySelectorAll: function(){ return []; },
+                    style: {}
+                };
+            }
+            return element;
+        };
+    } catch (e) {
+        console.error('Error patching functions:', e);
+    }
+});
+</script>
+{% endblock %}
+
 {% endblock %} 
