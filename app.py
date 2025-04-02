@@ -712,7 +712,14 @@ def admin_new_video():
             description = request.form.get('description')
             url = request.form.get('url')
             thumbnail_url = request.form.get('thumbnail_url')
-            category_id = int(request.form.get('category_id')) if request.form.get('category_id') else None
+            # Safer category_id handling
+            category_id_str = request.form.get('category_id')
+            category_id = int(category_id_str) if category_id_str and category_id_str.isdigit() else None
+            
+            # Validate required fields (optional but good practice)
+            if not title or not url:
+                flash('Başlık ve URL alanları zorunludur.', 'danger')
+                return render_template('admin/new_video.html', categories=categories)
             
             # Create new video
             new_video = Video(
@@ -734,7 +741,7 @@ def admin_new_video():
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Admin new video error: {str(e)}")
-        flash('Video eklenirken bir hata oluştu!', 'danger')
+        flash('Video eklenirken bir hata oluştu! Detaylar için logları kontrol edin.', 'danger') # Added more detail to flash
         return redirect(url_for('admin_videos'))
 
 @app.route('/admin')
