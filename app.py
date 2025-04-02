@@ -105,6 +105,7 @@ class Post(db.Model):
     content = db.Column(db.Text, nullable=False)
     excerpt = db.Column(db.Text)
     image = db.Column(db.String(200))
+    author = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
     views = db.Column(db.Integer, default=0)
@@ -417,6 +418,7 @@ def admin_new_post():
             published = request.form.get('published') == 'on'
             featured = request.form.get('featured') == 'on'
             image = request.files.get('image')
+            author = request.form.get('author')
             
             if not title or not content:
                 flash('Başlık ve içerik alanları zorunludur.', 'danger')
@@ -429,7 +431,8 @@ def admin_new_post():
                 category_id=int(category_id) if category_id else None,
                 excerpt=excerpt,
                 published=published,
-                featured=featured
+                featured=featured,
+                author=author
             )
             
             # Handle image upload
@@ -477,6 +480,7 @@ def admin_edit_post(post_id):
             featured = request.form.get('featured') == 'on'
             image = request.files.get('image')
             remove_image = request.form.get('remove_image') == 'on'
+            author = request.form.get('author')
             
             if not title or not content:
                 flash('Başlık ve içerik alanları zorunludur.', 'danger')
@@ -489,6 +493,7 @@ def admin_edit_post(post_id):
             post.excerpt = excerpt
             post.published = published
             post.featured = featured
+            post.author = author
             
             # Handle image
             if remove_image and post.image:

@@ -37,11 +37,18 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             
             <div class="row mb-3">
-                <div class="col-md-8">
+                <div class="col-md-6">
                     <label for="title" class="form-label required-field">Başlık</label>
                     <input type="text" class="form-control" id="title" name="title" value="{{ post.title if post else '' }}" required>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-6">
+                    <label for="author" class="form-label">Yazar</label>
+                    <input type="text" class="form-control" id="author" name="author" value="{{ post.author if post else '' }}">
+                </div>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-md-12">
                     <label for="category_id" class="form-label">Kategori</label>
                     <select class="form-select" id="category_id" name="category_id">
                         <option value="">Kategori Seçin</option>
