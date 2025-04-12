@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, Response
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, Response, make_response
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_wtf import FlaskForm, CSRFProtect
 from flask_ckeditor import CKEditor, CKEditorField
@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from flask_wtf.csrf import validate_csrf
 from supabase import create_client, Client
 from bs4 import BeautifulSoup
+import pytz
 
 # Load environment variables
 load_dotenv()
@@ -314,6 +315,17 @@ def video_thumbnail_url_filter(video):
         return url_for('static', filename=f'uploads/{video.thumbnail_url}')
     # Provide a default video thumbnail
     return url_for('static', filename='uploads/default_video_thumb.png')
+
+@app.template_filter('rss_date_format')
+def rss_date_format(dt):
+    """Format datetime object for RSS feed."""
+    if dt:
+        # Use Turkey timezone (UTC+3)
+        turkey_tz = pytz.timezone('Europe/Istanbul')
+        if dt.tzinfo is None:
+            dt = turkey_tz.localize(dt)
+        return dt.strftime('%a, %d %b %Y %H:%M:%S %z')
+    return ''
 
 # Routes
 @app.route('/')
@@ -1617,66 +1629,19 @@ def sync_admin_user(user):
 
 @app.route('/feed')
 def feed():
-    """Generate RSS feed for the site."""
-    try:
-        # Get the latest posts
-        posts = Post.query.filter_by(published=True).order_by(Post.created_at.desc()).limit(20).all()
-        
-        # Build the RSS XML
-        rss_xml = '<?xml version="1.0" encoding="UTF-8" ?>\n'
-        rss_xml += '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">\n'
-        rss_xml += '  <channel>\n'
-        rss_xml += f'    <title>HepsiHikaye</title>\n'
-        rss_xml += f'    <link>https://hepsihikaye.net</link>\n'
-        rss_xml += f'    <description>Kafamızda Çok Kuruyoruz</description>\n'
-        rss_xml += f'    <language>tr-tr</language>\n'
-        rss_xml += f'    <lastBuildDate>{datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0000")}</lastBuildDate>\n'
-        rss_xml += f'    <atom:link href="https://hepsihikaye.net/feed" rel="self" type="application/rss+xml" />\n'
-        
-        # Add items (posts)
-        for post in posts:
-            # Clean up content for RSS
-            content = post.content
-            
-            # Create proper image URL
-            image_url = ''
-            if post.image:
-                # Determine if image is from Supabase or local
-                if post.image.startswith('http'):
-                    image_url = post.image
-                else:
-                    image_url = f"https://hepsihikaye.net/static/uploads/{post.image}"
-            
-            # Format publication date
-            pub_date = post.created_at.strftime("%a, %d %b %Y %H:%M:%S +0000") if post.created_at else datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0000")
-            
-            # Generate excerpt if needed
-            excerpt = post.excerpt or (BeautifulSoup(post.content, 'html.parser').get_text()[:150] + '...') if post.content else ''
-            
-            # Add post to feed
-            rss_xml += '    <item>\n'
-            rss_xml += f'      <title>{post.title}</title>\n'
-            rss_xml += f'      <link>https://hepsihikaye.net/post/{post.id}</link>\n'
-            rss_xml += f'      <guid>https://hepsihikaye.net/post/{post.id}</guid>\n'
-            rss_xml += f'      <pubDate>{pub_date}</pubDate>\n'
-            if post.author:
-                rss_xml += f'      <author>{post.author}</author>\n'
-            if post.category:
-                rss_xml += f'      <category>{post.category.name}</category>\n'
-            rss_xml += f'      <description><![CDATA[{excerpt}]]></description>\n'
-            if image_url:
-                rss_xml += f'      <enclosure url="{image_url}" type="image/jpeg" />\n'
-            rss_xml += f'      <content:encoded><![CDATA[{content}]]></content:encoded>\n'
-            rss_xml += '    </item>\n'
-        
-        rss_xml += '  </channel>\n'
-        rss_xml += '</rss>'
-        
-        # Return as XML
-        return Response(rss_xml, mimetype='application/rss+xml')
-    except Exception as e:
-        app.logger.error(f"RSS Feed error: {str(e)}")
-        return render_template('errors/500.html')
+    posts = Post.query.filter_by(published=True).order_by(Post.created_at.desc()).limit(20).all()
+    
+    # Get current time in Turkey timezone
+    turkey_tz = pytz.timezone('Europe/Istanbul')
+    now = turkey_tz.localize(datetime.now())
+    
+    feed_xml = render_template('feed.xml', 
+                              posts=posts, 
+                              site_url=request.url_root.rstrip('/'),
+                              last_build_date=rss_date_format(now))
+    response = make_response(feed_xml)
+    response.headers['Content-Type'] = 'application/rss+xml'
+    return response
 
 # Import and register mobile API
 from mobile_api import register_mobile_api

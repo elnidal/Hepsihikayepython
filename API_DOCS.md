@@ -318,6 +318,141 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
+## Feed Management
+
+### Get Admin Feed
+
+**Endpoint:** `/feed`
+**Method:** `GET`
+**Auth Required:** Yes
+
+**Query Parameters:**
+- `page` (optional): Page number (default: 1)
+- `per_page` (optional): Items per page (default: 10)
+- `category_id` (optional): Filter by category ID
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Success",
+  "data": {
+    "items": [
+      {
+        "id": 1,
+        "title": "Post Title",
+        "content": "<p>HTML content of the post...</p>",
+        "excerpt": "Post excerpt...",
+        "category_id": 1,
+        "category_name": "Category Name",
+        "author": "Author Name",
+        "created_at": "2025-04-02T16:11:00",
+        "views": 33,
+        "likes": 2,
+        "published": true,
+        "featured": true,
+        "image": "https://example.com/image.jpg",
+        "enclosure": {
+          "url": "https://example.com/image.jpg",
+          "type": "image/jpeg",
+          "length": 0
+        },
+        "comments_count": 5
+      }
+    ],
+    "page": 1,
+    "pages": 5,
+    "total": 100
+  }
+}
+```
+
+### Get Public Feed
+
+**Endpoint:** `/public/feed`
+**Method:** `GET`
+**Auth Required:** No
+
+**Query Parameters:**
+- `page` (optional): Page number (default: 1)
+- `per_page` (optional): Items per page (default: 10)
+- `category_id` (optional): Filter by category ID
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Success",
+  "data": {
+    "items": [
+      {
+        "id": 1,
+        "title": "Post Title",
+        "excerpt": "Post excerpt...",
+        "category_id": 1,
+        "category_name": "Category Name",
+        "author": "Author Name",
+        "created_at": "2025-04-02T16:11:00",
+        "views": 33,
+        "likes": 2,
+        "image": "https://example.com/image.jpg",
+        "enclosure": {
+          "url": "https://example.com/image.jpg",
+          "type": "image/jpeg",
+          "length": 0
+        },
+        "comments_count": 5
+      }
+    ],
+    "page": 1,
+    "pages": 5,
+    "total": 100
+  }
+}
+```
+
+### Get Public Post Detail
+
+**Endpoint:** `/public/post/{post_id}`
+**Method:** `GET`
+**Auth Required:** No
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Success",
+  "data": {
+    "id": 1,
+    "title": "Post Title",
+    "content": "<p>HTML content of the post...</p>",
+    "excerpt": "Post excerpt",
+    "category_id": 1,
+    "category_name": "Category Name",
+    "author": "Author Name",
+    "created_at": "2025-04-02T16:11:00",
+    "views": 34,
+    "likes": 2,
+    "dislikes": 0,
+    "image": "https://example.com/image.jpg",
+    "enclosure": {
+      "url": "https://example.com/image.jpg",
+      "type": "image/jpeg",
+      "length": 0
+    },
+    "comments": [
+      {
+        "id": 1,
+        "content": "Comment text",
+        "name": "Commenter Name",
+        "created_at": "2025-04-03T12:30:00",
+        "status": "approved"
+      }
+    ]
+  }
+}
+```
+
 ## Statistics
 
 ### Get Overview Statistics
@@ -383,6 +518,20 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
+## Standard RSS Feed
+
+In addition to the API endpoints, a standard RSS feed is available at:
+
+**URL:** `https://hepsihikaye.net/feed`
+
+This feed follows the RSS 2.0 specification and includes:
+- Enclosure tags for images
+- Full article content in content:encoded tags
+- Proper category tags
+- Consistent date formats
+
+This is useful for RSS readers and other applications that can consume standard RSS feeds.
+
 ## Error Responses
 
 All error responses follow this format:
@@ -407,4 +556,6 @@ Common HTTP status codes:
 2. Implement token refresh logic when tokens expire
 3. Handle network errors gracefully with appropriate user messaging
 4. Use proper error handling and loading states in the UI
-5. Consider implementing offline capabilities for content editing 
+5. Consider implementing offline capabilities for content editing
+6. For the reader app, use the `/public/feed` and `/public/post/{post_id}` endpoints
+7. For the admin app, use the authenticated endpoints 

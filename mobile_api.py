@@ -429,6 +429,128 @@ def mobile_upload_media(current_user):
         logger.error(f"Upload error: {e}")
         return api_response(message=f"Upload failed: {str(e)}", status=500)
 
+@mobile_api.route('/feed', methods=['GET'])
+@token_required
+def mobile_get_feed(current_user):
+    """Get the latest posts in a format optimized for the iOS app."""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    category_id = request.args.get('category_id', type=int)
+    
+    query = Post.query.filter_by(published=True)
+    
+    if category_id:
+        query = query.filter_by(category_id=category_id)
+    
+    posts = query.order_by(Post.created_at.desc()).paginate(page=page, per_page=per_page)
+    
+    result = {
+        'items': [{
+            'id': post.id,
+            'title': post.title,
+            'content': post.content,
+            'excerpt': post.excerpt or (BeautifulSoup(post.content, 'html.parser').get_text()[:150] + '...' if len(BeautifulSoup(post.content, 'html.parser').get_text()) > 150 else BeautifulSoup(post.content, 'html.parser').get_text()),
+            'category_id': post.category_id,
+            'category_name': post.category.name if post.category else None,
+            'author': post.author,
+            'created_at': post.created_at.isoformat(),
+            'views': post.views,
+            'likes': post.likes,
+            'published': post.published,
+            'featured': post.featured,
+            'image': post.image,
+            'enclosure': {
+                'url': post.image if post.image and post.image.startswith('http') else f"{request.url_root.rstrip('/')}/static/uploads/{post.image}" if post.image else None,
+                'type': 'image/jpeg',
+                'length': 0
+            } if post.image else None,
+            'comments_count': len(post.comments) if hasattr(post, 'comments') else 0
+        } for post in posts.items],
+        'page': posts.page,
+        'pages': posts.pages,
+        'total': posts.total
+    }
+    
+    return api_response(result)
+
+@mobile_api.route('/public/feed', methods=['GET'])
+def mobile_get_public_feed():
+    """Get the latest public posts for the iOS app without requiring authentication."""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    category_id = request.args.get('category_id', type=int)
+    
+    query = Post.query.filter_by(published=True)
+    
+    if category_id:
+        query = query.filter_by(category_id=category_id)
+    
+    posts = query.order_by(Post.created_at.desc()).paginate(page=page, per_page=per_page)
+    
+    result = {
+        'items': [{
+            'id': post.id,
+            'title': post.title,
+            'excerpt': post.excerpt or (BeautifulSoup(post.content, 'html.parser').get_text()[:150] + '...' if len(BeautifulSoup(post.content, 'html.parser').get_text()) > 150 else BeautifulSoup(post.content, 'html.parser').get_text()),
+            'category_id': post.category_id,
+            'category_name': post.category.name if post.category else None,
+            'author': post.author,
+            'created_at': post.created_at.isoformat(),
+            'views': post.views,
+            'likes': post.likes,
+            'image': post.image,
+            'enclosure': {
+                'url': post.image if post.image and post.image.startswith('http') else f"{request.url_root.rstrip('/')}/static/uploads/{post.image}" if post.image else None,
+                'type': 'image/jpeg',
+                'length': 0
+            } if post.image else None,
+            'comments_count': len(post.comments) if hasattr(post, 'comments') else 0
+        } for post in posts.items],
+        'page': posts.page,
+        'pages': posts.pages,
+        'total': posts.total
+    }
+    
+    return api_response(result)
+
+@mobile_api.route('/public/post/<int:post_id>', methods=['GET'])
+def mobile_get_public_post(post_id):
+    """Get a single public post with full content without requiring authentication."""
+    post = Post.query.filter_by(id=post_id, published=True).first_or_404()
+    
+    # Increment view count
+    post.views += 1
+    db.session.commit()
+    
+    result = {
+        'id': post.id,
+        'title': post.title,
+        'content': post.content,
+        'excerpt': post.excerpt,
+        'category_id': post.category_id,
+        'category_name': post.category.name if post.category else None,
+        'author': post.author,
+        'created_at': post.created_at.isoformat(),
+        'views': post.views,
+        'likes': post.likes,
+        'dislikes': post.dislikes,
+        'image': post.image,
+        'enclosure': {
+            'url': post.image if post.image and post.image.startswith('http') else f"{request.url_root.rstrip('/')}/static/uploads/{post.image}" if post.image else None,
+            'type': 'image/jpeg',
+            'length': 0
+        } if post.image else None,
+        'comments': [{
+            'id': comment.id,
+            'content': comment.content,
+            'name': comment.name,
+            'created_at': comment.created_at.isoformat(),
+            'status': comment.status
+        } for comment in post.comments if comment.status == 'approved']
+    }
+    
+    return api_response(result)
+
 # Register the blueprint with the app
 def register_mobile_api(app):
     app.register_blueprint(mobile_api)
