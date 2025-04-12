@@ -30,6 +30,14 @@
 - AJAX-based voting without page reload
 - Visual feedback for user actions
 
+### E. Mobile API
+- RESTful API for iOS app integration
+- JWT token-based authentication
+- Comprehensive endpoints for content management
+- Secure file uploads from mobile devices
+- Dashboard statistics and analytics
+- Comment moderation capabilities
+
 ## 2. User Interface
 
 ### A. Navigation
@@ -57,12 +65,14 @@
 - Secure login system
 - Protected admin routes
 - Session management
+- JWT token-based authentication for mobile
 
 ### B. Content Management
 - Admin dashboard
 - Post creation interface
 - Post editing capabilities
 - Image upload management
+- Mobile admin interface via iOS app
 
 ## 4. Technical Implementation
 
@@ -75,6 +85,13 @@
 @app.route('/post/<int:post_id>/rate/<action>')  # Rating system
 @app.route('/upload')  # Image upload
 @app.route('/admin')  # Admin dashboard
+
+# API Routes
+@mobile_api.route('/api/v1/auth/login', methods=['POST'])  # Mobile authentication
+@mobile_api.route('/api/v1/posts', methods=['GET', 'POST'])  # Post management
+@mobile_api.route('/api/v1/posts/<int:post_id>', methods=['GET', 'PUT', 'DELETE'])  # Single post operations
+@mobile_api.route('/api/v1/comments', methods=['GET'])  # Comment management
+@mobile_api.route('/api/v1/stats/overview', methods=['GET'])  # Statistics
 
 # Database Models
 class Post(db.Model)  # Post management
@@ -113,31 +130,39 @@ Rating Table:
 - IP-based vote tracking
 - Admin authentication
 - Error handling and logging
+- JWT token security for mobile API
+- Token refresh mechanism
+- Secure API endpoints
 
 ## 6. Performance Optimizations
 - Image optimization
 - Database indexing
 - Efficient queries
 - Caching mechanisms
+- Optimized API responses for mobile
 
 ## 7. Deployment
 - Render deployment configuration
 - Production environment settings
 - Static file serving
 - Database management
+- API endpoint security
 
 ## 8. Error Handling
 - Custom error pages
 - Logging system
 - User-friendly error messages
 - Graceful fallbacks
+- Structured API error responses
 
 ## Project Structure
 ```
 project/
 ├── app.py                 # Main application file
+├── mobile_api.py         # Mobile API endpoints
 ├── requirements.txt       # Dependencies
 ├── render.yaml           # Deployment configuration
+├── API_DOCS.md           # Mobile API documentation
 ├── static/
 │   ├── css/
 │   │   └── style.css    # Custom styles
@@ -159,6 +184,9 @@ project/
 3. Activated like/dislike functionality
 4. Added real-time vote updates
 5. Improved error handling and user feedback
+6. Added Mobile API for iOS app integration
+7. Implemented secure JWT authentication for mobile
+8. Created comprehensive API documentation
 
 ## Summary
 The website is now a fully functional content management system with:
@@ -168,5 +196,6 @@ The website is now a fully functional content management system with:
 - Robust error handling
 - Secure implementation
 - Production-ready deployment
+- Mobile API for iOS app integration
 
 All these features work together to create a modern, user-friendly platform for sharing and engaging with written content. The system is also easily extensible for future features and improvements.

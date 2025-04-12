@@ -1678,6 +1678,10 @@ def feed():
         app.logger.error(f"RSS Feed error: {str(e)}")
         return render_template('errors/500.html')
 
+# Import and register mobile API
+from mobile_api import register_mobile_api
+register_mobile_api(app)
+
 if __name__ == '__main__':
     # Create required directories
     for directory in ['static/uploads', 'static/logs']:

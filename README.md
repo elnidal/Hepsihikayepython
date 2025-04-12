@@ -12,6 +12,7 @@ A modern blog platform for sharing stories, poems, and literary content.
 - Modern UI with smooth transitions
 - SEO-friendly URLs
 - YouTube video integration
+- Mobile API for iOS app integration
 
 ## Technical Stack
 
@@ -22,6 +23,7 @@ A modern blog platform for sharing stories, poems, and literary content.
 - CKEditor for rich text editing
 - PIL for image processing
 - Bootstrap for styling
+- JWT for mobile API authentication
 
 ## Installation
 
@@ -87,10 +89,22 @@ python -c "from app import db, User; user = User.query.filter_by(username='admin
 ## Project Structure
 
 - `app.py` - Main application file
+- `mobile_api.py` - Mobile API endpoints for iOS app
 - `templates/` - HTML templates
 - `static/` - Static files (CSS, JS, images)
 - `instance/` - Instance-specific files (database)
 - `requirements.txt` - Python dependencies
+- `API_DOCS.md` - Mobile API documentation
+
+## Mobile API
+
+The platform includes a RESTful API for mobile app integration:
+
+- JWT token-based authentication
+- Endpoints for posts, categories, comments, and media
+- Comprehensive documentation in API_DOCS.md
+
+This allows for building mobile applications like an iOS admin app to manage content on the go.
 
 ## Deployment
 
