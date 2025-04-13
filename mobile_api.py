@@ -161,7 +161,8 @@ def mobile_get_post(current_user, post_id):
         'excerpt': post.excerpt,
         'category_id': post.category_id,
         'category_name': post.category.name if post.category else None,
-        'author': post.author,
+        'author_id': post.author_id,
+        'author_username': post.author_relationship.username if post.author_relationship else None,
         'created_at': post.created_at.isoformat(),
         'updated_at': post.updated_at.isoformat() if post.updated_at else None,
         'views': post.views,
@@ -194,25 +195,26 @@ def mobile_create_post(current_user):
         category = Category.query.get(category_id)
         if not category:
             return api_response(message="Invalid category", status=400)
+            
+    # Get author_id from request, assuming it might be passed
+    # Or potentially default to the current_user if that makes sense for your API auth
+    author_id = data.get('author_id') 
     
     post = Post(
         title=data.get('title'),
         content=data.get('content'),
         excerpt=data.get('excerpt'),
-        author=data.get('author'),
         category_id=category_id,
         published=data.get('published', True),
         featured=data.get('featured', False),
-        image=data.get('image')
+        author_id=author_id, # Use the new author_id
+        image=data.get('image') # Assuming image URL might be passed
     )
     
     db.session.add(post)
     db.session.commit()
     
-    return api_response({
-        'id': post.id,
-        'title': post.title
-    }, message="Post created successfully")
+    return api_response({'id': post.id, 'title': post.title}, status=201, message="Post created successfully")
 
 @mobile_api.route('/posts/<int:post_id>', methods=['PUT'])
 @token_required
@@ -220,39 +222,32 @@ def mobile_update_post(current_user, post_id):
     post = Post.query.get_or_404(post_id)
     data = request.get_json()
     
-    if 'title' in data:
-        post.title = data['title']
-    
-    if 'content' in data:
-        post.content = data['content']
-    
-    if 'excerpt' in data:
-        post.excerpt = data['excerpt']
-    
-    if 'author' in data:
-        post.author = data['author']
-    
+    if not data:
+        return api_response(message="Request body cannot be empty", status=400)
+        
+    # Update fields if present in the request
+    if 'title' in data: post.title = data['title']
+    if 'content' in data: post.content = data['content']
+    if 'excerpt' in data: post.excerpt = data['excerpt']
     if 'category_id' in data:
-        category = Category.query.get(data['category_id'])
-        if not category:
-            return api_response(message="Invalid category", status=400)
-        post.category_id = data['category_id']
-    
-    if 'published' in data:
-        post.published = data['published']
-    
-    if 'featured' in data:
-        post.featured = data['featured']
-    
-    if 'image' in data:
-        post.image = data['image']
+        category_id = data['category_id']
+        if category_id:
+             category = Category.query.get(category_id)
+             if not category:
+                 return api_response(message="Invalid category", status=400)
+             post.category_id = category_id
+        else:
+             post.category_id = None
+             
+    if 'published' in data: post.published = data['published']
+    if 'featured' in data: post.featured = data['featured']
+    # Update author_id if provided
+    if 'author_id' in data: post.author_id = data['author_id']
+    if 'image' in data: post.image = data['image'] # Assuming image URL might be passed
     
     db.session.commit()
     
-    return api_response({
-        'id': post.id,
-        'title': post.title
-    }, message="Post updated successfully")
+    return api_response({'id': post.id, 'title': post.title}, message="Post updated successfully")
 
 @mobile_api.route('/posts/<int:post_id>', methods=['DELETE'])
 @token_required
@@ -446,26 +441,21 @@ def mobile_get_feed(current_user):
     
     result = {
         'items': [{
-            'id': post.id,
-            'title': post.title,
-            'content': post.content,
-            'excerpt': post.excerpt or (BeautifulSoup(post.content, 'html.parser').get_text()[:150] + '...' if len(BeautifulSoup(post.content, 'html.parser').get_text()) > 150 else BeautifulSoup(post.content, 'html.parser').get_text()),
-            'category_id': post.category_id,
-            'category_name': post.category.name if post.category else None,
-            'author': post.author,
-            'created_at': post.created_at.isoformat(),
-            'views': post.views,
-            'likes': post.likes,
-            'published': post.published,
-            'featured': post.featured,
-            'image': post.image,
-            'enclosure': {
-                'url': post.image if post.image and post.image.startswith('http') else f"{request.url_root.rstrip('/')}/static/uploads/{post.image}" if post.image else None,
-                'type': 'image/jpeg',
-                'length': 0
-            } if post.image else None,
-            'comments_count': len(post.comments) if hasattr(post, 'comments') else 0
-        } for post in posts.items],
+            'id': item.id,
+            'type': 'post' if isinstance(item, Post) else 'video',
+            'title': item.title,
+            'excerpt': getattr(item, 'excerpt', None) or (BeautifulSoup(getattr(item, 'content', ''), 'html.parser').get_text()[:150] + '...' if len(BeautifulSoup(getattr(item, 'content', ''), 'html.parser').get_text()) > 150 else BeautifulSoup(getattr(item, 'content', ''), 'html.parser').get_text()),
+            'category_id': item.category_id,
+            'category_name': item.category.name if item.category else None,
+            'created_at': item.created_at.isoformat(),
+            'views': getattr(item, 'views', 0),
+            'likes': getattr(item, 'likes', 0),
+            'published': item.published,
+            'featured': getattr(item, 'featured', False),
+            'image': getattr(item, 'image', None),
+            'author_id': getattr(item, 'author_id', None) if isinstance(item, Post) else None,
+            'author_username': getattr(item.author_relationship, 'username', None) if isinstance(item, Post) and hasattr(item, 'author_relationship') else None
+        } for item in posts.items],
         'page': posts.page,
         'pages': posts.pages,
         'total': posts.total
@@ -489,23 +479,21 @@ def mobile_get_public_feed():
     
     result = {
         'items': [{
-            'id': post.id,
-            'title': post.title,
-            'excerpt': post.excerpt or (BeautifulSoup(post.content, 'html.parser').get_text()[:150] + '...' if len(BeautifulSoup(post.content, 'html.parser').get_text()) > 150 else BeautifulSoup(post.content, 'html.parser').get_text()),
-            'category_id': post.category_id,
-            'category_name': post.category.name if post.category else None,
-            'author': post.author,
-            'created_at': post.created_at.isoformat(),
-            'views': post.views,
-            'likes': post.likes,
-            'image': post.image,
-            'enclosure': {
-                'url': post.image if post.image and post.image.startswith('http') else f"{request.url_root.rstrip('/')}/static/uploads/{post.image}" if post.image else None,
-                'type': 'image/jpeg',
-                'length': 0
-            } if post.image else None,
-            'comments_count': len(post.comments) if hasattr(post, 'comments') else 0
-        } for post in posts.items],
+            'id': item.id,
+            'type': 'post' if isinstance(item, Post) else 'video',
+            'title': item.title,
+            'excerpt': getattr(item, 'excerpt', None) or (BeautifulSoup(getattr(item, 'content', ''), 'html.parser').get_text()[:150] + '...' if len(BeautifulSoup(getattr(item, 'content', ''), 'html.parser').get_text()) > 150 else BeautifulSoup(getattr(item, 'content', ''), 'html.parser').get_text()),
+            'category_id': item.category_id,
+            'category_name': item.category.name if item.category else None,
+            'created_at': item.created_at.isoformat(),
+            'views': getattr(item, 'views', 0),
+            'likes': getattr(item, 'likes', 0),
+            'published': item.published,
+            'featured': getattr(item, 'featured', False),
+            'image': getattr(item, 'image', None),
+            'author_id': getattr(item, 'author_id', None) if isinstance(item, Post) else None,
+            'author_username': getattr(item.author_relationship, 'username', None) if isinstance(item, Post) and hasattr(item, 'author_relationship') else None
+        } for item in posts.items],
         'page': posts.page,
         'pages': posts.pages,
         'total': posts.total
@@ -529,8 +517,10 @@ def mobile_get_public_post(post_id):
         'excerpt': post.excerpt,
         'category_id': post.category_id,
         'category_name': post.category.name if post.category else None,
-        'author': post.author,
+        'author_id': post.author_id,
+        'author_username': post.author_relationship.username if post.author_relationship else None,
         'created_at': post.created_at.isoformat(),
+        'updated_at': post.updated_at.isoformat() if post.updated_at else None,
         'views': post.views,
         'likes': post.likes,
         'dislikes': post.dislikes,

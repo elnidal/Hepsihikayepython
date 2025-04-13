@@ -19,8 +19,8 @@
       <guid isPermaLink="true">{{ site_url }}/post/{{ post.id }}</guid>
       <pubDate>{{ post.created_at|rss_date_format }}</pubDate>
       
-      {% if post.author %}
-      <dc:creator>{{ post.author }}</dc:creator>
+      {% if post.author_relationship %}
+      <dc:creator>{{ post.author_relationship.username }}</dc:creator>
       {% endif %}
       
       {% if post.category %}

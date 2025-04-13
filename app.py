@@ -170,7 +170,6 @@ class Post(db.Model):
     content = db.Column(db.Text, nullable=False)
     excerpt = db.Column(db.Text)
     image = db.Column(db.String(200))
-    author = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
     views = db.Column(db.Integer, default=0)
@@ -180,6 +179,10 @@ class Post(db.Model):
     featured = db.Column(db.Boolean, default=False)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'))
     comments = db.relationship('Comment', backref='post', lazy=True, cascade="all, delete-orphan")
+    
+    # Add the new foreign key and relationship
+    author_id = db.Column(db.Integer, db.ForeignKey('admin_users.id'), nullable=True)
+    author_relationship = db.relationship('AdminUser', backref=db.backref('posts', lazy='dynamic'))
 
 class Video(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -296,12 +299,15 @@ def format_datetime_filter(dt):
 
 @app.template_filter('post_image_url')
 def post_image_url_filter(post):
-    if hasattr(post, 'image') and post.image:
+    # Check if post object exists and has an image attribute
+    image_attr = getattr(post, 'image', None)
+    if image_attr:
         # If the image is already a full URL (from Supabase), return it directly
-        if post.image.startswith('http'):
-            return post.image
+        if image_attr.startswith('http'):
+            return image_attr
         # Otherwise, treat it as a local file
-        return url_for('static', filename=f'uploads/{post.image}')
+        return url_for('static', filename=f'uploads/{image_attr}')
+    # Use default image if post has no image or image attribute doesn't exist
     return url_for('static', filename='uploads/default_post_image.png')
 
 @app.template_filter('video_thumbnail_url')
@@ -522,6 +528,8 @@ def admin_posts():
 def admin_new_post():
     try:
         categories = Category.query.all()
+        # Fetch admin users for the author dropdown
+        admin_users = AdminUser.query.all() 
         
         if request.method == 'POST':
             title = request.form.get('title')
@@ -531,13 +539,16 @@ def admin_new_post():
             published = request.form.get('published') == 'on'
             featured = request.form.get('featured') == 'on'
             image = request.files.get('image')
-            author = request.form.get('author')
+            # Get author_id from the form's select dropdown
+            author_id_str = request.form.get('author_id')
+            author_id = int(author_id_str) if author_id_str else None # Handle empty selection
             
             if not title or not content:
                 flash('Başlık ve içerik alanları zorunludur.', 'danger')
-                return render_template('admin/post_form.html', categories=categories)
+                # Pass admin_users back to the template on error
+                return render_template('admin/post_form.html', categories=categories, admin_users=admin_users) 
             
-            # Create new post
+            # Create new post using author_id
             new_post = Post(
                 title=title,
                 content=content,
@@ -545,7 +556,7 @@ def admin_new_post():
                 excerpt=excerpt,
                 published=published,
                 featured=featured,
-                author=author
+                author_id=author_id # Use the new author_id field
             )
             
             # Handle image upload
@@ -595,11 +606,19 @@ def admin_new_post():
             flash('Hikaye başarıyla eklendi!', 'success')
             return redirect(url_for('admin_posts'))
         
-        return render_template('admin/post_form.html', categories=categories)
+        # Pass admin_users to the template for the GET request
+        return render_template('admin/post_form.html', categories=categories, admin_users=admin_users) 
     except Exception as e:
+        db.session.rollback() # Rollback in case of error during commit
         app.logger.error(f"Admin new post error: {str(e)}")
         flash('Hikaye eklenirken bir hata oluştu!', 'danger')
-        return render_template('admin/post_form.html', categories=categories)
+        # Fetch admin_users again if error occurs before initial fetch
+        try:
+             admin_users = AdminUser.query.all()
+        except:
+             admin_users = [] # Avoid crashing if DB error persists
+        categories = Category.query.all() # Also refetch categories
+        return render_template('admin/post_form.html', categories=categories, admin_users=admin_users)
 
 @app.route('/admin/posts/<int:post_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -607,6 +626,8 @@ def admin_edit_post(post_id):
     try:
         post = Post.query.get_or_404(post_id)
         categories = Category.query.all()
+        # Fetch admin users for the author dropdown
+        admin_users = AdminUser.query.all() 
         
         if request.method == 'POST':
             title = request.form.get('title')
@@ -617,11 +638,14 @@ def admin_edit_post(post_id):
             featured = request.form.get('featured') == 'on'
             image = request.files.get('image')
             remove_image = request.form.get('remove_image') == 'on'
-            author = request.form.get('author')
+            # Get author_id from the form's select dropdown
+            author_id_str = request.form.get('author_id')
+            author_id = int(author_id_str) if author_id_str else None # Handle empty selection
             
             if not title or not content:
                 flash('Başlık ve içerik alanları zorunludur.', 'danger')
-                return render_template('admin/post_form.html', post=post, categories=categories)
+                 # Pass admin_users back to the template on error
+                return render_template('admin/post_form.html', post=post, categories=categories, admin_users=admin_users)
             
             # Update post data
             post.title = title
@@ -630,7 +654,7 @@ def admin_edit_post(post_id):
             post.excerpt = excerpt
             post.published = published
             post.featured = featured
-            post.author = author
+            post.author_id = author_id # Use the new author_id field
             
             # Handle image
             if remove_image and post.image:
@@ -682,8 +706,10 @@ def admin_edit_post(post_id):
             flash('Hikaye başarıyla güncellendi!', 'success')
             return redirect(url_for('admin_posts'))
         
-        return render_template('admin/post_form.html', post=post, categories=categories)
+         # Pass admin_users to the template for the GET request
+        return render_template('admin/post_form.html', post=post, categories=categories, admin_users=admin_users)
     except Exception as e:
+        db.session.rollback() # Rollback in case of error during commit
         app.logger.error(f"Admin edit post error: {str(e)}")
         flash('Hikaye düzenlenirken bir hata oluştu!', 'danger')
         return redirect(url_for('admin_posts'))

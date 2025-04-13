@@ -42,8 +42,15 @@
                     <input type="text" class="form-control" id="title" name="title" value="{{ post.title if post else '' }}" required>
                 </div>
                 <div class="col-md-6">
-                    <label for="author" class="form-label">Yazar</label>
-                    <input type="text" class="form-control" id="author" name="author" value="{{ post.author if post else '' }}">
+                    <label for="author_id" class="form-label">Yazar</label>
+                    <select class="form-select" id="author_id" name="author_id">
+                        <option value="">Yazar Seçin (Opsiyonel)</option>
+                        {% for user in admin_users %}
+                            <option value="{{ user.id }}" {{ 'selected' if post and post.author_id == user.id else '' }}>
+                                {{ user.username }} (ID: {{ user.id }})
+                            </option>
+                        {% endfor %}
+                    </select>
                 </div>
             </div>
             
@@ -74,7 +81,7 @@
                     
                     {% if post and post.image %}
                         <div class="mt-2">
-                            <img src="{{ url_for('static', filename='uploads/' + post.image) }}" alt="{{ post.title }}" class="image-preview">
+                            <img src="{{ post_image_url_filter(post) }}" alt="{{ post.title }}" class="image-preview">
                             <div class="form-check mt-2">
                                 <input class="form-check-input" type="checkbox" id="remove_image" name="remove_image">
                                 <label class="form-check-label" for="remove_image">
